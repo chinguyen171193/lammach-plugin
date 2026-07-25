@@ -1,0 +1,855 @@
+.dat-pcb-tracer-app {
+	--dat-bg: #10151c;
+	--dat-panel: #18212b;
+	--dat-panel-2: #202b37;
+	--dat-line: #334353;
+	--dat-text: #eef4f7;
+	--dat-muted: #9eb0bd;
+	--dat-accent: #ffb23e;
+	background: linear-gradient(135deg, #10151c 0%, #17222c 55%, #26301f 100%);
+	color: var(--dat-text);
+	border: 1px solid var(--dat-line);
+	min-height: 760px;
+	font-family: "Segoe UI", Tahoma, sans-serif;
+}
+.dat-pcb-tracer-shortcode-wrap {
+	position: fixed !important;
+	inset: 0 !important;
+	z-index: 2147483000 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	max-width: none !important;
+	max-height: none !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	overflow: hidden !important;
+	background: #10151c;
+	transform: none !important;
+}
+.dat-pcb-tracer-app.dat-pcb-tracer-fullscreen {
+	width: 100vw !important;
+	height: 100vh !important;
+	min-height: 100vh !important;
+	max-width: none !important;
+	margin: 0 !important;
+	border: 0;
+	display: flex;
+	flex-direction: column;
+}
+.dat-pcb-tracer-fullscreen-active,
+.dat-pcb-tracer-fullscreen-active body {
+	margin: 0 !important;
+	overflow: hidden !important;
+}
+.dat-pcb-tracer-fullscreen .dat-pcb-toolbar {
+	position: relative;
+	top: auto;
+	flex: 0 0 auto;
+}
+.dat-pcb-tracer-fullscreen .dat-pcb-main {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+.dat-pcb-tracer-fullscreen .dat-pcb-status {
+	flex: 0 0 auto;
+}
+.dat-pcb-tracer-fullscreen .dat-pcb-canvas-panel {
+	min-height: 0;
+}
+.dat-pcb-tracer-app button,
+.dat-pcb-tracer-app input,
+.dat-pcb-tracer-app select,
+.dat-pcb-tracer-app textarea {
+	font: inherit;
+}
+.dat-pcb-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+	padding: 10px;
+	background: rgba(12, 18, 24, 0.92);
+	border-bottom: 1px solid var(--dat-line);
+	position: sticky;
+	top: 32px;
+	z-index: 3;
+}
+.dat-pcb-toolbar button,
+.dat-pcb-layers button,
+.dat-pcb-properties button,
+.dat-upload-btn {
+	background: #243241;
+	color: var(--dat-text);
+	border: 1px solid #405064;
+	border-radius: 6px;
+	padding: 6px 10px;
+	cursor: pointer;
+}
+.dat-pcb-file-menu {
+	position: relative;
+	display: inline-flex;
+}
+.dat-pcb-file-menu .dat-pcb-file-menu-button {
+	min-width: 64px;
+	font-weight: 700;
+}
+.dat-pcb-file-menu-popover {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 20;
+	min-width: 180px;
+	padding: 8px;
+	background: #16202a;
+	border: 1px solid #405064;
+	border-radius: 8px;
+	box-shadow: 0 16px 42px rgba(0,0,0,.42);
+}
+.dat-pcb-file-menu-popover[hidden] {
+	display: none !important;
+}
+.dat-pcb-file-menu-label {
+	padding: 5px 8px 7px;
+	color: var(--dat-accent);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+.dat-pcb-file-menu-popover button {
+	width: 100%;
+	text-align: left;
+	margin: 0;
+}
+.dat-pcb-toolbar button:hover,
+.dat-pcb-layers button:hover,
+.dat-pcb-properties button:hover {
+	border-color: var(--dat-accent);
+}
+.dat-pcb-toolbar .dat-pcb-user-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 44px;
+	font-weight: 700;
+}
+.dat-pcb-user-button svg {
+	width: 18px;
+	height: 18px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+.dat-pcb-user-button.is-verified {
+	border-color: rgba(76, 195, 138, .72);
+	background: rgba(76, 195, 138, .16);
+	color: #8ff0bf;
+}
+.dat-pcb-account-template[hidden] {
+	display: none !important;
+}
+.dat-pcb-account-panel {
+	display: grid;
+	gap: 12px;
+	min-width: min(420px, calc(100vw - 56px));
+}
+.dat-pcb-account-panel h2 {
+	margin: 0 0 4px;
+	color: var(--dat-accent);
+	font-size: 18px;
+}
+.dat-pcb-account-panel p {
+	margin: 0;
+}
+.dat-pcb-account-link {
+	color: #8ecbff;
+	font-weight: 700;
+	text-decoration: none;
+}
+.dat-pcb-account-link:hover {
+	text-decoration: underline;
+}
+.dat-route-mode-switch {
+	display: inline-grid;
+	grid-template-columns: repeat(4, minmax(44px, auto));
+	gap: 4px;
+	align-items: center;
+	padding: 3px;
+	border: 1px solid rgba(255,255,255,.12);
+	border-radius: 8px;
+	background: rgba(7, 12, 17, .5);
+}
+.dat-route-mode-switch button {
+	min-width: 44px;
+	padding-inline: 8px;
+}
+.dat-route-mode-switch button.is-active {
+	border-color: #ffc107;
+	background: rgba(255, 193, 7, .18);
+	color: #ffd76c;
+}
+.dat-upload-btn input {
+	display: none;
+}
+.dat-pcb-main {
+	display: grid;
+	grid-template-columns: 245px minmax(520px, 1fr) 285px;
+	height: 650px;
+}
+.dat-pcb-layers,
+.dat-pcb-properties {
+	background: rgba(24, 33, 43, 0.92);
+	border-right: 1px solid var(--dat-line);
+	padding: 12px;
+	overflow: auto;
+}
+.dat-pcb-properties {
+	border-right: 0;
+	border-left: 1px solid var(--dat-line);
+}
+.dat-pcb-layers h2,
+.dat-pcb-properties h2 {
+	color: var(--dat-accent);
+	font-size: 14px;
+	margin: 12px 0 8px;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+}
+.dat-pcb-layers label,
+.dat-pcb-properties label {
+	display: block;
+	margin: 8px 0;
+	color: var(--dat-muted);
+}
+.dat-pcb-layers input,
+.dat-pcb-layers select,
+.dat-pcb-properties input,
+.dat-pcb-properties select,
+.dat-pcb-properties textarea {
+	width: 100%;
+	box-sizing: border-box;
+	background: #101821;
+	color: var(--dat-text);
+	border: 1px solid #3b4b5d;
+	border-radius: 5px;
+	padding: 5px;
+	margin-top: 3px;
+}
+.dat-pcb-layers input[type="checkbox"] {
+	width: auto;
+}
+.dat-pcb-properties textarea {
+	min-height: 110px;
+	resize: vertical;
+}
+.dat-pcb-canvas-panel {
+	position: relative;
+	overflow: hidden;
+	background-color: #0d1218;
+	background-image: radial-gradient(circle at 20% 30%, rgba(255,178,62,.08), transparent 32%), radial-gradient(circle at 80% 10%, rgba(50,160,255,.08), transparent 26%);
+}
+#dat-pcb-tracer-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: crosshair;
+}
+#dat-pcb-tracer-canvas.is-panning {
+	cursor: grabbing;
+}
+.dat-pcb-status {
+	display: flex;
+	gap: 22px;
+	align-items: center;
+	min-height: 34px;
+	padding: 8px 12px;
+	background: #0b1117;
+	border-top: 1px solid var(--dat-line);
+	color: var(--dat-muted);
+}
+.dat-pcb-status strong {
+	color: var(--dat-text);
+}
+.dat-pcb-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(0,0,0,.58);
+	z-index: 99999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.dat-pcb-modal[hidden] {
+	display: none !important;
+}
+.dat-pcb-modal-box {
+	background: #17212c;
+	color: var(--dat-text);
+	border: 1px solid #405064;
+	box-shadow: 0 22px 70px rgba(0,0,0,.45);
+	width: min(840px, 90vw);
+	max-height: 86vh;
+	overflow: auto;
+	padding: 18px;
+	border-radius: 12px;
+}
+.dat-pcb-modal-box button {
+	margin: 4px;
+}
+.dat-modal-close {
+	float: right;
+}
+@media (max-width: 1100px) {
+	.dat-pcb-main {
+		grid-template-columns: 1fr;
+		height: auto;
+	}
+	.dat-pcb-layers,
+	.dat-pcb-properties,
+	.dat-pcb-canvas-panel {
+		min-height: 260px;
+	}
+}
+
+/* EasyEDA-like dark panels. */
+.dat-pcb-tracer-app {
+	--eda-bg: #10161d;
+	--eda-panel: rgba(24, 31, 39, .98);
+	--eda-panel-2: #202a34;
+	--eda-panel-3: #111922;
+	--eda-line: rgba(180, 197, 214, .18);
+	--eda-line-strong: rgba(180, 197, 214, .3);
+	--eda-text: #edf3f7;
+	--eda-muted: #9aaab7;
+	--eda-accent: #f7b23d;
+	--eda-blue: #3b82f6;
+}
+
+.dat-easy-panel {
+	position: fixed;
+	z-index: 2147482500;
+	display: grid;
+	grid-template-rows: auto auto auto auto minmax(0, 1fr);
+	min-width: 280px;
+	min-height: 300px;
+	border: 1px solid var(--eda-line);
+	border-radius: 10px;
+	background: var(--eda-panel);
+	box-shadow: 0 18px 46px rgba(0,0,0,.38);
+	color: var(--eda-text);
+	overflow: hidden;
+	backdrop-filter: blur(10px);
+}
+
+.dat-easy-panel.is-collapsed {
+	height: 43px !important;
+	min-height: 43px;
+	resize: none;
+}
+
+.dat-easy-panel.is-collapsed > :not(.dat-easy-panel-header) {
+	display: none !important;
+}
+
+.dat-easy-panel-header {
+	display: grid;
+	grid-template-columns: 22px minmax(0, 1fr) 34px 34px;
+	align-items: center;
+	gap: 8px;
+	min-height: 42px;
+	padding: 6px 8px 6px 10px;
+	border-bottom: 1px solid var(--eda-line);
+	background: linear-gradient(180deg, rgba(38,49,61,.98), rgba(27,36,45,.98));
+	cursor: grab;
+	user-select: none;
+	touch-action: none;
+}
+
+.dat-easy-panel-header:active {
+	cursor: grabbing;
+}
+
+.dat-easy-panel-header strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14px;
+	font-weight: 750;
+	letter-spacing: 0;
+}
+
+.dat-easy-panel-grip {
+	color: var(--eda-muted);
+	font-size: 18px;
+	line-height: 1;
+}
+
+.dat-easy-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	min-width: 30px;
+	min-height: 30px;
+	padding: 0;
+	border: 1px solid var(--eda-line);
+	border-radius: 8px;
+	background: #17212b;
+	color: var(--eda-text);
+	transition: border-color .16s ease, background .16s ease;
+}
+
+.dat-easy-icon-button:hover {
+	border-color: var(--eda-accent);
+	background: #233142;
+}
+
+.dat-easy-tabs {
+	display: flex;
+	gap: 4px;
+	padding: 7px;
+	border-bottom: 1px solid var(--eda-line);
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+.dat-easy-tabs button {
+	flex: 0 0 auto;
+	min-height: 30px;
+	padding: 0 10px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--eda-muted);
+	font-size: 12px;
+	font-weight: 700;
+	transition: color .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.dat-easy-tabs button:hover,
+.dat-easy-tabs button.is-active {
+	color: var(--eda-text);
+	border-color: var(--eda-line);
+	background: #263340;
+}
+
+.dat-easy-panel-tools {
+	padding: 8px;
+}
+
+.dat-easy-panel-tools input {
+	width: 100%;
+	height: 34px;
+	padding: 0 10px;
+	border: 1px solid var(--eda-line);
+	border-radius: 8px;
+	background: var(--eda-panel-3);
+	color: var(--eda-text);
+	outline: 0;
+}
+
+.dat-easy-panel-tools input:focus {
+	border-color: rgba(247,178,61,.7);
+	box-shadow: 0 0 0 3px rgba(247,178,61,.12);
+}
+
+.dat-easy-action-row {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 6px;
+	padding: 0 8px 8px;
+}
+
+.dat-easy-action-row button,
+.dat-easy-secondary-button {
+	min-height: 32px;
+	padding: 0 8px;
+	border: 1px solid var(--eda-line);
+	border-radius: 8px;
+	background: #233040;
+	color: var(--eda-text);
+	font-size: 12px;
+	font-weight: 700;
+	transition: border-color .16s ease, background .16s ease;
+}
+
+.dat-easy-action-row button:hover,
+.dat-easy-secondary-button:hover {
+	border-color: var(--eda-accent);
+	background: #2b3a4d;
+}
+
+.dat-easy-layer-list {
+	min-height: 0;
+	overflow: auto;
+	padding: 4px 6px 10px;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(180,197,214,.34) transparent;
+}
+
+.dat-easy-layer-row {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) 30px 30px;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 34px;
+	padding: 4px 6px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--eda-text);
+	text-align: left;
+	transition: background .16s ease, border-color .16s ease;
+}
+
+.dat-easy-layer-row:hover,
+.dat-easy-layer-row.is-active {
+	border-color: rgba(247,178,61,.34);
+	background: rgba(247,178,61,.08);
+}
+
+.dat-easy-layer-swatch {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 2px rgba(255,255,255,.08);
+}
+
+.dat-easy-layer-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+}
+
+.dat-easy-layer-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 7px;
+	color: var(--eda-muted);
+}
+
+.dat-easy-layer-icon:hover {
+	background: rgba(255,255,255,.08);
+	color: var(--eda-text);
+}
+
+.dat-easy-layer-pill {
+	grid-column: span 2;
+	justify-self: end;
+	color: var(--eda-muted);
+	font-size: 11px;
+}
+
+.dat-easy-resize-handle {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	width: 18px;
+	height: 18px;
+	cursor: nwse-resize;
+}
+
+.dat-easy-resize-handle::after {
+	content: "";
+	position: absolute;
+	right: 4px;
+	bottom: 4px;
+	width: 8px;
+	height: 8px;
+	border-right: 2px solid rgba(237,243,247,.45);
+	border-bottom: 2px solid rgba(237,243,247,.45);
+}
+
+.dat-easy-layer-launcher {
+	position: fixed;
+	left: 16px;
+	top: 96px;
+	z-index: 2147482400;
+	min-height: 34px;
+	padding: 0 12px;
+	border: 1px solid var(--eda-line);
+	border-radius: 999px;
+	background: var(--eda-panel);
+	color: var(--eda-text);
+	box-shadow: 0 12px 30px rgba(0,0,0,.34);
+}
+
+.dat-easy-properties {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	color: var(--eda-text);
+}
+
+.dat-easy-empty {
+	padding: 16px 4px;
+	color: var(--eda-muted);
+	font-size: 14px;
+}
+
+.dat-easy-prop-group {
+	border: 1px solid var(--eda-line);
+	border-radius: 10px;
+	background: rgba(17, 25, 34, .64);
+	overflow: hidden;
+}
+
+.dat-easy-prop-group-header {
+	width: 100%;
+	min-height: 36px;
+	padding: 0 12px;
+	border: 0;
+	border-bottom: 1px solid var(--eda-line);
+	border-radius: 0;
+	background: #202a34;
+	color: var(--eda-accent);
+	text-align: left;
+	font-size: 12px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+.dat-easy-prop-group-body {
+	display: grid;
+	gap: 0;
+	padding: 6px;
+}
+
+.dat-easy-prop-row {
+	display: grid;
+	grid-template-columns: minmax(92px, .9fr) minmax(0, 1.1fr);
+	align-items: center;
+	gap: 8px;
+	min-height: 34px;
+	padding: 4px 6px;
+	border-radius: 7px;
+	color: var(--eda-muted);
+	font-size: 12px;
+}
+
+.dat-easy-prop-row:hover {
+	background: rgba(255,255,255,.035);
+}
+
+.dat-easy-prop-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dat-easy-prop-control {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 5px;
+}
+
+.dat-easy-prop-control input,
+.dat-easy-prop-control select {
+	width: 100%;
+	min-width: 0;
+	min-height: 30px;
+	margin: 0;
+	padding: 0 8px;
+	border: 1px solid var(--eda-line);
+	border-radius: 7px;
+	background: var(--eda-panel-3);
+	color: var(--eda-text);
+	outline: 0;
+}
+
+.dat-easy-prop-control input[type="number"] {
+	text-align: right;
+}
+
+.dat-easy-prop-control input[type="checkbox"] {
+	appearance: none;
+	width: 34px;
+	height: 18px;
+	min-height: 18px;
+	justify-self: end;
+	padding: 0;
+	border-radius: 999px;
+	background: #344150;
+	position: relative;
+}
+
+.dat-easy-prop-control input[type="checkbox"]::after {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #cbd5df;
+	transition: transform .16s ease, background .16s ease;
+}
+
+.dat-easy-prop-control input[type="checkbox"]:checked {
+	background: #2f8f5b;
+}
+
+.dat-easy-prop-control input[type="checkbox"]:checked::after {
+	transform: translateX(16px);
+	background: #ffffff;
+}
+
+.dat-easy-prop-control input:focus,
+.dat-easy-prop-control select:focus {
+	border-color: rgba(247,178,61,.7);
+	box-shadow: 0 0 0 2px rgba(247,178,61,.12);
+}
+
+.dat-easy-unit,
+.dat-easy-prop-value {
+	color: var(--eda-muted);
+	font-size: 11px;
+	text-align: right;
+}
+
+.dat-easy-prop-value {
+	color: var(--eda-text);
+	font-size: 12px;
+}
+
+.dat-easy-secondary-button {
+	width: 100%;
+	margin: 2px 0 8px;
+}
+
+.dat-easy-library-panel {
+	grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.dat-easy-library-actions {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 6px;
+	padding: 8px;
+	border-bottom: 1px solid var(--eda-line);
+}
+
+.dat-easy-library-actions button {
+	min-height: 32px;
+	padding: 0 8px;
+	border: 1px solid var(--eda-line);
+	border-radius: 8px;
+	background: #233040;
+	color: var(--eda-text);
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.dat-easy-library-body {
+	display: grid;
+	grid-template-columns: 118px minmax(0, 1fr);
+	min-height: 0;
+}
+
+.dat-easy-library-folders {
+	min-height: 0;
+	overflow: auto;
+	padding: 8px;
+	border-right: 1px solid var(--eda-line);
+	background: rgba(12, 18, 24, .34);
+}
+
+.dat-easy-library-folder {
+	width: 100%;
+	min-height: 32px;
+	margin-bottom: 5px;
+	padding: 0 8px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--eda-muted);
+	text-align: left;
+	font-size: 12px;
+}
+
+.dat-easy-library-folder:hover,
+.dat-easy-library-folder.is-active {
+	border-color: rgba(247,178,61,.34);
+	background: rgba(247,178,61,.08);
+	color: var(--eda-text);
+}
+
+.dat-easy-library-items {
+	min-height: 0;
+	overflow: auto;
+	padding: 8px;
+}
+
+.dat-easy-library-item {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 30px;
+	align-items: center;
+	gap: 6px;
+	min-height: 38px;
+	margin-bottom: 6px;
+	padding: 4px;
+	border: 1px solid var(--eda-line);
+	border-radius: 9px;
+	background: rgba(17,25,34,.72);
+}
+
+.dat-easy-library-item > button:first-child {
+	min-width: 0;
+	min-height: 30px;
+	padding: 0 8px;
+	border: 0;
+	background: transparent;
+	color: var(--eda-text);
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dat-easy-library-item:hover {
+	border-color: rgba(247,178,61,.34);
+	background: rgba(247,178,61,.06);
+}
+
+@media (max-width: 1024px) {
+	.dat-easy-panel {
+		width: 280px !important;
+	}
+
+	.dat-easy-prop-row {
+		grid-template-columns: minmax(82px, .85fr) minmax(0, 1.15fr);
+	}
+}
+
+@media (max-width: 640px) {
+	.dat-easy-layers-panel {
+		left: auto !important;
+		right: 8px;
+		top: 8px !important;
+		width: min(320px, calc(100vw - 16px)) !important;
+		height: calc(100vh - 16px) !important;
+	}
+
+	.dat-pcb-properties {
+		position: fixed;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		z-index: 2147482300;
+		width: min(320px, 88vw);
+		max-width: none;
+		border-left: 1px solid var(--eda-line);
+		box-shadow: -18px 0 44px rgba(0,0,0,.42);
+	}
+}
