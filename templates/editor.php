@@ -13,6 +13,7 @@ $dat_pcb_user_label = is_user_logged_in() ? ( $dat_pcb_phone_verified ? 'User OK
 	<?php endif; ?>
 	<div id="dat-pcb-tracer-app" class="dat-pcb-tracer-app<?php echo $dat_pcb_tracer_shortcode ? ' dat-pcb-tracer-fullscreen' : ''; ?>"<?php echo $dat_pcb_tracer_shortcode ? ' style="width:100vw;height:100vh;min-height:100vh;max-width:none;margin:0;"' : ''; ?>>
 		<div class="dat-pcb-toolbar" role="toolbar">
+			<span class="dat-pcb-version-badge" title="Phiên bản plugin - dùng để kiểm tra đã upload bản mới chưa">v<?php echo esc_html( DAT_PCB_TRACER_VERSION ); ?></span>
 			<button type="button" class="dat-pcb-user-button<?php echo $dat_pcb_phone_verified ? ' is-verified' : ''; ?>" data-action="user-account" title="<?php echo esc_attr( $dat_pcb_user_label ); ?>" aria-label="<?php echo esc_attr( $dat_pcb_user_label ); ?>">
 				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>
 				<span><?php echo esc_html( $dat_pcb_user_label ); ?></span>
@@ -24,6 +25,8 @@ $dat_pcb_user_label = is_user_logged_in() ? ( $dat_pcb_phone_verified ? 'User OK
 			<button type="button" data-action="redo">Redo</button>
 			<button type="button" data-action="duplicate">Nhân bản</button>
 			<button type="button" data-action="toggle-lock">Khóa/mở khóa</button>
+			<button type="button" data-action="align-menu">Căn chỉnh</button>
+			<button type="button" data-action="array-menu">Mảng</button>
 			<button type="button" data-tool="select">Chọn</button>
 			<button type="button" data-tool="track">Vẽ đường mạch</button>
 			<div class="dat-route-mode-switch" role="group" aria-label="Routing mode">
@@ -35,11 +38,15 @@ $dat_pcb_user_label = is_user_logged_in() ? ( $dat_pcb_phone_verified ? 'User OK
 			<button type="button" data-tool="pad_round">Pad tròn</button>
 			<button type="button" data-tool="pad_rect">Pad chữ nhật</button>
 			<button type="button" data-tool="pad_oval">Pad oval</button>
+			<button type="button" data-tool="pad_roundrect">Pad bo góc</button>
 			<button type="button" data-tool="via">Via</button>
 			<button type="button" data-tool="drill">Lỗ khoan</button>
 			<button type="button" data-tool="outline">Viền bo</button>
 			<button type="button" data-tool="region">Vùng đồng</button>
 			<button type="button" data-tool="annotation">Ghi chú</button>
+			<button type="button" data-tool="measure">Đo</button>
+			<button type="button" data-tool="zoom_window">Zoom vùng</button>
+			<button type="button" data-tool="pan">Kéo màn hình</button>
 			<button type="button" data-action="calibrate">Cân chỉnh</button>
 			<button type="button" data-action="fit">Fit màn hình</button>
 			<button type="button" data-action="preview3d">Xem 3D</button>
@@ -89,6 +96,7 @@ $dat_pcb_user_label = is_user_logged_in() ? ( $dat_pcb_phone_verified ? 'User OK
 			<span>Tọa độ: <strong data-status-coord>0, 0 mm</strong></span>
 			<span>Zoom: <strong data-status-zoom>100%</strong></span>
 			<span>Công cụ: <strong data-status-tool>select</strong></span>
+			<span title="Phiên bản plugin - dùng để kiểm tra đã upload bản mới chưa">Bản: <strong>v<?php echo esc_html( DAT_PCB_TRACER_VERSION ); ?></strong></span>
 		</div>
 		<div class="dat-pcb-modal" data-modal hidden>
 			<div class="dat-pcb-modal-box">

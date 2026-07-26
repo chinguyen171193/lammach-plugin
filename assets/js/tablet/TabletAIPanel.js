@@ -41,6 +41,7 @@
 		generate.type = 'button';
 		generate.textContent = 'Generate';
 		generate.setAttribute('data-ai-generate', '1');
+		this.generateButton = generate;
 		this.history.className = 'dat-tablet-ai-history';
 		this.panel.appendChild(resize);
 		this.panel.appendChild(header);
@@ -73,6 +74,7 @@
 	};
 
 	TabletAIPanel.prototype.generate = function () {
+		if (!this.prompt.value || !this.prompt.value.trim()) return;
 		var self = this;
 		var context = {
 			side: this.app.activeSide || 'top',
@@ -81,16 +83,84 @@
 			y: this.app.cursor && this.app.cursor.y,
 			file: this.file.files && this.file.files[0]
 		};
+		this.setBusy(true);
 		global.generateCircuit(this.prompt.value, context).then(function (result) {
-			self.executor.execute(result.commands);
-			self.addHistory(result);
+			self.setBusy(false);
+			self.showPreview(result || {});
 		}).catch(function (err) {
-			self.addHistory({ error: err && err.message ? err.message : 'AI request failed' });
+			self.setBusy(false);
+			self.addHistory({ error: err && err.message ? err.message : 'AI request failed' }, 'error');
 		});
 	};
 
-	TabletAIPanel.prototype.addHistory = function (result) {
+	TabletAIPanel.prototype.setBusy = function (busy) {
+		this.generateButton.disabled = !!busy;
+		this.generateButton.textContent = busy ? 'Đang tạo...' : 'Generate';
+	};
+
+	TabletAIPanel.prototype.showPreview = function (result) {
+		var commands = Array.isArray(result.commands) ? result.commands : [];
+		var footprints = commands.filter(function (c) { return c && c.type === 'ADD_FOOTPRINT'; });
+		var connections = commands.filter(function (c) { return c && c.type === 'CONNECT'; });
+		if (!footprints.length) {
+			this.addHistory({ message: 'AI không trả về linh kiện nào để chèn.', raw: result }, 'warn');
+			return;
+		}
+		var self = this;
+		var card = document.createElement('div');
+		card.className = 'dat-tablet-ai-preview';
+		footprints.forEach(function (command) {
+			var line = document.createElement('div');
+			line.className = 'dat-tablet-ai-preview-item';
+			var pinCount = Array.isArray(command.pins) ? command.pins.length : 0;
+			line.textContent = (command.ref || '?') + ' · ' + (command.component || command.package || '?') + ' (' + (command.package || '?') + ') · ' + pinCount + ' chân · mặt ' + (command.side === 'bottom' ? 'Bottom' : 'Top');
+			card.appendChild(line);
+		});
+		if (connections.length) {
+			var connLine = document.createElement('div');
+			connLine.className = 'dat-tablet-ai-preview-item';
+			connLine.textContent = '🔗 ' + connections.length + ' đường nối tự động giữa các linh kiện trên';
+			card.appendChild(connLine);
+		}
+		if (result.warnings && result.warnings.length) {
+			var warnTitle = document.createElement('div');
+			warnTitle.className = 'dat-tablet-ai-preview-warn-title';
+			warnTitle.textContent = 'Cảnh báo:';
+			card.appendChild(warnTitle);
+			result.warnings.forEach(function (warning) {
+				var w = document.createElement('div');
+				w.className = 'dat-tablet-ai-preview-warn';
+				w.textContent = '⚠ ' + warning;
+				card.appendChild(w);
+			});
+		}
+		var actions = document.createElement('div');
+		actions.className = 'dat-tablet-ai-preview-actions';
+		var insert = document.createElement('button');
+		insert.type = 'button';
+		insert.textContent = 'Chèn vào bản vẽ';
+		insert.setAttribute('data-ai-preview-insert', '1');
+		var discard = document.createElement('button');
+		discard.type = 'button';
+		discard.textContent = 'Huỷ';
+		discard.setAttribute('data-ai-preview-discard', '1');
+		actions.appendChild(insert);
+		actions.appendChild(discard);
+		card.appendChild(actions);
+		insert.addEventListener('click', function () {
+			self.executor.execute(commands);
+			card.remove();
+			self.addHistory({ inserted: footprints.map(function (c) { return c.ref; }), connections: connections.length }, 'ok');
+		});
+		discard.addEventListener('click', function () {
+			card.remove();
+		});
+		this.history.insertBefore(card, this.history.firstChild);
+	};
+
+	TabletAIPanel.prototype.addHistory = function (result, kind) {
 		var item = document.createElement('pre');
+		item.className = kind ? 'dat-tablet-ai-history-' + kind : '';
 		item.textContent = JSON.stringify(result, null, 2);
 		this.history.insertBefore(item, this.history.firstChild);
 	};

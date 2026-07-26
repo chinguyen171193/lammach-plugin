@@ -36,11 +36,6 @@ class DAT_PCB_AI {
 			return new WP_Error( 'dat_pcb_ai_empty_prompt', 'Vui long nhap ten linh kien hoac noi dung datasheet.', array( 'status' => 400 ) );
 		}
 
-		$api_key = $this->get_api_key();
-		if ( '' === $api_key ) {
-			return new WP_Error( 'dat_pcb_ai_missing_key', 'Chua cau hinh OpenAI API key trong DAT PCB Tracer - Cai dat.', array( 'status' => 400 ) );
-		}
-
 		$side  = isset( $params['side'] ) && 'bottom' === $params['side'] ? 'bottom' : 'top';
 		$board = isset( $params['board'] ) && is_array( $params['board'] ) ? $params['board'] : array();
 		$x = isset( $params['x'] ) ? (float) $params['x'] : 20;
@@ -48,9 +43,19 @@ class DAT_PCB_AI {
 		$board_width = isset( $board['width_mm'] ) ? max( 1, (float) $board['width_mm'] ) : 100;
 		$board_height = isset( $board['height_mm'] ) ? max( 1, (float) $board['height_mm'] ) : 80;
 
+		$circuit = $this->known_circuit_plan( $prompt, $side, $x, $y );
+		if ( $circuit ) {
+			return rest_ensure_response( $this->sanitize_plan( $circuit, $side, $x, $y, $board_width, $board_height ) );
+		}
+
 		$template = $this->known_component_plan( $prompt, $side, $x, $y );
 		if ( $template ) {
 			return rest_ensure_response( $this->sanitize_plan( $template, $side, $x, $y, $board_width, $board_height ) );
+		}
+
+		$api_key = $this->get_api_key();
+		if ( '' === $api_key ) {
+			return new WP_Error( 'dat_pcb_ai_missing_key', 'Chua cau hinh OpenAI API key trong DAT PCB Tracer - Cai dat. Cac linh kien/mach co san (LM2596, 7805, BC547, header, tu dien...) van dung duoc ma khong can API key.', array( 'status' => 400 ) );
 		}
 
 		$content = array();
@@ -192,6 +197,108 @@ class DAT_PCB_AI {
 			'version'  => 'component-plan-1',
 			'warnings' => array( $command['warning'] ?? 'Dung footprint template cuc bo. Kiem tra datasheet va quy trinh san xuat truoc khi dat PCB.' ),
 			'commands' => array( $command ),
+		);
+	}
+
+	private function template_to_command( $template, $side, $x, $y, $ref, $value_override = null ) {
+		$command = $template;
+		$command['type'] = 'ADD_FOOTPRINT';
+		$command['side'] = $side;
+		$command['x'] = $x;
+		$command['y'] = $y;
+		$command['ref'] = $ref;
+		if ( null !== $value_override ) {
+			$command['value'] = $value_override;
+		}
+		unset( $command['ref_prefix'], $command['warning'] );
+		return $command;
+	}
+
+	private function known_circuit_plan( $prompt, $side, $x, $y ) {
+		$text = strtolower( (string) $prompt );
+		if ( false === strpos( $text, 'lm2596' ) ) {
+			return null;
+		}
+		$has_circuit_intent = $this->prompt_has_any( $text, array( 'mach', 'mạch', 'circuit', 'module', 'on ap', 'ổn áp', 'converter', 'buck', 'nguon', 'nguồn' ) );
+		if ( ! $has_circuit_intent ) {
+			return null;
+		}
+
+		$voltage = 5.0;
+		if ( preg_match( '/(\d+(?:[.,]\d+)?)\s*v\b/i', $prompt, $vmatch ) ) {
+			$parsed = (float) str_replace( ',', '.', $vmatch[1] );
+			if ( $parsed >= 1.5 && $parsed <= 35 ) {
+				$voltage = $parsed;
+			}
+		}
+		$r1_ohm = 1000;
+		$r2_ohm = max( 100, (int) round( $r1_ohm * ( $voltage / 1.23 - 1 ) / 10 ) * 10 );
+		$r2_label = $r2_ohm >= 1000 ? ( rtrim( rtrim( number_format( $r2_ohm / 1000, 2, '.', '' ), '0' ), '.' ) . 'k' ) : $r2_ohm . 'R';
+
+		$commands = array(
+			$this->template_to_command( $this->template_lm2596( true ), $side, $x, $y, 'U1' ),
+			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x - 15, $y, 'C1' ),
+			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x + 18, $y, 'C2' ),
+			$this->template_to_command( $this->template_radial_inductor( '33uH' ), $side, $x + 9, $y - 9, 'L1' ),
+			$this->template_to_command( $this->template_sma( 'SS34' ), $side, $x + 2, $y + 9, 'D1' ),
+			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 4, $y + 12, 'R1', '1k' ),
+			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 4, $y + 16, 'R2', $r2_label ),
+		);
+		$connects = array(
+			array( 'type' => 'CONNECT', 'from' => 'U1.1', 'to' => 'C1.1' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'C1.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'C2.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'D1.A' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'R1.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.2', 'to' => 'L1.1' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.2', 'to' => 'D1.K' ),
+			array( 'type' => 'CONNECT', 'from' => 'L1.2', 'to' => 'C2.1' ),
+			array( 'type' => 'CONNECT', 'from' => 'L1.2', 'to' => 'R2.1' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.4', 'to' => 'R2.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.4', 'to' => 'R1.1' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.5', 'to' => 'U1.3' ),
+		);
+		return array(
+			'version'  => 'component-plan-1',
+			'warnings' => array(
+				'Mach LM2596 buck ' . $voltage . 'V dung mau mach cuc bo: R1=1k, R2~' . $r2_label . ' (Vref=1.23V, cong thuc Vout = 1.23 * (1 + R2/R1)).',
+				'Day la thiet ke tham khao pho bien (Cin/Cout/L/D catch/feedback divider), khong thay the ho so ky thuat. Kiem tra lai gia tri linh kien thuc te va datasheet LM2596 truoc khi san xuat.',
+				'Cac duong noi la track thang ve tu dong giua tam chan, hay kiem tra be rong dong va di lai theo dong dien thuc te (dac biet nut chuyen mach OUT-L1-D1) truoc khi san xuat.',
+			),
+			'commands' => array_merge( $commands, $connects ),
+		);
+	}
+
+	private function template_radial_cap( $value, $diameter = 5.0, $lead_spacing = 2.0 ) {
+		$half = $lead_spacing / 2;
+		return $this->local_template(
+			'CAP',
+			'C',
+			'Radial D' . $diameter . 'mm P' . $lead_spacing . 'mm',
+			array( 'width' => $diameter, 'height' => $diameter ),
+			array(
+				$this->pin( '1', '+', -$half, 0, 'round', 1.3, 1.3, 0.7, false, true ),
+				$this->pin( '2', '-', $half, 0, 'round', 1.3, 1.3, 0.7, false, true ),
+			),
+			'Tu dien radial cuc bo, kich thuoc gan dung. Kiem tra kich thuoc that cua linh kien truoc khi khoan lo.',
+			null,
+			$value
+		);
+	}
+
+	private function template_radial_inductor( $value ) {
+		return $this->local_template(
+			'IND',
+			'L',
+			'Radial Power Inductor',
+			array( 'width' => 10.0, 'height' => 10.0 ),
+			array(
+				$this->pin( '1', '1', -3.75, 0, 'round', 1.4, 1.4, 0.9, false, true ),
+				$this->pin( '2', '2', 3.75, 0, 'round', 1.4, 1.4, 0.9, false, true ),
+			),
+			'Cuon cam cuc bo, kich thuoc gan dung. Kiem tra kich thuoc that cua linh kien truoc khi khoan lo.',
+			null,
+			$value
 		);
 	}
 
@@ -576,10 +683,81 @@ class DAT_PCB_AI {
 	}
 
 	private function build_instructions() {
-		return 'You generate PCB footprint commands for a browser PCB editor. Return only JSON that matches the schema. Use millimeters. Prefer real package conventions from the component name or datasheet. Keep coordinates relative to the provided insertion point. Include silk lines when known, and use an empty silk array when unknown. Include pin rotation and suppress_pin_name for every pin. Do not invent electrical connections. If uncertain, add warnings and create a conservative footprint.';
+		return 'You generate PCB footprint and wiring commands for a browser PCB editor. Return only JSON that matches the schema. Use millimeters. Prefer real package conventions from the component name or datasheet. If the user asks for a full circuit or module (not just one bare part), return multiple ADD_FOOTPRINT commands - one per component (IC, passives, connectors) - laid out with non-overlapping x/y coordinates around the insertion point, plus CONNECT commands for every required electrical connection using "REF.PIN" strings, for example {"type":"CONNECT","from":"U1.1","to":"C1.1"}. Every ref used in a CONNECT command must exist as an ADD_FOOTPRINT command with that exact ref and pin number earlier in the same commands array. Keep coordinates relative to the provided insertion point. Include silk lines when known, and use an empty silk array when unknown. Include pin rotation and suppress_pin_name for every pin. Do not invent electrical connections you are not confident about. If uncertain about component values or wiring, add clear warnings and prefer a conservative, commonly used reference design.';
 	}
 
 	private function component_schema() {
+		$footprint_schema = array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'outline', 'silk', 'pins' ),
+			'properties'           => array(
+				'type'      => array( 'type' => 'string', 'enum' => array( 'ADD_FOOTPRINT' ) ),
+				'ref'       => array( 'type' => 'string' ),
+				'component' => array( 'type' => 'string' ),
+				'value'     => array( 'type' => 'string' ),
+				'package'   => array( 'type' => 'string' ),
+				'side'      => array( 'type' => 'string', 'enum' => array( 'top', 'bottom' ) ),
+				'x'         => array( 'type' => 'number' ),
+				'y'         => array( 'type' => 'number' ),
+				'outline'   => array(
+					'type'                 => 'object',
+					'additionalProperties' => false,
+					'required'             => array( 'width', 'height' ),
+					'properties'           => array(
+						'width'  => array( 'type' => 'number' ),
+						'height' => array( 'type' => 'number' ),
+					),
+				),
+				'silk'      => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'required'             => array( 'x1', 'y1', 'x2', 'y2', 'width' ),
+						'properties'           => array(
+							'x1'    => array( 'type' => 'number' ),
+							'y1'    => array( 'type' => 'number' ),
+							'x2'    => array( 'type' => 'number' ),
+							'y2'    => array( 'type' => 'number' ),
+							'width' => array( 'type' => 'number' ),
+						),
+					),
+				),
+				'pins'      => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'required'             => array( 'number', 'name', 'x', 'y', 'shape', 'width', 'height', 'diameter', 'drill', 'smd', 'rotation', 'suppress_pin_name' ),
+						'properties'           => array(
+							'number'   => array( 'type' => 'string' ),
+							'name'     => array( 'type' => 'string' ),
+							'x'        => array( 'type' => 'number' ),
+							'y'        => array( 'type' => 'number' ),
+							'shape'    => array( 'type' => 'string', 'enum' => array( 'round', 'rect', 'oval' ) ),
+							'width'    => array( 'type' => 'number' ),
+							'height'   => array( 'type' => 'number' ),
+							'diameter' => array( 'type' => 'number' ),
+							'drill'    => array( 'type' => 'number' ),
+							'smd'      => array( 'type' => 'boolean' ),
+							'rotation' => array( 'type' => 'number' ),
+							'suppress_pin_name' => array( 'type' => 'boolean' ),
+						),
+					),
+				),
+			),
+		);
+		$connect_schema = array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'from', 'to' ),
+			'properties'           => array(
+				'type' => array( 'type' => 'string', 'enum' => array( 'CONNECT' ) ),
+				'from' => array( 'type' => 'string', 'description' => 'Reference designator and pin number joined by a dot, e.g. U1.1' ),
+				'to'   => array( 'type' => 'string', 'description' => 'Reference designator and pin number joined by a dot, e.g. C1.2' ),
+			),
+		);
 		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
@@ -590,65 +768,7 @@ class DAT_PCB_AI {
 				'commands' => array(
 					'type'  => 'array',
 					'items' => array(
-						'type'                 => 'object',
-						'additionalProperties' => false,
-						'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'outline', 'silk', 'pins' ),
-						'properties'           => array(
-							'type'      => array( 'type' => 'string', 'enum' => array( 'ADD_FOOTPRINT' ) ),
-							'ref'       => array( 'type' => 'string' ),
-							'component' => array( 'type' => 'string' ),
-							'value'     => array( 'type' => 'string' ),
-							'package'   => array( 'type' => 'string' ),
-							'side'      => array( 'type' => 'string', 'enum' => array( 'top', 'bottom' ) ),
-							'x'         => array( 'type' => 'number' ),
-							'y'         => array( 'type' => 'number' ),
-							'outline'   => array(
-								'type'                 => 'object',
-								'additionalProperties' => false,
-								'required'             => array( 'width', 'height' ),
-								'properties'           => array(
-									'width'  => array( 'type' => 'number' ),
-									'height' => array( 'type' => 'number' ),
-								),
-							),
-							'silk'      => array(
-								'type'  => 'array',
-								'items' => array(
-									'type'                 => 'object',
-									'additionalProperties' => false,
-									'required'             => array( 'x1', 'y1', 'x2', 'y2', 'width' ),
-									'properties'           => array(
-										'x1'    => array( 'type' => 'number' ),
-										'y1'    => array( 'type' => 'number' ),
-										'x2'    => array( 'type' => 'number' ),
-										'y2'    => array( 'type' => 'number' ),
-										'width' => array( 'type' => 'number' ),
-									),
-								),
-							),
-							'pins'      => array(
-								'type'  => 'array',
-								'items' => array(
-									'type'                 => 'object',
-									'additionalProperties' => false,
-									'required'             => array( 'number', 'name', 'x', 'y', 'shape', 'width', 'height', 'diameter', 'drill', 'smd', 'rotation', 'suppress_pin_name' ),
-									'properties'           => array(
-										'number'   => array( 'type' => 'string' ),
-										'name'     => array( 'type' => 'string' ),
-										'x'        => array( 'type' => 'number' ),
-										'y'        => array( 'type' => 'number' ),
-										'shape'    => array( 'type' => 'string', 'enum' => array( 'round', 'rect', 'oval' ) ),
-										'width'    => array( 'type' => 'number' ),
-										'height'   => array( 'type' => 'number' ),
-										'diameter' => array( 'type' => 'number' ),
-										'drill'    => array( 'type' => 'number' ),
-										'smd'      => array( 'type' => 'boolean' ),
-										'rotation' => array( 'type' => 'number' ),
-										'suppress_pin_name' => array( 'type' => 'boolean' ),
-									),
-								),
-							),
-						),
+						'anyOf' => array( $footprint_schema, $connect_schema ),
 					),
 				),
 			),
@@ -689,8 +809,28 @@ class DAT_PCB_AI {
 		if ( empty( $plan['commands'] ) || ! is_array( $plan['commands'] ) ) {
 			return $out;
 		}
+		$known_pins = array();
 		foreach ( $plan['commands'] as $command ) {
-			if ( ! is_array( $command ) || 'ADD_FOOTPRINT' !== ( $command['type'] ?? '' ) ) {
+			if ( ! is_array( $command ) ) {
+				continue;
+			}
+			if ( 'CONNECT' === ( $command['type'] ?? '' ) ) {
+				$from = sanitize_text_field( (string) ( $command['from'] ?? '' ) );
+				$to   = sanitize_text_field( (string) ( $command['to'] ?? '' ) );
+				if ( '' === $from || '' === $to || ! isset( $known_pins[ $from ] ) || ! isset( $known_pins[ $to ] ) ) {
+					continue;
+				}
+				if ( count( $out['commands'] ) >= 400 ) {
+					continue;
+				}
+				$out['commands'][] = array(
+					'type' => 'CONNECT',
+					'from' => $from,
+					'to'   => $to,
+				);
+				continue;
+			}
+			if ( 'ADD_FOOTPRINT' !== ( $command['type'] ?? '' ) ) {
 				continue;
 			}
 			$pins = array();
@@ -751,6 +891,9 @@ class DAT_PCB_AI {
 			);
 			if ( ! empty( $silk ) ) {
 				$clean_command['silk'] = $silk;
+			}
+			foreach ( $pins as $pin ) {
+				$known_pins[ $clean_command['ref'] . '.' . $pin['number'] ] = true;
 			}
 			$out['commands'][] = $clean_command;
 		}

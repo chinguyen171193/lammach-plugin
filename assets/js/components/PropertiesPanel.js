@@ -89,7 +89,7 @@
 			this.field('Note', 'note', obj.note || '', 'root', 'text')
 		]);
 		var geometry = [];
-		['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'width', 'height', 'diameter', 'drill', 'rotation', 'radius', 'startAngle', 'endAngle'].forEach(function (key) {
+		['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'width', 'height', 'diameter', 'drill', 'rotation', 'radius', 'bow', 'startAngle', 'endAngle'].forEach(function (key) {
 			if (g[key] !== undefined) geometry.push(this.field(this.pretty(key), key, g[key], 'geometry', 'number', this.unitFor(key)));
 		}, this);
 		if (geometry.length) this.group(panel, 'Thông số hình học', geometry);
@@ -150,11 +150,13 @@
 	};
 
 	PropertiesPanel.prototype.pretty = function (key) {
+		if (key === 'bow') return 'Độ cong (0 = thẳng)';
 		return key.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
 	};
 
 	PropertiesPanel.prototype.unitFor = function (key) {
 		if (key === 'rotation' || key === 'startAngle' || key === 'endAngle') return 'deg';
+		if (key === 'bow') return '';
 		return 'mm';
 	};
 

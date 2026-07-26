@@ -10,6 +10,51 @@
 		makeId: function () {
 			return 'obj_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 		},
+		circumcircle: function (a, b, c) {
+			var ax = a.x, ay = a.y, bx = b.x, by = b.y, cx = c.x, cy = c.y;
+			var d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+			if (Math.abs(d) < 1e-9) return null;
+			var ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
+			var uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+			return { x: ux, y: uy, r: Math.hypot(ax - ux, ay - uy) };
+		},
+		arcFromTrack: function (g) {
+			var bow = Number(g && g.bow || 0);
+			if (!bow) return null;
+			var x1 = Number(g.x1 || 0), y1 = Number(g.y1 || 0), x2 = Number(g.x2 || 0), y2 = Number(g.y2 || 0);
+			var dx = x2 - x1, dy = y2 - y1;
+			var chord = Math.hypot(dx, dy);
+			if (chord < 1e-6) return null;
+			var nx = -dy / chord, ny = dx / chord;
+			var clamped = Math.max(-1.5, Math.min(1.5, bow));
+			var sagitta = clamped * chord / 2;
+			var midx = (x1 + x2) / 2 + nx * sagitta;
+			var midy = (y1 + y2) / 2 + ny * sagitta;
+			var circle = Tools.circumcircle({ x: x1, y: y1 }, { x: midx, y: midy }, { x: x2, y: y2 });
+			if (!circle) return null;
+			var a1 = Math.atan2(y1 - circle.y, x1 - circle.x);
+			var aMid = Math.atan2(midy - circle.y, midx - circle.x);
+			var a2 = Math.atan2(y2 - circle.y, x2 - circle.x);
+			var twoPi = Math.PI * 2;
+			function mod2pi(a) { a = a % twoPi; if (a < 0) a += twoPi; return a; }
+			var deltaMid = mod2pi(aMid - a1);
+			var deltaEnd = mod2pi(a2 - a1);
+			var direction, sweep;
+			if (deltaMid < deltaEnd) { direction = 1; sweep = deltaEnd; } else { direction = -1; sweep = twoPi - deltaEnd; }
+			return { cx: circle.x, cy: circle.y, r: circle.r, startAngle: a1, direction: direction, sweep: sweep, midX: midx, midY: midy };
+		},
+		sampleArcPoints: function (g, steps) {
+			var arc = Tools.arcFromTrack(g);
+			if (!arc) return null;
+			steps = steps || 24;
+			var pts = [];
+			for (var i = 0; i <= steps; i++) {
+				var t = i / steps;
+				var angle = arc.startAngle + arc.direction * arc.sweep * t;
+				pts.push({ x: arc.cx + Math.cos(angle) * arc.r, y: arc.cy + Math.sin(angle) * arc.r });
+			}
+			return pts;
+		},
 		layerForTool: function (tool, side) {
 			if (tool === 'outline' || tool === 'cutout') return 'outline';
 			if (tool === 'drill' || tool === 'slot') return 'drill';
@@ -24,11 +69,14 @@
 			var common = { id: id, type: 'pad', layer: layer, geometry: {}, style: {}, locked: false, visible: true, note: '' };
 			if (tool === 'track') {
 				common.type = 'track';
-				common.geometry = { x1: point.x, y1: point.y, x2: point.x, y2: point.y, width: opts.trackWidth || 0.4 };
+				common.geometry = { x1: point.x, y1: point.y, x2: point.x, y2: point.y, width: opts.trackWidth || 0.4, bow: 0 };
 			} else if (tool === 'pad_round') {
 				common.geometry = { shape: 'round', x: point.x, y: point.y, diameter: opts.padDia || 1.6, drill: 0, side: opts.side };
 			} else if (tool === 'pad_rect' || tool === 'pad_square') {
 				common.geometry = { shape: 'rect', x: point.x, y: point.y, width: opts.padDia || 1.6, height: opts.padDia || 1.6, rotation: 0, radius: 0, side: opts.side };
+			} else if (tool === 'pad_roundrect') {
+				var rrW = (opts.padDia || 1.6) * 1.4, rrH = opts.padDia || 1.6;
+				common.geometry = { shape: 'roundrect', x: point.x, y: point.y, width: rrW, height: rrH, radius: Math.min(rrW, rrH) * 0.28, rotation: 0, drill: 0, side: opts.side };
 			} else if (tool === 'pad_smd') {
 				common.geometry = { shape: 'rect', x: point.x, y: point.y, width: (opts.padDia || 1.6) * 1.8, height: (opts.padDia || 1.6) * 0.75, rotation: 0, drill: 0, side: opts.side, mount: 'smd' };
 			} else if (tool === 'pad_oval') {
@@ -84,6 +132,10 @@
 		},
 		getObjectCenter: function (obj) {
 			var g = obj.geometry || {};
+			if (obj.type === 'track' && Number(g.bow || 0)) {
+				var arcCenter = Tools.arcFromTrack(g);
+				if (arcCenter) return { x: arcCenter.midX, y: arcCenter.midY };
+			}
 			if (obj.type === 'track' || obj.type === 'slot') return { x: (Number(g.x1) + Number(g.x2)) / 2, y: (Number(g.y1) + Number(g.y2)) / 2 };
 			if (obj.type === 'shape') {
 				if (g.shape === 'line' || g.shape === 'bezier') return { x: (Number(g.x1) + Number(g.x2)) / 2, y: (Number(g.y1) + Number(g.y2)) / 2 };
@@ -95,7 +147,9 @@
 		getObjectBounds: function (obj) {
 			var g = obj.geometry || {};
 			var pts = [];
-			if (obj.type === 'track' || obj.type === 'slot') {
+			if (obj.type === 'track' && Number(g.bow || 0)) {
+				pts = Tools.sampleArcPoints(g, 12) || [{ x: Number(g.x1 || 0), y: Number(g.y1 || 0) }, { x: Number(g.x2 || 0), y: Number(g.y2 || 0) }];
+			} else if (obj.type === 'track' || obj.type === 'slot') {
 				pts = [{ x: Number(g.x1 || 0), y: Number(g.y1 || 0) }, { x: Number(g.x2 || 0), y: Number(g.y2 || 0) }];
 			} else if (obj.type === 'shape' && (g.shape === 'line' || g.shape === 'bezier')) {
 				pts = [{ x: Number(g.x1 || 0), y: Number(g.y1 || 0) }, { x: Number(g.x2 || 0), y: Number(g.y2 || 0) }];
@@ -177,6 +231,49 @@
 			} else if (isPolylineObject(obj)) {
 				g.points.forEach(rotatePoint);
 			} else {
+				g.rotation = Number(g.rotation || 0) + degrees;
+				if (obj.type === 'shape' && g.shape === 'arc') {
+					g.startAngle = Number(g.startAngle || 0) + degrees;
+					g.endAngle = Number(g.endAngle || 0) + degrees;
+				}
+			}
+		},
+		rotateObjectAroundPoint: function (obj, cx, cy, degrees) {
+			var g = obj.geometry || {};
+			if (obj.locked) return;
+			var rad = degrees * Math.PI / 180;
+			var cosA = Math.cos(rad), sinA = Math.sin(rad);
+			function rotatePoint(p) {
+				var x = Number(p.x || 0) - cx;
+				var y = Number(p.y || 0) - cy;
+				p.x = cx + x * cosA - y * sinA;
+				p.y = cy + x * sinA + y * cosA;
+			}
+			if (obj.type === 'track' || obj.type === 'slot') {
+				var a = { x: g.x1, y: g.y1 }, b = { x: g.x2, y: g.y2 };
+				rotatePoint(a);
+				rotatePoint(b);
+				g.x1 = a.x; g.y1 = a.y; g.x2 = b.x; g.y2 = b.y;
+			} else if (obj.type === 'shape' && (g.shape === 'line' || g.shape === 'bezier')) {
+				var p1 = { x: g.x1, y: g.y1 }, p2 = { x: g.x2, y: g.y2 };
+				rotatePoint(p1);
+				rotatePoint(p2);
+				g.x1 = p1.x; g.y1 = p1.y; g.x2 = p2.x; g.y2 = p2.y;
+				if (g.shape === 'bezier') {
+					var cp = { x: g.cx, y: g.cy };
+					rotatePoint(cp);
+					g.cx = cp.x;
+					g.cy = cp.y;
+				}
+			} else if (obj.type === 'shape' && g.shape === 'polygon' && Array.isArray(g.points)) {
+				g.points.forEach(rotatePoint);
+			} else if (isPolylineObject(obj)) {
+				g.points.forEach(rotatePoint);
+			} else {
+				var p = { x: Number(g.x || 0), y: Number(g.y || 0) };
+				rotatePoint(p);
+				g.x = p.x;
+				g.y = p.y;
 				g.rotation = Number(g.rotation || 0) + degrees;
 				if (obj.type === 'shape' && g.shape === 'arc') {
 					g.startAngle = Number(g.startAngle || 0) + degrees;

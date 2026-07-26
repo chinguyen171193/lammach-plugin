@@ -86,6 +86,16 @@
 	padding: 6px 10px;
 	cursor: pointer;
 }
+.dat-pcb-version-badge {
+	background: #f3b23f;
+	color: #10151c;
+	font-weight: 700;
+	font-size: 12px;
+	padding: 4px 8px;
+	border-radius: 6px;
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
 .dat-pcb-file-menu {
 	position: relative;
 	display: inline-flex;
@@ -298,6 +308,9 @@
 }
 .dat-pcb-modal-box button {
 	margin: 4px;
+}
+.dat-pcb-align-row {
+	margin-bottom: 10px;
 }
 .dat-modal-close {
 	float: right;

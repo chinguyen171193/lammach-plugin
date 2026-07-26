@@ -13,6 +13,7 @@
 		this.tabletGesture = null;
 		this.snapCandidate = null;
 		this.spaceDown = false;
+		this.zoomBox = null;
 		this.bind();
 		this.loop();
 	}
@@ -140,10 +141,16 @@
 	Renderer.prototype.onDown = function (e) {
 		var rect = this.canvas.getBoundingClientRect();
 		var p = this.snap(this.screenToMm(e.clientX - rect.left, e.clientY - rect.top));
-		if (e.button === 1 || e.button === 2 || this.spaceDown) {
+		if (e.button === 1 || e.button === 2 || this.spaceDown || this.app.tool === 'pan') {
 			e.preventDefault();
 			this.drag = { mode: 'pan', sx: e.clientX, sy: e.clientY, ox: this.view.ox, oy: this.view.oy };
 			this.canvas.classList.add('is-panning');
+			return;
+		}
+		if (this.app.tool === 'zoom_window') {
+			this.zoomBox = { x1: e.clientX - rect.left, y1: e.clientY - rect.top, x2: e.clientX - rect.left, y2: e.clientY - rect.top };
+			this.drag = { mode: 'zoombox' };
+			this.invalidate();
 			return;
 		}
 		this.app.cursor = p;
@@ -175,6 +182,10 @@
 			this.view.ox = this.drag.ox + e.clientX - this.drag.sx;
 			this.view.oy = this.drag.oy + e.clientY - this.drag.sy;
 			this.invalidate();
+		} else if (this.drag && this.drag.mode === 'zoombox') {
+			this.zoomBox.x2 = e.clientX - rect.left;
+			this.zoomBox.y2 = e.clientY - rect.top;
+			this.invalidate();
 		} else if (this.drag) {
 			this.app.pointerMove(p, e);
 			this.invalidate();
@@ -191,11 +202,37 @@
 	};
 
 	Renderer.prototype.onUp = function () {
-		if (this.drag) {
+		if (this.drag && this.drag.mode === 'zoombox') {
+			this.finishZoomBox();
+		} else if (this.drag) {
 			this.app.pointerUp();
 		}
 		this.canvas.classList.remove('is-panning');
 		this.drag = null;
+	};
+
+	Renderer.prototype.finishZoomBox = function () {
+		var box = this.zoomBox;
+		this.zoomBox = null;
+		if (!box) return;
+		var a = this.screenToMm(box.x1, box.y1);
+		var b = this.screenToMm(box.x2, box.y2);
+		var w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+		if (w < 1 || h < 1) { this.invalidate(); return; }
+		this.fitToMmBounds(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y));
+		this.app.setTool('select');
+	};
+
+	Renderer.prototype.fitToMmBounds = function (minX, minY, maxX, maxY) {
+		var w = Math.max(0.5, maxX - minX), h = Math.max(0.5, maxY - minY);
+		var cw = this.canvas.clientWidth, ch = this.canvas.clientHeight;
+		var scale = Math.min(cw / w, ch / h) * 0.92;
+		this.view.scale = Math.max(0.5, Math.min(80, scale));
+		var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+		this.view.ox = cw / 2 - cx * this.view.scale;
+		this.view.oy = ch / 2 - cy * this.view.scale;
+		this.app.updateStatus();
+		this.invalidate();
 	};
 
 	Renderer.prototype.onPointerUp = function (e) {
@@ -279,13 +316,76 @@
 		this.drawImages(ctx);
 		this.drawObjects(ctx);
 		this.drawSnapCandidate(ctx);
+		this.drawMeasurement(ctx);
+		this.drawZoomBox(ctx);
+	};
+
+	Renderer.prototype.drawZoomBox = function (ctx) {
+		if (!this.zoomBox) return;
+		var box = this.zoomBox;
+		ctx.save();
+		ctx.strokeStyle = '#48e0a4';
+		ctx.fillStyle = 'rgba(72,224,164,.12)';
+		ctx.lineWidth = 1;
+		ctx.setLineDash([5, 4]);
+		var x = Math.min(box.x1, box.x2), y = Math.min(box.y1, box.y2);
+		var w = Math.abs(box.x2 - box.x1), h = Math.abs(box.y2 - box.y1);
+		ctx.fillRect(x, y, w, h);
+		ctx.strokeRect(x, y, w, h);
+		ctx.restore();
+	};
+
+	Renderer.prototype.drawMeasurement = function (ctx) {
+		var measure = this.app.measure;
+		if (!measure) return;
+		var a = this.mmToScreen(measure.start), b = this.mmToScreen(measure.end);
+		var dx = measure.end.x - measure.start.x, dy = measure.end.y - measure.start.y;
+		var distance = Math.hypot(dx, dy);
+		var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+		if (angle < 0) angle += 360;
+		ctx.save();
+		ctx.strokeStyle = '#48e0ff';
+		ctx.fillStyle = '#48e0ff';
+		ctx.lineWidth = 1.5;
+		ctx.setLineDash([6, 4]);
+		ctx.beginPath();
+		ctx.moveTo(a.x, a.y);
+		ctx.lineTo(b.x, b.y);
+		ctx.stroke();
+		ctx.setLineDash([]);
+		[a, b].forEach(function (pt) {
+			ctx.beginPath();
+			ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
+			ctx.fill();
+		});
+		var label = distance.toFixed(3) + ' mm, ' + angle.toFixed(1) + '°';
+		var midx = (a.x + b.x) / 2, midy = (a.y + b.y) / 2;
+		ctx.font = '12px sans-serif';
+		ctx.textAlign = 'center';
+		ctx.lineWidth = 3;
+		ctx.strokeStyle = 'rgba(16,21,28,.9)';
+		ctx.strokeText(label, midx, midy - 10);
+		ctx.fillStyle = '#d8fbff';
+		ctx.fillText(label, midx, midy - 10);
+		ctx.restore();
+	};
+
+	Renderer.prototype.effectiveGridStep = function (base) {
+		var minPx = 8;
+		var scale = this.view.scale;
+		if (base * scale >= minPx) return base;
+		var seq = [1, 2, 5];
+		for (var k = 1; k < 60; k++) {
+			var step = base * seq[k % 3] * Math.pow(10, Math.floor(k / 3));
+			if (step * scale >= minPx) return step;
+		}
+		return base * 1000000;
 	};
 
 	Renderer.prototype.drawGrid = function (ctx, w, h) {
 		if (!this.app.options.gridVisible) return;
-		var grid = Number(this.app.state.board.grid_mm || 0.5);
-		var step = grid * this.view.scale;
-		if (step < 4) return;
+		var base = Number(this.app.state.board.grid_mm || 0.5);
+		var grid = this.effectiveGridStep(base);
 		ctx.save();
 		ctx.strokeStyle = 'rgba(255,255,255,0.08)';
 		ctx.lineWidth = 1;
@@ -375,6 +475,20 @@
 	Renderer.prototype.drawObject = function (ctx, obj) {
 		var g = obj.geometry || {};
 		if (obj.type === 'track') {
+			if (Number(g.bow || 0)) {
+				var arcPts = global.DATPCBTracerTools.sampleArcPoints(g, 32);
+				if (arcPts && arcPts.length > 1) {
+					ctx.lineWidth = Math.max(1, Number(g.width || 0.4) * this.view.scale);
+					ctx.lineCap = 'round';
+					ctx.beginPath();
+					arcPts.forEach(function (pt, i) {
+						var sp = this.mmToScreen(pt);
+						if (i) ctx.lineTo(sp.x, sp.y); else ctx.moveTo(sp.x, sp.y);
+					}, this);
+					ctx.stroke();
+					return;
+				}
+			}
 			var a = this.mmToScreen({ x: g.x1, y: g.y1 }), b = this.mmToScreen({ x: g.x2, y: g.y2 });
 			ctx.lineWidth = Math.max(1, Number(g.width || 0.4) * this.view.scale);
 			ctx.lineCap = 'round';
@@ -414,6 +528,10 @@
 			ctx.stroke();
 		} else if (g.shape === 'rect') {
 			ctx.rect(-width / 2, -height / 2, width, height);
+			ctx.fill();
+		} else if (g.shape === 'roundrect') {
+			var radiusPx = Math.min(Number(g.radius || 0) * this.view.scale, width / 2, height / 2);
+			this.roundedRectPath(ctx, -width / 2, -height / 2, width, height, radiusPx);
 			ctx.fill();
 		} else {
 			ctx.ellipse(0, 0, width / 2, height / 2, 0, 0, Math.PI * 2);

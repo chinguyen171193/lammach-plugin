@@ -98,9 +98,11 @@ Moi object:
 
 ```json
 {
-  "geometry": { "x1": 0, "y1": 0, "x2": 10, "y2": 0, "width": 0.4 }
+  "geometry": { "x1": 0, "y1": 0, "x2": 10, "y2": 0, "width": 0.4, "bow": 0 }
 }
 ```
+
+- `bow`: do cong tuong doi so voi nua day cung (chord). `0` la duong thang. Khac 0 se ve/tao mot cung tron di qua hai dau mut, khong doi khi track duoc di chuyen/xoay (mirror se tu dong dao chieu cong dung). Xuat Gerber xap xi cung tron bang cac doan thang ngan.
 
 ### pad
 
@@ -119,6 +121,16 @@ Pad chu nhat/oval:
   "geometry": { "shape": "rect|oval", "x": 10, "y": 10, "width": 2, "height": 1, "rotation": 0, "drill": 0 }
 }
 ```
+
+Pad bo goc (rounded rectangle):
+
+```json
+{
+  "geometry": { "shape": "roundrect", "x": 10, "y": 10, "width": 2, "height": 1.4, "radius": 0.3, "rotation": 0, "drill": 0 }
+}
+```
+
+Xuat Gerber xap xi pad bo goc bang aperture chu nhat thuong (khong ma hoa ban kinh goc), co canh bao trong bao cao xuat.
 
 ### via
 

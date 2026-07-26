@@ -319,6 +319,72 @@
 	font-size: 12px;
 }
 
+.tablet-mode .dat-tablet-ai-history pre.dat-tablet-ai-history-error {
+	border-color: rgba(229, 57, 53, .6);
+	color: #ffb4b0;
+}
+
+.tablet-mode .dat-tablet-ai-history pre.dat-tablet-ai-history-warn {
+	border-color: rgba(243, 178, 63, .6);
+	color: #ffe0a3;
+}
+
+.tablet-mode .dat-tablet-ai-history pre.dat-tablet-ai-history-ok {
+	border-color: rgba(76, 195, 138, .6);
+	color: #c7f3dd;
+}
+
+.tablet-mode .dat-tablet-ai-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	background: #16222c;
+	border: 1px solid rgba(243, 178, 63, .5);
+	border-radius: 8px;
+	padding: 10px;
+	margin-bottom: 8px;
+	font-size: 13px;
+	color: #eef4f7;
+}
+
+.tablet-mode .dat-tablet-ai-preview-item {
+	font-weight: 600;
+}
+
+.tablet-mode .dat-tablet-ai-preview-warn-title {
+	margin-top: 4px;
+	font-weight: 700;
+	color: var(--tablet-accent);
+}
+
+.tablet-mode .dat-tablet-ai-preview-warn {
+	font-size: 12px;
+	color: #ffe0a3;
+}
+
+.tablet-mode .dat-tablet-ai-preview-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 6px;
+}
+
+.tablet-mode .dat-tablet-ai-preview-actions [data-ai-preview-insert] {
+	background: var(--tablet-good, #4cc38a);
+	color: #10151c;
+	font-weight: 700;
+	border: none;
+	border-radius: 7px;
+	padding: 8px 14px;
+}
+
+.tablet-mode .dat-tablet-ai-preview-actions [data-ai-preview-discard] {
+	background: transparent;
+	border: 1px solid rgba(255,255,255,.3);
+	color: #eef4f7;
+	border-radius: 7px;
+	padding: 8px 14px;
+}
+
 .tablet-mode .dat-tablet-panel-flash {
 	outline: 2px solid var(--dat-accent);
 	outline-offset: -2px;
@@ -369,10 +435,24 @@
 	padding: 8px 14px;
 	gap: 8px;
 	flex-wrap: nowrap;
-	overflow: visible;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
 	background: rgba(17, 20, 23, .96);
 	border-bottom: 1px solid var(--tablet-border);
 	box-shadow: 0 10px 24px rgba(0,0,0,.22);
+}
+
+.tablet-mode .dat-pcb-toolbar::-webkit-scrollbar {
+	display: none;
+}
+
+.tablet-mode .dat-pcb-toolbar button,
+.tablet-mode .dat-pcb-version-badge,
+.tablet-mode .dat-route-mode-switch,
+.tablet-mode .dat-pcb-file-menu {
+	flex: 0 0 auto;
 }
 
 .tablet-mode .dat-pcb-toolbar button,
@@ -404,6 +484,12 @@
 .tablet-mode .dat-pcb-toolbar [data-tool="outline"],
 .tablet-mode .dat-pcb-toolbar [data-tool="region"],
 .tablet-mode .dat-pcb-toolbar [data-tool="annotation"],
+.tablet-mode .dat-pcb-toolbar [data-tool="pad_roundrect"],
+.tablet-mode .dat-pcb-toolbar [data-tool="measure"],
+.tablet-mode .dat-pcb-toolbar [data-tool="zoom_window"],
+.tablet-mode .dat-pcb-toolbar [data-tool="pan"],
+.tablet-mode .dat-pcb-toolbar [data-action="align-menu"],
+.tablet-mode .dat-pcb-toolbar [data-action="array-menu"],
 .tablet-mode .dat-upload-btn {
 	display: none;
 }
@@ -2375,7 +2461,7 @@
 
 .tablet-mode .dat-tablet-compact-palette {
 	position: fixed;
-	left: 292px;
+	left: 356px;
 	top: 88px;
 	z-index: 2147483000;
 	width: min(384px, calc(100vw - 24px));

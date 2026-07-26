@@ -36,7 +36,17 @@
 		var g = obj.geometry || {};
 		var layerId = global.DATPCBGerberLayerMapper.copperLayerForObject(obj);
 		var layer = this.layers[layerId === 'bottomCopper' ? 'bottomCopper' : 'topCopper'];
-		layer.line(g.x1, g.y1, g.x2, g.y2, Number(g.width || 0.4));
+		var width = Number(g.width || 0.4);
+		if (Number(g.bow || 0) && global.DATPCBTracerTools && global.DATPCBTracerTools.sampleArcPoints) {
+			var pts = global.DATPCBTracerTools.sampleArcPoints(g, 24);
+			if (pts && pts.length > 1) {
+				for (var i = 1; i < pts.length; i++) {
+					layer.line(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y, width);
+				}
+				return;
+			}
+		}
+		layer.line(g.x1, g.y1, g.x2, g.y2, width);
 	};
 
 	GeometryExporter.prototype.exportPad = function (obj) {
@@ -48,6 +58,9 @@
 		global.DATPCBGerberLayerMapper.maskLayersForObject(obj).forEach(function (maskId) {
 			this.layers[maskId].flash(shape, g.x, g.y, this.expandParams(params, 0.1));
 		}, this);
+		if (g.shape === 'roundrect') {
+			this.warnings.push('Rounded rectangle pad exported as standard rectangle aperture (corner radius not encoded in Gerber): ' + obj.id);
+		}
 		if (Number(g.drill || 0) > 0) {
 			this.drillHoles.push({ x: Number(g.x || 0), y: Number(g.y || 0), diameter: Number(g.drill) });
 		}
@@ -133,13 +146,13 @@
 	};
 
 	GeometryExporter.prototype.padShape = function (g) {
-		if (g.shape === 'rect') return 'rect';
+		if (g.shape === 'rect' || g.shape === 'roundrect') return 'rect';
 		if (g.shape === 'oval') return 'oval';
 		return 'circle';
 	};
 
 	GeometryExporter.prototype.padParams = function (g) {
-		if (g.shape === 'rect' || g.shape === 'oval') {
+		if (g.shape === 'rect' || g.shape === 'oval' || g.shape === 'roundrect') {
 			return { width: Number(g.width || g.diameter || 1.6), height: Number(g.height || g.diameter || 1.6) };
 		}
 		return { diameter: Number(g.diameter || g.width || 1.6) };

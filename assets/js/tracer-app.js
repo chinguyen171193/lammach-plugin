@@ -69,11 +69,12 @@
 		this.selected = [];
 		this.activePinId = '';
 		this.cursor = { x: 0, y: 0 };
-		this.options = { gridVisible: true, snap: true, trackWidth: 0.4, padDia: 1.6, drillDia: 0.8, routeMode: '45' };
+		this.options = { gridVisible: true, snap: true, trackWidth: 0.4, padDia: 1.6, drillDia: 0.8, routeMode: '45', arcBow: 0.35 };
 		this.history = new global.DATPCBTracerHistory(100);
 		this.dirty = false;
 		this.drawing = null;
 		this.calibration = null;
+		this.measure = null;
 		this.clipboard = [];
 		this.canvas = new global.DATPCBTracerCanvas(qs(root, '#dat-pcb-tracer-canvas'), this);
 		this.layersPanel = global.DATPCBLayersPanel ? new global.DATPCBLayersPanel(this) : null;
@@ -190,6 +191,15 @@
 			else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); self.duplicateSelected(); }
 			else if (e.key === 'Delete') self.deleteSelected();
 			else if (e.key === 'Escape') self.cancelTool();
+			else if ((e.key === '[' || e.key === ']') && self.tool === 'track' && self.drawing && self.drawing.obj) {
+				e.preventDefault();
+				var delta = e.key === ']' ? 0.05 : -0.05;
+				self.options.arcBow = Math.max(-1.5, Math.min(1.5, (self.options.arcBow || 0) + delta));
+				if (Number(self.drawing.obj.geometry.bow || 0)) {
+					self.drawing.obj.geometry.bow = self.options.arcBow;
+					self.canvas.invalidate();
+				}
+			}
 		});
 		qs(this.root, '[data-modal-close]').addEventListener('click', function () {
 			qs(self.root, '[data-modal]').hidden = true;
@@ -222,6 +232,7 @@
 	};
 
 	App.prototype.setTool = function (tool) {
+		if (tool !== 'measure') this.measure = null;
 		this.tool = tool;
 		this.drawing = null;
 		this.updateRouteModeControls();
@@ -361,7 +372,8 @@
 				x2: Number(end.x || 0),
 				y2: Number(end.y || 0),
 				width: this.options.trackWidth || 0.4,
-				route_mode: this.options.routeMode || '45'
+				route_mode: this.options.routeMode || '45',
+				bow: 0
 			},
 			style: {},
 			locked: false,
@@ -378,6 +390,7 @@
 		g.y2 = Number(segment.end.y || 0);
 		g.width = this.options.trackWidth || g.width || 0.4;
 		g.route_mode = this.options.routeMode || '45';
+		g.bow = 0;
 	};
 
 	App.prototype.removeObjectById = function (id) {
@@ -398,6 +411,10 @@
 
 	App.prototype.updateRoutePreview = function (p) {
 		if (!this.drawing || !this.drawing.anchor) return;
+		if ((this.options.routeMode || '45') === 'arc') {
+			this.updateArcRoutePreview(p);
+			return;
+		}
 		var points = this.calculateRoutePoints(this.drawing.anchor, p, this.options.routeMode || '45');
 		var segments = this.routeSegmentsFromPoints(points);
 		if (!segments.length) segments = [{ start: this.drawing.anchor, end: this.drawing.anchor }];
@@ -417,6 +434,19 @@
 		}, this);
 		this.drawing.obj = this.drawing.draftObjects[this.drawing.draftObjects.length - 1] || null;
 		if (this.drawing.obj) this.selected = [this.drawing.obj.id];
+	};
+
+	App.prototype.updateArcRoutePreview = function (p) {
+		while (this.drawing.draftObjects.length > 1) {
+			var removed = this.drawing.draftObjects.pop();
+			this.removeObjectById(removed.id);
+			this.drawing.routeObjects = this.drawing.routeObjects.filter(function (obj) { return obj.id !== removed.id; });
+		}
+		var draft = this.drawing.draftObjects[0] || this.ensureRouteDraftObject();
+		this.setTrackSegmentGeometry(draft, { start: this.drawing.anchor, end: p });
+		draft.geometry.bow = this.options.arcBow || 0;
+		this.drawing.obj = draft;
+		this.selected = [draft.id];
 	};
 
 	App.prototype.trackLength = function (obj) {
@@ -455,6 +485,7 @@
 		for (var i = 0; i < routeObjects.length - 1; i++) {
 			var a = routeObjects[i], b = routeObjects[i + 1];
 			var ga = a.geometry || {}, gb = b.geometry || {};
+			if (Number(ga.bow || 0) || Number(gb.bow || 0)) continue;
 			if (a.layer !== b.layer || Number(ga.width || 0) !== Number(gb.width || 0)) continue;
 			if (!this.samePoint({ x: ga.x2, y: ga.y2 }, { x: gb.x1, y: gb.y1 })) continue;
 			if (this.trackDirection(a) !== this.trackDirection(b) || this.trackDirection(a) === 'free') continue;
@@ -516,6 +547,16 @@
 		else if (action === 'bring-front') this.bringSelectedFront();
 		else if (action === 'send-back') this.sendSelectedBack();
 		else if (action === 'properties') this.showSelectedProperties();
+		else if (action === 'align-menu') this.showAlignMenu();
+		else if (action === 'array-menu') this.showArrayMenu();
+		else if (action === 'align-left') this.alignObjects('left');
+		else if (action === 'align-right') this.alignObjects('right');
+		else if (action === 'align-top') this.alignObjects('top');
+		else if (action === 'align-bottom') this.alignObjects('bottom');
+		else if (action === 'align-center-x') this.alignObjects('center-x');
+		else if (action === 'align-center-y') this.alignObjects('center-y');
+		else if (action === 'distribute-x') this.distributeObjects('x');
+		else if (action === 'distribute-y') this.distributeObjects('y');
 		else if (action === 'component-properties') { this.activePinId = ''; this.renderProperties(); this.canvas.invalidate(); }
 		else if (action === 'personal-library' && this.personalLibrary) this.personalLibrary.open();
 		else if (action === 'export') this.exportJson();
@@ -589,6 +630,11 @@
 			this.addCalibrationPoint(p);
 			return;
 		}
+		if (this.tool === 'measure') {
+			this.measure = { start: p, end: p, done: false };
+			this.drawing = { mode: 'measure' };
+			return;
+		}
 		if (this.tool === 'select') {
 			var hit = this.hitTest(p);
 			if (hit) {
@@ -648,6 +694,10 @@
 
 	App.prototype.pointerMove = function (p) {
 		if (!this.drawing) return;
+		if (this.drawing.mode === 'measure') {
+			this.measure.end = p;
+			return;
+		}
 		if (this.drawing.mode === 'move') {
 			var dx = p.x - this.drawing.last.x, dy = p.y - this.drawing.last.y;
 			this.selectedObjects().forEach(function (obj) { global.DATPCBTracerTools.moveObject(obj, dx, dy); });
@@ -663,6 +713,10 @@
 
 	App.prototype.pointerUp = function () {
 		if (this.drawing && this.drawing.mode === 'move') this.markDirty();
+		if (this.drawing && this.drawing.mode === 'measure') {
+			this.measure.done = true;
+			this.drawing = null;
+		}
 		if (this.drawing && this.drawing.mode === 'create' && this.tool !== 'track' && !this.isPolylineTool(this.tool)) this.drawing = null;
 		this.renderAll();
 	};
@@ -769,6 +823,20 @@
 			component.x = (minX + maxX) / 2;
 			component.y = (minY + maxY) / 2;
 		}
+	};
+
+	App.prototype.mirrorComponentGeometry = function (component) {
+		var pivot = Number(component.x || 0);
+		this.componentObjects(component.id).forEach(function (obj) {
+			var g = obj.geometry || {};
+			if (g.x1 !== undefined && g.x2 !== undefined) {
+				g.x1 = 2 * pivot - Number(g.x1 || 0);
+				g.x2 = 2 * pivot - Number(g.x2 || 0);
+			} else if (g.x !== undefined) {
+				g.x = 2 * pivot - Number(g.x || 0);
+			}
+			if (g.rotation !== undefined) g.rotation = 180 - Number(g.rotation || 0);
+		});
 	};
 
 	App.prototype.refreshSelectedComponents = function () {
@@ -913,6 +981,242 @@
 		this.markDirty();
 	};
 
+	App.prototype.selectionBounds = function () {
+		var objects = this.selectedObjects();
+		if (!objects.length) return null;
+		var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		objects.forEach(function (obj) {
+			var b = global.DATPCBTracerTools.getObjectBounds(obj);
+			minX = Math.min(minX, b.minX);
+			minY = Math.min(minY, b.minY);
+			maxX = Math.max(maxX, b.maxX);
+			maxY = Math.max(maxY, b.maxY);
+		});
+		return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+	};
+
+	App.prototype.alignObjects = function (mode) {
+		var objects = this.selectedObjects();
+		if (objects.length < 2) { this.showMessage('Chọn ít nhất 2 đối tượng để căn chỉnh.'); return; }
+		this.history.push(this.state);
+		var items = objects.map(function (obj) { return { obj: obj, b: global.DATPCBTracerTools.getObjectBounds(obj) }; });
+		var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+		items.forEach(function (item) {
+			minX = Math.min(minX, item.b.minX);
+			maxX = Math.max(maxX, item.b.maxX);
+			minY = Math.min(minY, item.b.minY);
+			maxY = Math.max(maxY, item.b.maxY);
+		});
+		var centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
+		items.forEach(function (item) {
+			var dx = 0, dy = 0;
+			if (mode === 'left') dx = minX - item.b.minX;
+			else if (mode === 'right') dx = maxX - item.b.maxX;
+			else if (mode === 'center-x') dx = centerX - (item.b.minX + item.b.maxX) / 2;
+			else if (mode === 'top') dy = minY - item.b.minY;
+			else if (mode === 'bottom') dy = maxY - item.b.maxY;
+			else if (mode === 'center-y') dy = centerY - (item.b.minY + item.b.maxY) / 2;
+			if (dx || dy) global.DATPCBTracerTools.moveObject(item.obj, dx, dy);
+		});
+		this.refreshSelectedComponents();
+		this.markDirty();
+	};
+
+	App.prototype.distributeObjects = function (axis) {
+		var objects = this.selectedObjects();
+		if (objects.length < 3) { this.showMessage('Chọn ít nhất 3 đối tượng để phân bố đều.'); return; }
+		this.history.push(this.state);
+		var items = objects.map(function (obj) {
+			var b = global.DATPCBTracerTools.getObjectBounds(obj);
+			return { obj: obj, center: axis === 'x' ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2 };
+		});
+		items.sort(function (a, b) { return a.center - b.center; });
+		var first = items[0].center, last = items[items.length - 1].center;
+		var step = (last - first) / (items.length - 1);
+		items.forEach(function (item, index) {
+			var delta = (first + step * index) - item.center;
+			if (Math.abs(delta) < 1e-9) return;
+			if (axis === 'x') global.DATPCBTracerTools.moveObject(item.obj, delta, 0);
+			else global.DATPCBTracerTools.moveObject(item.obj, 0, delta);
+		});
+		this.refreshSelectedComponents();
+		this.markDirty();
+	};
+
+	App.prototype.showAlignMenu = function () {
+		if (this.selected.length < 2) { this.showMessage('Chọn ít nhất 2 đối tượng để căn chỉnh.'); return; }
+		var box = el('div');
+		box.appendChild(el('h2', 'Căn chỉnh & phân bố'));
+		box.appendChild(el('p', 'Căn cần từ 2 đối tượng, phân bố đều cần từ 3 đối tượng.'));
+		var alignRow = el('div');
+		alignRow.className = 'dat-pcb-align-row';
+		[
+			['align-left', 'Trái'],
+			['align-center-x', 'Giữa dọc'],
+			['align-right', 'Phải'],
+			['align-top', 'Trên'],
+			['align-center-y', 'Giữa ngang'],
+			['align-bottom', 'Dưới']
+		].forEach(function (item) {
+			var button = el('button', item[1]);
+			button.type = 'button';
+			button.setAttribute('data-action', item[0]);
+			alignRow.appendChild(button);
+		});
+		box.appendChild(alignRow);
+		var distRow = el('div');
+		distRow.className = 'dat-pcb-align-row';
+		[['distribute-x', 'Phân bố ngang'], ['distribute-y', 'Phân bố dọc']].forEach(function (item) {
+			var button = el('button', item[1]);
+			button.type = 'button';
+			button.setAttribute('data-action', item[0]);
+			distRow.appendChild(button);
+		});
+		box.appendChild(distRow);
+		this.showNode(box);
+	};
+
+	App.prototype.numberField = function (container, labelText, value, step) {
+		var label = el('label', labelText + ' ');
+		var input = document.createElement('input');
+		input.type = 'number';
+		input.step = String(step || 1);
+		input.value = value;
+		label.appendChild(input);
+		container.appendChild(label);
+		return input;
+	};
+
+	App.prototype.showArrayMenu = function () {
+		if (!this.selected.length) { this.showMessage('Chọn đối tượng trước khi tạo mảng.'); return; }
+		var self = this;
+		var box = el('div');
+		box.appendChild(el('h2', 'Tạo mảng (Array)'));
+		var typeLabel = el('label', 'Kiểu ');
+		var typeSelect = document.createElement('select');
+		['linear', 'circular'].forEach(function (value) {
+			var opt = document.createElement('option');
+			opt.value = value;
+			opt.textContent = value === 'linear' ? 'Lưới (Linear)' : 'Vòng tròn (Circular)';
+			typeSelect.appendChild(opt);
+		});
+		typeLabel.appendChild(typeSelect);
+		box.appendChild(typeLabel);
+
+		var linearBox = el('div');
+		var rowsInput = this.numberField(linearBox, 'Số hàng', 1, 1);
+		var colsInput = this.numberField(linearBox, 'Số cột', 2, 1);
+		var dxInput = this.numberField(linearBox, 'Khoảng cách X (mm)', 2, 0.01);
+		var dyInput = this.numberField(linearBox, 'Khoảng cách Y (mm)', 0, 0.01);
+		box.appendChild(linearBox);
+
+		var bounds = this.selectionBounds();
+		var circularBox = el('div');
+		circularBox.hidden = true;
+		var countInput = this.numberField(circularBox, 'Số lượng', 6, 1);
+		var angleInput = this.numberField(circularBox, 'Tổng góc (độ)', 360, 1);
+		var cxInput = this.numberField(circularBox, 'Tâm X (mm)', bounds ? (bounds.minX + bounds.maxX) / 2 : 0, 0.01);
+		var cyInput = this.numberField(circularBox, 'Tâm Y (mm)', bounds ? (bounds.minY + bounds.maxY) / 2 : 0, 0.01);
+		box.appendChild(circularBox);
+
+		typeSelect.addEventListener('change', function () {
+			var circular = typeSelect.value === 'circular';
+			linearBox.hidden = circular;
+			circularBox.hidden = !circular;
+		});
+
+		var createButton = el('button', 'Tạo mảng');
+		createButton.type = 'button';
+		createButton.addEventListener('click', function () {
+			if (typeSelect.value === 'circular') {
+				self.createCircularArray({
+					count: Math.max(2, Math.round(Number(countInput.value) || 2)),
+					totalAngle: Number(angleInput.value) || 360,
+					cx: Number(cxInput.value) || 0,
+					cy: Number(cyInput.value) || 0
+				});
+			} else {
+				self.createLinearArray({
+					rows: Math.max(1, Math.round(Number(rowsInput.value) || 1)),
+					cols: Math.max(1, Math.round(Number(colsInput.value) || 1)),
+					dx: Number(dxInput.value) || 0,
+					dy: Number(dyInput.value) || 0
+				});
+			}
+			qs(self.root, '[data-modal]').hidden = true;
+		});
+		box.appendChild(createButton);
+		this.showNode(box);
+	};
+
+	App.prototype.cloneSelectionForArray = function (transformFn) {
+		var newIds = [];
+		var componentMap = {};
+		if (!this.state.components) this.state.components = [];
+		this.selectedObjects().forEach(function (obj) {
+			var copy = global.DATPCBTracerClone(obj);
+			copy.id = global.DATPCBTracerTools.makeId();
+			var componentId = this.getComponentIdForObject(copy);
+			if (componentId) {
+				if (!componentMap[componentId]) {
+					var component = this.getComponentById(componentId);
+					var newComponentId = 'cmp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+					componentMap[componentId] = { id: newComponentId, component: null };
+					if (component) {
+						var componentCopy = global.DATPCBTracerClone(component);
+						componentCopy.id = newComponentId;
+						componentCopy.pins = [];
+						this.state.components.push(componentCopy);
+						componentMap[componentId].component = componentCopy;
+					}
+				}
+				copy.geometry.component_id = componentMap[componentId].id;
+			}
+			transformFn(copy);
+			this.state.objects.push(copy);
+			newIds.push(copy.id);
+			if (componentId && componentMap[componentId].component && (copy.type === 'pad' || copy.type === 'via')) {
+				componentMap[componentId].component.pins.push({ number: String(copy.geometry.ai_pin || ''), name: String(copy.geometry.pin_name || ''), object_id: copy.id });
+			}
+		}, this);
+		Object.keys(componentMap).forEach(function (key) {
+			this.refreshComponentPlacement(componentMap[key].id);
+		}, this);
+		return newIds;
+	};
+
+	App.prototype.createLinearArray = function (config) {
+		if (!this.selected.length) return;
+		this.history.push(this.state);
+		var allNew = [];
+		for (var row = 0; row < config.rows; row++) {
+			for (var col = 0; col < config.cols; col++) {
+				if (row === 0 && col === 0) continue;
+				var dx = col * config.dx, dy = row * config.dy;
+				allNew = allNew.concat(this.cloneSelectionForArray(function (obj) {
+					global.DATPCBTracerTools.moveObject(obj, dx, dy);
+				}));
+			}
+		}
+		if (allNew.length) this.selected = allNew;
+		this.markDirty();
+	};
+
+	App.prototype.createCircularArray = function (config) {
+		if (!this.selected.length) return;
+		this.history.push(this.state);
+		var step = config.totalAngle / config.count;
+		var allNew = [];
+		for (var i = 1; i < config.count; i++) {
+			var angle = step * i;
+			allNew = allNew.concat(this.cloneSelectionForArray(function (obj) {
+				global.DATPCBTracerTools.rotateObjectAroundPoint(obj, config.cx, config.cy, angle);
+			}));
+		}
+		if (allNew.length) this.selected = allNew;
+		this.markDirty();
+	};
+
 	App.prototype.bringSelectedFront = function () {
 		if (!this.selected.length) return;
 		this.history.push(this.state);
@@ -955,6 +1259,7 @@
 	App.prototype.cancelTool = function () {
 		this.drawing = null;
 		this.calibration = null;
+		this.measure = null;
 		this.setTool('select');
 	};
 
@@ -1307,6 +1612,7 @@
 				});
 			}
 			if (key === 'side' && component.side !== prevSide) {
+				this.mirrorComponentGeometry(component);
 				this.componentObjects(component.id).forEach(function (componentObj) {
 					var g = componentObj.geometry || {};
 					g.side = component.side;

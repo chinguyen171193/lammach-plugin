@@ -42,14 +42,15 @@
 		panel.style.width = this.position.w + 'px';
 		panel.style.height = this.position.h + 'px';
 		panel.hidden = false;
+		panel.classList.add('is-collapsed');
 
 		var header = el('div', 'dat-easy-panel-header');
 		this.dragHandle = header;
 		header.appendChild(el('span', 'dat-easy-panel-grip', '⠿'));
 		header.appendChild(el('strong', '', 'Lớp và đối tượng'));
-		var collapse = el('button', 'dat-easy-icon-button', '−');
+		var collapse = el('button', 'dat-easy-icon-button', '+');
 		collapse.type = 'button';
-		collapse.title = 'Thu gọn';
+		collapse.title = 'Mở rộng';
 		collapse.setAttribute('data-layers-collapse', '1');
 		var close = el('button', 'dat-easy-icon-button', '×');
 		close.type = 'button';

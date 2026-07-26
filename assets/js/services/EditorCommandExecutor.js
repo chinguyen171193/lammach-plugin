@@ -9,25 +9,42 @@
 	EditorCommandExecutor.prototype.execute = function (commands) {
 		if (!Array.isArray(commands) || !commands.length) return;
 		this.app.history.push(this.app.state);
+		var localPins = {};
 		commands.forEach(function (command) {
-			if (command.type === 'ADD_FOOTPRINT') this.addFootprint(command);
+			if (command.type === 'ADD_FOOTPRINT') this.addFootprint(command, localPins);
 			if (command.type === 'ADD_COMPONENT') this.addComponent(command);
-			if (command.type === 'CONNECT') this.connect(command);
+			if (command.type === 'CONNECT') this.connect(command, localPins);
 		}, this);
 		this.app.markDirty();
 	};
 
-	EditorCommandExecutor.prototype.addFootprint = function (command) {
+	EditorCommandExecutor.prototype.nextAvailableRef = function (ref) {
+		var match = String(ref || 'U1').match(/^([A-Za-z_]+)(\d*)$/);
+		var prefix = match ? match[1] : 'U';
+		var start = match && match[2] ? Number(match[2]) : 1;
+		var used = {};
+		(this.app.state.components || []).forEach(function (component) {
+			var m = String(component.ref || '').match(/^([A-Za-z_]+)(\d+)$/);
+			if (m && m[1].toUpperCase() === prefix.toUpperCase()) used[Number(m[2])] = true;
+		});
+		var n = start > 0 ? start : 1;
+		while (used[n]) n++;
+		return prefix + n;
+	};
+
+	EditorCommandExecutor.prototype.addFootprint = function (command, localPins) {
 		var x = Number(command.x || 0);
 		var y = Number(command.y || 0);
-		var ref = String(command.ref || command.component || 'U1');
+		var requestedRef = String(command.ref || command.component || 'U1');
+		var ref = this.nextAvailableRef(requestedRef);
 		var side = command.side === 'bottom' ? 'bottom' : (this.app.activeSide || 'top');
+		var mirror = side === 'bottom' ? -1 : 1;
 		var layer = global.DATPCBTracerTools.layerForTool('pad_round', side);
 		var componentId = 'cmp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 		var objects = [];
 		var pins = [];
 		(command.pins || []).forEach(function (pin) {
-			var px = x + Number(pin.x || 0);
+			var px = x + mirror * Number(pin.x || 0);
 			var py = y + Number(pin.y || 0);
 			var smd = !!pin.smd;
 			var shape = pin.shape === 'rect' || pin.shape === 'oval' ? pin.shape : 'round';
@@ -40,7 +57,7 @@
 			} else {
 				g.width = Number(pin.width || pin.diameter || 1.6);
 				g.height = Number(pin.height || pin.diameter || 1.6);
-				g.rotation = Number(pin.rotation || 0);
+				g.rotation = mirror === -1 ? (180 - Number(pin.rotation || 0)) : Number(pin.rotation || 0);
 				g.drill = smd ? 0 : Number(pin.drill || 0.8);
 				g.mount = smd ? 'smd' : 'th';
 			}
@@ -55,11 +72,12 @@
 				note: ref + '.' + String(pin.number || '') + (pin.name ? ' ' + pin.name : '')
 			});
 			pins.push({ number: String(pin.number || ''), name: String(pin.name || ''), object_id: padId });
+			if (localPins) localPins[requestedRef + '.' + String(pin.number || '')] = { x: px, y: py, side: side };
 		});
 		var outline = command.outline || {};
 		var ow = Number(outline.width || 0);
 		var oh = Number(outline.height || 0);
-		this.addSilkscreen(objects, command, componentId, ref, side, x, y);
+		this.addSilkscreen(objects, command, componentId, ref, side, x, y, mirror);
 		if (ow > 0 && oh > 0) {
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
@@ -103,8 +121,9 @@
 		this.app.selected = objects.length ? objects.map(function (obj) { return obj.id; }) : this.app.selected;
 	};
 
-	EditorCommandExecutor.prototype.addSilkscreen = function (objects, command, componentId, ref, side, x, y) {
+	EditorCommandExecutor.prototype.addSilkscreen = function (objects, command, componentId, ref, side, x, y, mirror) {
 		if (!Array.isArray(command.silk)) return;
+		mirror = mirror || 1;
 		command.silk.forEach(function (line) {
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
@@ -112,9 +131,9 @@
 				layer: 'annotation',
 				geometry: {
 					shape: 'line',
-					x1: x + Number(line.x1 || 0),
+					x1: x + mirror * Number(line.x1 || 0),
 					y1: y + Number(line.y1 || 0),
-					x2: x + Number(line.x2 || 0),
+					x2: x + mirror * Number(line.x2 || 0),
 					y2: y + Number(line.y2 || 0),
 					strokeWidth: Number(line.width || 0.12),
 					side: side,
@@ -133,7 +152,7 @@
 	EditorCommandExecutor.prototype.addComponent = function (command) {
 		var x = Number(command.x || 0);
 		var y = Number(command.y || 0);
-		var ref = String(command.ref || command.component || 'U1');
+		var ref = this.nextAvailableRef(String(command.ref || command.component || 'U1'));
 		var side = this.app.activeSide;
 		var layer = global.DATPCBTracerTools.layerForTool('pad_round', side);
 		var pinA = {
@@ -170,19 +189,20 @@
 		this.app.selected = [label.id];
 	};
 
-	EditorCommandExecutor.prototype.connect = function (command) {
-		var a = this.findPin(command.from);
-		var b = this.findPin(command.to);
+	EditorCommandExecutor.prototype.connect = function (command, localPins) {
+		var a = (localPins && localPins[command.from]) || this.findPin(command.from);
+		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
 		if (!a || !b) return;
+		var side = a.side || b.side || this.app.activeSide;
 		this.app.state.objects.push({
 			id: global.DATPCBTracerTools.makeId(),
 			type: 'track',
-			layer: this.app.activeSide === 'bottom' ? 'bottom_copper' : 'top_copper',
-			geometry: { x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: this.app.options.trackWidth || 0.4 },
+			layer: side === 'bottom' ? 'bottom_copper' : 'top_copper',
+			geometry: { x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: this.app.options.trackWidth || 0.4, bow: 0 },
 			style: {},
 			locked: false,
 			visible: true,
-			note: 'AI mock connect ' + command.from + ' -> ' + command.to
+			note: 'AI connect ' + command.from + ' -> ' + command.to
 		});
 	};
 

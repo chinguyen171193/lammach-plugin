@@ -1,0 +1,15 @@
+# Deployment credentials - never commit
+sftp.json
+
+# Temporary export zips
+*.zip
+
+# Local tool config
+.claude/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Dependencies (if any tooling is added later)
+node_modules/
