@@ -8,6 +8,8 @@ class DAT_PCB_AI {
 	const OPTION_MODEL       = 'dat_pcb_tracer_openai_model';
 	const OPTION_WEB_SEARCH  = 'dat_pcb_tracer_openai_web_search';
 	const OPTION_MODEL_FIXED = 'dat_pcb_tracer_openai_model_upgraded';
+	const OPTION_DEBUG       = 'dat_pcb_tracer_openai_debug';
+	const OPTION_LAST_LOG    = 'dat_pcb_tracer_openai_last_log';
 
 	// Dong gpt-5.6 vua suy luan tot hon han gpt-4.x vua ho tro built-in tool
 	// web_search, nen AI co the tu tra datasheet/pinout thay vi doan tu tri nho.
@@ -42,11 +44,24 @@ class DAT_PCB_AI {
 		return '0' !== (string) get_option( self::OPTION_WEB_SEARCH, '1' );
 	}
 
+	public function debug_enabled() {
+		return '1' === (string) get_option( self::OPTION_DEBUG, '0' );
+	}
+
+	public function get_debug_log() {
+		$log = get_option( self::OPTION_LAST_LOG, '' );
+		return is_string( $log ) ? $log : '';
+	}
+
+	public function clear_debug_log() {
+		delete_option( self::OPTION_LAST_LOG );
+	}
+
 	public function has_api_key() {
 		return '' !== $this->get_api_key();
 	}
 
-	public function update_settings( $api_key, $model, $clear_key = false, $web_search = null ) {
+	public function update_settings( $api_key, $model, $clear_key = false, $web_search = null, $debug = null ) {
 		if ( $clear_key ) {
 			delete_option( self::OPTION_API_KEY );
 		} elseif ( is_string( $api_key ) && '' !== trim( $api_key ) ) {
@@ -63,6 +78,33 @@ class DAT_PCB_AI {
 		if ( null !== $web_search ) {
 			update_option( self::OPTION_WEB_SEARCH, $web_search ? '1' : '0', false );
 		}
+
+		if ( null !== $debug ) {
+			update_option( self::OPTION_DEBUG, $debug ? '1' : '0', false );
+		}
+	}
+
+	/**
+	 * Ghi lai luot goi gan nhat de xem model that su tra ve gi.
+	 *
+	 * Chi bat khi can go loi: cat bo instructions/schema (dai va da biet truoc) va
+	 * chi giu phan model sinh ra. Khong bao gio ghi API key.
+	 */
+	private function log_exchange( $body, $code, $raw ) {
+		if ( ! $this->debug_enabled() ) {
+			return;
+		}
+		$log  = '=== ' . gmdate( 'Y-m-d H:i:s' ) . " UTC ===\n";
+		$log .= 'model: ' . ( $body['model'] ?? '?' ) . '   web_search: ' . ( isset( $body['tools'] ) ? 'on' : 'off' ) . "   HTTP: {$code}\n";
+
+		$last_input = is_array( $body['input'] ?? null ) ? end( $body['input'] ) : null;
+		if ( $last_input ) {
+			$content = $last_input['content'] ?? '';
+			$log .= "--- yeu cau cuoi ---\n" . mb_substr( is_string( $content ) ? $content : wp_json_encode( $content ), 0, 1500 ) . "\n";
+		}
+
+		$log .= "--- phan hoi tho ---\n" . mb_substr( (string) $raw, 0, 40000 ) . "\n";
+		update_option( self::OPTION_LAST_LOG, $log, false );
 	}
 
 	public function generate_component( $params ) {
@@ -353,7 +395,9 @@ class DAT_PCB_AI {
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		$raw  = wp_remote_retrieve_body( $response );
+		$data = json_decode( $raw, true );
+		$this->log_exchange( $body, $code, $raw );
 		if ( $code < 200 || $code >= 300 ) {
 			$message = isset( $data['error']['message'] ) ? $data['error']['message'] : 'OpenAI API error.';
 			$code_id = 400 === (int) $code ? 'dat_pcb_ai_api_rejected' : 'dat_pcb_ai_api_error';
@@ -964,7 +1008,7 @@ class DAT_PCB_AI {
 	 * Hop dong ve hinh hoc chan, dung chung cho ca hai prompt.
 	 */
 	private function footprint_geometry_instructions() {
-		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout to null and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch. Most important of all: an ADD_FOOTPRINT with layout set to null AND an empty pins array draws absolutely nothing, so never emit one - exactly one of the two must be filled in, and layout is the one you should almost always choose. Always put the real package name in the "package" field too (for example "TSSOP-20", "LQFP-32", "DIP-8"), because it is what the server falls back on when the layout is unusable.';
+		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout to null and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch. Most important of all: an ADD_FOOTPRINT with layout set to null AND an empty pins array draws absolutely nothing, so never emit one - exactly one of the two must be filled in, and layout is the one you should almost always choose. Always put the real package name in the "package" field too (for example "TSSOP-20", "LQFP-32", "DIP-8"), because it is what the server falls back on when the layout is unusable. Finally, and this is the single most common way to fail the user: the commands array is what actually draws on the board, and the reply text draws nothing at all. If you tell the user you added, moved or wired something, the matching command MUST be in the commands array of the SAME response. Never answer "I have created U1" with an empty commands array - either emit the command or say plainly that you did not do it.';
 	}
 
 	private function build_instructions() {
@@ -981,7 +1025,7 @@ class DAT_PCB_AI {
 					'type'                 => array( 'object', 'null' ),
 					'description'          => 'Preferred way to define a footprint: describe the package and the server generates exact pin coordinates. Use null ONLY for a part whose pins do not fit any family below, and then fill the pins array by hand instead. Every numeric field accepts 0 meaning "not known - use a sane default for this family".',
 					'additionalProperties' => false,
-					'required'             => array( 'family', 'pin_count', 'pitch', 'row_spacing', 'column_spacing', 'pad_long', 'pad_short', 'drill', 'rows', 'body_width', 'body_height', 'pin_names' ),
+					'required'             => array( 'family', 'pin_count', 'pitch', 'row_spacing', 'rows', 'body_width', 'body_height', 'pin_names' ),
 					'properties'           => array(
 						'family'         => array(
 							'type'        => 'string',
@@ -991,10 +1035,6 @@ class DAT_PCB_AI {
 						'pin_count'      => array( 'type' => 'integer', 'description' => 'Total number of electrical pins. Must be divisible by 4 for qfp/qfn, exactly 3 for sot23, exactly 2 for chip/radial/axial.' ),
 						'pitch'          => array( 'type' => 'number', 'description' => 'Centre-to-centre distance in mm between two adjacent pins along one row, read from the datasheet mechanical drawing (e.g. 2.54 for DIP, 1.27 for SOIC, 0.65 for TSSOP, 0.5 for LQFP).' ),
 						'row_spacing'    => array( 'type' => 'number', 'description' => 'Centre-to-centre distance in mm between the LEFT and RIGHT pin rows. For dip/soic/qfp/qfn this is the lead span across the package (not the plastic body width). For a 2-row header it is the distance between the two rows. For chip/radial/axial it is the distance between the two pads. For sot23 it is the distance between the 2-lead side and the 1-lead side.' ),
-						'column_spacing' => array( 'type' => 'number', 'description' => 'qfp/qfn only: centre-to-centre distance in mm between the TOP and BOTTOM pin rows. Use 0 for a square package to reuse row_spacing.' ),
-						'pad_long'       => array( 'type' => 'number', 'description' => 'Pad size in mm along the direction the lead points (away from the body). 0 = default for the family.' ),
-						'pad_short'      => array( 'type' => 'number', 'description' => 'Pad size in mm along the pitch direction. Must be smaller than pitch; the server clamps it anyway so pads can never touch.' ),
-						'drill'          => array( 'type' => 'number', 'description' => 'Hole diameter in mm for through-hole parts. Use 0 for surface-mount parts.' ),
 						'rows'           => array( 'type' => 'integer', 'description' => 'header only: 1 or 2 rows. Use 1 for every other family.' ),
 						'body_width'     => array( 'type' => 'number', 'description' => 'Plastic body width in mm (X axis) for the silkscreen outline. 0 = fit to the pins.' ),
 						'body_height'    => array( 'type' => 'number', 'description' => 'Plastic body height in mm (Y axis) for the silkscreen outline. 0 = fit to the pins.' ),

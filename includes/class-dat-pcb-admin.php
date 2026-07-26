@@ -23,12 +23,17 @@ class DAT_PCB_Admin {
 				isset( $_POST['dat_pcb_openai_api_key'] ) ? wp_unslash( $_POST['dat_pcb_openai_api_key'] ) : '',
 				isset( $_POST['dat_pcb_openai_model'] ) ? wp_unslash( $_POST['dat_pcb_openai_model'] ) : '',
 				! empty( $_POST['dat_pcb_clear_openai_api_key'] ),
-				! empty( $_POST['dat_pcb_openai_web_search'] )
+				! empty( $_POST['dat_pcb_openai_web_search'] ),
+				! empty( $_POST['dat_pcb_openai_debug'] )
 			);
+			if ( ! empty( $_POST['dat_pcb_clear_openai_log'] ) ) {
+				$this->ai->clear_debug_log();
+			}
 			echo '<div class="notice notice-success is-dismissible"><p>Da luu cai dat.</p></div>';
 		}
 		$model      = esc_attr( $this->ai->get_model() );
 		$web_search = $this->ai->web_search_enabled();
+		$debug      = $this->ai->debug_enabled();
 		echo '<div class="wrap">';
 		echo '<h1>DAT PCB Tracer - OpenAI</h1>';
 		echo '<p>Cau hinh OpenAI de tao footprint linh kien tu ten linh kien hoac URL datasheet PDF.</p>';
@@ -50,8 +55,20 @@ class DAT_PCB_Admin {
 		echo '<label><input id="dat-pcb-openai-web-search" name="dat_pcb_openai_web_search" type="checkbox" value="1"' . checked( $web_search, true, false ) . '> Cho AI tu tim datasheet/pinout tren mang</label>';
 		echo '<p class="description">Khi bat, AI se tu tra so chan va kich thuoc package cua linh kien la thay vi doan theo tri nho. Moi luot chat se cham hon va ton them token cho ket qua tim kiem.</p>';
 		echo '</td></tr>';
+		echo '<tr><th scope="row">Go loi</th><td>';
+		echo '<label><input id="dat-pcb-openai-debug" name="dat_pcb_openai_debug" type="checkbox" value="1"' . checked( $debug, true, false ) . '> Ghi lai luot goi AI gan nhat</label>';
+		echo '<p class="description">Bat khi AI tra loi nhung khong ve gi, de xem model that su gui ve nhung lenh nao. Khong ghi API key. Tat di khi da xong.</p>';
+		echo '</td></tr>';
 		echo '</tbody></table>';
 		submit_button( 'Luu cai dat', 'primary', 'dat_pcb_tracer_save_settings' );
+
+		$log = $this->ai->get_debug_log();
+		if ( '' !== $log ) {
+			echo '<h2>Luot goi AI gan nhat</h2>';
+			echo '<p class="description">Sao chep toan bo o duoi day khi can nho nguoi khac xem giup.</p>';
+			echo '<textarea readonly rows="20" style="width:100%;font-family:monospace;font-size:12px" onclick="this.select()">' . esc_textarea( $log ) . '</textarea>';
+			echo '<p><label><input type="checkbox" name="dat_pcb_clear_openai_log" value="1"> Xoa log nay khi luu</label></p>';
+		}
 		echo '</form>';
 		echo '</div>';
 	}
