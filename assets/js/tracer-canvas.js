@@ -556,9 +556,14 @@
 		var g = obj.geometry || {};
 		var label = g.ai_pin || g.pin_number || '';
 		if (!label) return;
-		var p = this.mmToScreen({ x: g.x, y: g.y });
 		var width = Number(g.width || g.diameter || 1) * this.view.scale;
 		var height = Number(g.height || g.diameter || 1) * this.view.scale;
+		var padSize = Math.max(width, height);
+		// Chan qua nho/day dac tren man hinh (vi du TSSOP pitch nho) se lam chu de len
+		// nhau khong doc duoc - an bot nhan theo dung muc zoom, giong cach luoi grid
+		// da an khi zoom xa, thay vi luon ve du bat ke kich thuoc pad.
+		if (padSize < 14) return;
+		var p = this.mmToScreen({ x: g.x, y: g.y });
 		ctx.save();
 		ctx.font = Math.max(9, Math.min(14, 1.25 * this.view.scale)) + 'px sans-serif';
 		ctx.textAlign = 'center';
@@ -568,7 +573,7 @@
 		ctx.fillStyle = '#ffffff';
 		ctx.strokeText(String(label).slice(0, 4), p.x, p.y - height / 2 - 8);
 		ctx.fillText(String(label).slice(0, 4), p.x, p.y - height / 2 - 8);
-		if (g.pin_name && !g.suppress_pin_name) {
+		if (g.pin_name && !g.suppress_pin_name && padSize >= 20) {
 			ctx.font = Math.max(8, Math.min(12, 1.05 * this.view.scale)) + 'px sans-serif';
 			ctx.strokeText(String(g.pin_name).slice(0, 8), p.x, p.y + height / 2 + 8);
 			ctx.fillText(String(g.pin_name).slice(0, 8), p.x, p.y + height / 2 + 8);
