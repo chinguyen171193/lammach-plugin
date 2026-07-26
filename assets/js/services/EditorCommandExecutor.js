@@ -153,7 +153,10 @@
 		if (oh > 0) { minY = Math.min(minY, y - oh / 2); maxY = Math.max(maxY, y + oh / 2); }
 		if (!isFinite(minX)) { minX = x; maxX = x; }
 		if (!isFinite(minY)) { minY = y; maxY = y; }
-		this.addSilkscreen(objects, command, componentId, ref, side, x, y, mirror);
+		// Tu ve lai silk tu bounding box that cua chan/outline, khong dung silk AI
+		// tu khai bao (co the khong khop voi vi tri chan that AI dat), de dam bao
+		// silk luon bao dung quanh than linh kien du AI cho toa do gi.
+		this.addAutoSilk(objects, minX, minY, maxX, maxY, side, componentId, ref);
 		if (ow > 0 && oh > 0) {
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
@@ -169,7 +172,7 @@
 		// Dat nhan ngay tren canh tren cung cua vung bao quanh chan/outline thuc te,
 		// thay vi dua vao "outline" AI khai bao (co the khong khop voi chan that),
 		// de nhan luon nam sat than linh kien du AI cho kich thuoc gi.
-		var labelText = command.silk && command.silk.length ? ref : ref + (command.package ? ' ' + String(command.package) : '');
+		var labelText = ref + (command.package ? ' ' + String(command.package) : '');
 		objects.push({
 			id: global.DATPCBTracerTools.makeId(),
 			type: 'annotation',
@@ -200,21 +203,30 @@
 		this.app.selected = objects.length ? objects.map(function (obj) { return obj.id; }) : this.app.selected;
 	};
 
-	EditorCommandExecutor.prototype.addSilkscreen = function (objects, command, componentId, ref, side, x, y, mirror) {
-		if (!Array.isArray(command.silk)) return;
-		mirror = mirror || 1;
-		command.silk.forEach(function (line) {
+	EditorCommandExecutor.prototype.addAutoSilk = function (objects, minX, minY, maxX, maxY, side, componentId, ref) {
+		var margin = 0.25;
+		var x1 = minX - margin, y1 = minY - margin, x2 = maxX + margin, y2 = maxY + margin;
+		if (x2 - x1 <= 0 || y2 - y1 <= 0) return;
+		var corner = Math.min(0.8, (x2 - x1) / 3, (y2 - y1) / 3);
+		var lines = [
+			{ x1: x1, y1: y1, x2: x2, y2: y1 },
+			{ x1: x1, y1: y1, x2: x1, y2: y2 },
+			{ x1: x2, y1: y1, x2: x2, y2: y2 },
+			{ x1: x1, y1: y2, x2: x2, y2: y2 },
+			{ x1: x1, y1: y1, x2: x1 + corner, y2: y1 + corner }
+		];
+		lines.forEach(function (line) {
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
 				type: 'shape',
 				layer: 'annotation',
 				geometry: {
 					shape: 'line',
-					x1: x + mirror * Number(line.x1 || 0),
-					y1: y + Number(line.y1 || 0),
-					x2: x + mirror * Number(line.x2 || 0),
-					y2: y + Number(line.y2 || 0),
-					strokeWidth: Number(line.width || 0.12),
+					x1: line.x1,
+					y1: line.y1,
+					x2: line.x2,
+					y2: line.y2,
+					strokeWidth: 0.12,
 					side: side,
 					component_id: componentId,
 					component_ref: ref,
