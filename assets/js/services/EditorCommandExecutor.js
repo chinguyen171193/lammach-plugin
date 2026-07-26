@@ -45,10 +45,19 @@
 		if (!component) return;
 		var idSet = {};
 		this.app.componentObjects(component.id).forEach(function (obj) { idSet[obj.id] = true; });
+		var affectedLinks = {};
+		this.app.state.objects.forEach(function (obj) {
+			if (obj.type !== 'track') return;
+			var g = obj.geometry || {};
+			if ((idSet[g.anchor1] || idSet[g.anchor2]) && g.net_link) affectedLinks[g.net_link] = true;
+		});
 		this.app.state.objects = this.app.state.objects.filter(function (obj) {
 			if (idSet[obj.id]) return false;
 			var g = obj.geometry || {};
-			if (obj.type === 'track' && (idSet[g.anchor1] || idSet[g.anchor2])) return false;
+			if (obj.type === 'track') {
+				if (idSet[g.anchor1] || idSet[g.anchor2]) return false;
+				if (g.net_link && affectedLinks[g.net_link]) return false;
+			}
 			return true;
 		});
 		this.app.state.components = this.app.state.components.filter(function (c) { return c.id !== component.id; });
@@ -65,11 +74,14 @@
 		var a = (localPins && localPins[command.from]) || this.findPin(command.from);
 		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
 		if (!a || !b || !a.id || !b.id) return;
+		var link1 = a.id + '__' + b.id;
+		var link2 = b.id + '__' + a.id;
 		this.app.state.objects = this.app.state.objects.filter(function (obj) {
 			if (obj.type !== 'track') return true;
 			var g = obj.geometry || {};
-			var matches = (g.anchor1 === a.id && g.anchor2 === b.id) || (g.anchor1 === b.id && g.anchor2 === a.id);
-			return !matches;
+			if (g.net_link === link1 || g.net_link === link2) return false;
+			var directMatch = (g.anchor1 === a.id && g.anchor2 === b.id) || (g.anchor1 === b.id && g.anchor2 === a.id);
+			return !directMatch;
 		});
 	};
 
@@ -98,6 +110,7 @@
 		var componentId = 'cmp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 		var objects = [];
 		var pins = [];
+		var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 		(command.pins || []).forEach(function (pin) {
 			var px = x + mirror * Number(pin.x || 0);
 			var py = y + Number(pin.y || 0);
@@ -128,10 +141,18 @@
 			});
 			pins.push({ number: String(pin.number || ''), name: String(pin.name || ''), object_id: padId });
 			if (localPins) localPins[requestedRef + '.' + String(pin.number || '')] = { x: px, y: py, side: side, id: padId };
+			var halfW = Number(g.width || g.diameter || 1) / 2;
+			var halfH = Number(g.height || g.diameter || 1) / 2;
+			minX = Math.min(minX, px - halfW); maxX = Math.max(maxX, px + halfW);
+			minY = Math.min(minY, py - halfH); maxY = Math.max(maxY, py + halfH);
 		});
 		var outline = command.outline || {};
 		var ow = Number(outline.width || 0);
 		var oh = Number(outline.height || 0);
+		if (ow > 0) { minX = Math.min(minX, x - ow / 2); maxX = Math.max(maxX, x + ow / 2); }
+		if (oh > 0) { minY = Math.min(minY, y - oh / 2); maxY = Math.max(maxY, y + oh / 2); }
+		if (!isFinite(minX)) { minX = x; maxX = x; }
+		if (!isFinite(minY)) { minY = y; maxY = y; }
 		this.addSilkscreen(objects, command, componentId, ref, side, x, y, mirror);
 		if (ow > 0 && oh > 0) {
 			objects.push({
@@ -145,12 +166,15 @@
 				note: ref + ' outline'
 			});
 		}
+		// Dat nhan ngay tren canh tren cung cua vung bao quanh chan/outline thuc te,
+		// thay vi dua vao "outline" AI khai bao (co the khong khop voi chan that),
+		// de nhan luon nam sat than linh kien du AI cho kich thuoc gi.
 		var labelText = command.silk && command.silk.length ? ref : ref + (command.package ? ' ' + String(command.package) : '');
 		objects.push({
 			id: global.DATPCBTracerTools.makeId(),
 			type: 'annotation',
 			layer: 'annotation',
-			geometry: { x: x - Math.max(2, ow / 2 || 3), y: y - Math.max(1.2, oh / 2 + 1 || 3), text: labelText, size: 1.2, side: side, component_id: componentId, component_ref: ref },
+			geometry: { x: minX, y: minY - 1.6, text: labelText, size: 1.2, side: side, component_id: componentId, component_ref: ref },
 			style: {},
 			locked: false,
 			visible: true,
@@ -249,19 +273,38 @@
 		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
 		if (!a || !b) return;
 		var side = a.side || b.side || this.app.activeSide;
-		var geometry = { x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: this.app.options.trackWidth || 0.4, bow: 0 };
-		if (a.id) geometry.anchor1 = a.id;
-		if (b.id) geometry.anchor2 = b.id;
-		this.app.state.objects.push({
-			id: global.DATPCBTracerTools.makeId(),
-			type: 'track',
-			layer: side === 'bottom' ? 'bottom_copper' : 'top_copper',
-			geometry: geometry,
-			style: {},
-			locked: false,
-			visible: true,
-			note: 'AI connect ' + command.from + ' -> ' + command.to
-		});
+		var layer = side === 'bottom' ? 'bottom_copper' : 'top_copper';
+		var width = this.app.options.trackWidth || 0.4;
+		var note = 'AI connect ' + command.from + ' -> ' + command.to;
+		var linkId = (a.id && b.id) ? (a.id + '__' + b.id) : null;
+		var self = this;
+		function pushSegment(p1, p2, anchor1, anchor2) {
+			var geometry = { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, width: width, bow: 0 };
+			if (anchor1) geometry.anchor1 = anchor1;
+			if (anchor2) geometry.anchor2 = anchor2;
+			if (linkId) geometry.net_link = linkId;
+			self.app.state.objects.push({
+				id: global.DATPCBTracerTools.makeId(),
+				type: 'track',
+				layer: layer,
+				geometry: geometry,
+				style: {},
+				locked: false,
+				visible: true,
+				note: note
+			});
+		}
+		// Neu 2 chan da thang hang (cung X hoac cung Y) thi 1 doan la du va bam
+		// theo ca 2 dau. Neu khong, di theo 2 doan vuong goc (kieu chu L) giong
+		// PCB thuc te thay vi 1 duong cheo cat ngang qua linh kien khac.
+		if (Math.abs(a.x - b.x) < 0.01 || Math.abs(a.y - b.y) < 0.01) {
+			pushSegment(a, b, a.id, b.id);
+			return;
+		}
+		var dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+		var corner = dx >= dy ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
+		pushSegment(a, corner, a.id, null);
+		pushSegment(corner, b, null, b.id);
 	};
 
 	EditorCommandExecutor.prototype.findPin = function (pinName) {
