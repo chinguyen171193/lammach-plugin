@@ -25,9 +25,10 @@ class DAT_PCB_AI {
 	// Web search + suy luan lam mot luot goi lau hon han truoc day.
 	const REQUEST_TIMEOUT = 180;
 
-	// Token suy luan cua gpt-5.x tinh chung vao max_output_tokens, nen han muc
-	// cu (3500) rat de bi dot het truoc khi model kip in ra JSON.
-	const MAX_OUTPUT_TOKENS = 16000;
+	// Token suy luan cua gpt-5.x tinh chung vao max_output_tokens, va mot luot co
+	// web_search con ton them cho ket qua tim kiem, nen can du cho de model kip in
+	// ra JSON sau khi da suy luan va tra cuu xong.
+	const MAX_OUTPUT_TOKENS = 24000;
 
 	public function get_model() {
 		$model = get_option( self::OPTION_MODEL, '' );
@@ -440,10 +441,61 @@ class DAT_PCB_AI {
 		return $data;
 	}
 
+	/**
+	 * Cat JSON cut ve phan tu cuoi cung con nguyen ven roi dong lai.
+	 *
+	 * Model co the lap mot lenh hang tram lan roi cut giua chung khi het han muc
+	 * token. Vut ca cau tra loi di thi nguoi dung khong duoc gi, trong khi phan
+	 * dau thuong van dung - giu lai duoc bao nhieu hay bay nhieu.
+	 */
+	private function repair_truncated_json( $text ) {
+		$in_string = false;
+		$escaped   = false;
+		$depth     = 0;
+		$last_safe = -1;
+		$length    = strlen( $text );
+
+		for ( $i = 0; $i < $length; $i++ ) {
+			$char = $text[ $i ];
+			if ( $in_string ) {
+				if ( $escaped ) {
+					$escaped = false;
+				} elseif ( '\\' === $char ) {
+					$escaped = true;
+				} elseif ( '"' === $char ) {
+					$in_string = false;
+				}
+				continue;
+			}
+			if ( '"' === $char ) {
+				$in_string = true;
+			} elseif ( '{' === $char || '[' === $char ) {
+				$depth++;
+			} elseif ( '}' === $char || ']' === $char ) {
+				$depth--;
+				// Do sau 2 = vua dong xong mot phan tu cua mang "commands".
+				if ( 2 === $depth ) {
+					$last_safe = $i;
+				}
+			}
+		}
+
+		if ( $last_safe < 0 ) {
+			return null;
+		}
+		$plan = json_decode( substr( $text, 0, $last_safe + 1 ) . ']}', true );
+		return is_array( $plan ) ? $plan : null;
+	}
+
 	private function decode_plan( $data ) {
-		$plan = json_decode( $this->extract_output_text( $data ), true );
+		$text = $this->extract_output_text( $data );
+		$plan = json_decode( $text, true );
 		if ( is_array( $plan ) ) {
 			return $plan;
+		}
+		$salvaged = $this->repair_truncated_json( $text );
+		if ( null !== $salvaged ) {
+			return $salvaged;
 		}
 		if ( 'incomplete' === ( $data['status'] ?? '' ) && 'max_output_tokens' === ( $data['incomplete_details']['reason'] ?? '' ) ) {
 			return new WP_Error( 'dat_pcb_ai_truncated', 'AI dung het han muc token truoc khi kip tra ket qua. Hay chia yeu cau thanh tung phan nho hon.', array( 'status' => 502 ) );
@@ -1029,17 +1081,17 @@ class DAT_PCB_AI {
 	 */
 	private function research_instructions() {
 		if ( ! ( $this->web_search_enabled() && $this->model_supports_web_search( $this->get_model() ) ) ) {
-			return 'You have no internet access, no browsing tool, and no way to open a URL or search the web in this conversation - you can only use what is in your training data plus any datasheet file the user explicitly attaches to their message. Never claim or imply that you looked something up online, fetched a datasheet, or verified against "the official datasheet" unless the user actually attached a PDF to THIS message (its content will appear as a file in the input, not just mentioned in text) - saying that when you did not is actively misleading. If the user insists you "search the internet" or "look it up" for a part you are not confident about, say plainly in the reply that you cannot browse the internet from here, give your best conservative guess only if reasonable, and suggest they attach the real datasheet PDF using the attachment button so you can read it directly.';
+			return 'RESEARCH. You cannot browse the web here; you only have your training data plus any datasheet PDF the user attached to this message. Never imply you looked something up or read "the official datasheet" unless a PDF really was attached. Not being able to check is not a reason to place nothing: still emit the footprint from memory, say plainly in the reply that you could not verify it, add a warning, and suggest attaching the datasheet PDF. Return an empty commands array only for a genuinely impossible or unsafe request, never merely because you are unsure of a footprint.';
 		}
 
-		return 'You have a web_search tool and you are expected to use it instead of guessing. Search before you commit to any pin layout you are not fully certain about: unfamiliar ICs, modules, connectors, relays, regulators, and anything with more than 8 pins. Search the exact manufacturer part number together with terms like "datasheet pinout package dimensions pin pitch", prefer the manufacturer\'s own datasheet PDF or a reputable distributor page over forum posts or image results, and derive the outline size, pin pitch and pin coordinates from what you actually read there. If the first result is ambiguous, search again with a different phrasing rather than settling for a guess. You may skip the search only for trivially standard parts (plain resistors, capacitors, 2.54mm headers) or when the user attached a datasheet PDF to this message - an attached datasheet always wins over anything you find online. In the reply, name the exact part number and package variant you based the footprint on and mention the source you read, in one short sentence, so the user can verify it. Never state that you read a datasheet you did not actually open in this conversation - if the search tool did not run or returned nothing useful, do not cite a URL, and say instead that the numbers come from memory. Being unable to search is never a reason to place nothing: still emit the footprint from your best recollection of the package, say plainly in the reply that you could not verify it, and add a warning telling the user to check the real datasheet before manufacturing. An unverified footprint with an honest warning is useful; a confident sentence with nothing drawn on the board is the one outcome that helps nobody.';
+		return 'RESEARCH. Use the web_search tool before committing to a pin layout you are not sure of: any unfamiliar IC, module, connector, or anything over 8 pins. Search the exact part number with "datasheet pinout package dimensions", prefer the manufacturer PDF, and take pitch and lead span from what you actually read. Skip the search only for trivially standard parts or when the user attached a datasheet, which always wins. Name the part number and the source in the reply. If the search did not run or found nothing useful, do not cite a URL and say the numbers come from memory - but still place the part, with a warning, because an unverified footprint the user can check beats an empty board. Return an empty commands array only for a genuinely impossible or unsafe request, never merely because you are unsure of a footprint.';
 	}
 
 	/**
 	 * Hop dong ve hinh hoc chan, dung chung cho ca hai prompt.
 	 */
 	private function footprint_geometry_instructions() {
-		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout.family to "none" and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch. Most important of all: an ADD_FOOTPRINT with layout.family "none" AND an empty pins array draws absolutely nothing, so never emit one - exactly one of the two must be filled in, and a real layout family is the one you should almost always choose. Always put the real package name in the "package" field too (for example "TSSOP-20", "LQFP-32", "DIP-8"), because it is what the server falls back on when the layout is unusable. Finally, and this is the single most common way to fail the user: the commands array is what actually draws on the board, and the reply text draws nothing at all. If you tell the user you added, moved or wired something, the matching command MUST be in the commands array of the SAME response. Never answer "I have created U1" with an empty commands array - either emit the command or say plainly that you did not do it.';
+		return 'FOOTPRINTS. Fill "layout" and the server computes every pin coordinate, applies datasheet numbering (pin 1 top left, counter-clockwise), centres the part on its origin, and keeps pads from touching. Give family, pin_count, pitch, and row_spacing - the lead span measured pad centre to pad centre, NOT the plastic body width - and leave any number you do not know as 0. Put pin function names in pin_names starting at pin 1. Set family "none" and fill "pins" by hand only for irregular parts such as relays, modules or staggered connectors; hand coordinates are millimetres from the part centre, +x right and +y DOWN, every pad smaller than the gap to its neighbour, and family "none" with an empty pins array draws nothing at all. Always fill "package" with the real package name like "TSSOP-20" or "LQFP-32", which the server falls back on when the layout is unusable.';
 	}
 
 	private function build_instructions() {
@@ -1050,7 +1102,7 @@ class DAT_PCB_AI {
 		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
-			'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'layout', 'outline', 'silk', 'pins' ),
+			'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'layout', 'outline', 'pins' ),
 			'properties'           => array(
 				'layout'    => array(
 					'type'                 => 'object',
@@ -1091,21 +1143,6 @@ class DAT_PCB_AI {
 					'properties'           => array(
 						'width'  => array( 'type' => 'number' ),
 						'height' => array( 'type' => 'number' ),
-					),
-				),
-				'silk'      => array(
-					'type'  => 'array',
-					'items' => array(
-						'type'                 => 'object',
-						'additionalProperties' => false,
-						'required'             => array( 'x1', 'y1', 'x2', 'y2', 'width' ),
-						'properties'           => array(
-							'x1'    => array( 'type' => 'number' ),
-							'y1'    => array( 'type' => 'number' ),
-							'x2'    => array( 'type' => 'number' ),
-							'y2'    => array( 'type' => 'number' ),
-							'width' => array( 'type' => 'number' ),
-						),
 					),
 				),
 				'pins'      => array(
@@ -1166,11 +1203,12 @@ class DAT_PCB_AI {
 	}
 
 	private function build_chat_instructions() {
-		return 'You are a PCB layout assistant chatting with a user inside a browser-based PCB editor. Each message includes the current board size and a JSON list of components already placed (ref, name, value, package, side, x, y, rotation in millimeters). Reply with JSON matching the schema: a short "reply" string in the same language the user wrote in, explaining what you did or answering their question, and a "commands" array (can be empty) with the changes to apply. Available command types: ADD_FOOTPRINT (add a brand new footprint - describe the package in the layout object and the server generates the pins), CONNECT (from "REF.PIN" to "REF.PIN", adds a straight copper track between two existing pins), DISCONNECT (from "REF.PIN" to "REF.PIN", removes an existing track directly wiring those two pins), MOVE_COMPONENT (ref, x, y - move an EXISTING component from the provided list to a new absolute position in millimeters), DELETE_COMPONENT (ref - remove an existing component and everything that belongs to it), SET_VALUE (ref, value - change an existing component value/label). Only reference a ref that is either in the provided component list or that you are adding earlier in the same commands array - never invent a ref that does not exist. If the user asks for something genuinely unsafe or impossible, explain why in the reply and return an empty commands array. That escape hatch is NOT for uncertainty about a footprint: when the user asks for a part, always place it, using your best conservative geometry plus a warning, because an approximate footprint the user can check against a datasheet is far more useful than an empty board.
-Layout and routing quality matter a lot because every connection is drawn as a single straight track between two exact pin coordinates - there is no autorouter and nothing bends around parts. To keep the result readable: (1) when adding a part that connects to a specific pin of an existing IC, place that part\'s x/y close to that pin\'s absolute position (pin absolute position = component x/y plus the pin offset you gave it), not just clustered near the component center - this keeps the straight track short. (2) Never place a new footprint\'s body, or the straight line path between two pins you are about to CONNECT, on top of another existing component\'s body or pins. (3) When several existing pins share the same net (for example multiple grounds), do not wire them all to one central hub pin - instead chain them through whichever already-connected pin is physically nearest, so tracks run between neighbors instead of radiating long diagonals across the board. (4) Prefer arranging newly added parts in a single row or a small grid with clear spacing (at least the sum of both parts\' largest dimension) rather than scattering them at arbitrary angles around the IC.
-Pin geometry accuracy matters even more for footprints you build without an attached datasheet. For any part with more than 8 pins (microcontrollers, connectors with many pins, relays with unusual mechanical pinouts), do not trust your memory of the exact pin spacing - look the datasheet up first as described below, then feed the numbers you read into the layout object. Getting the package family, pin count and pitch right matters more than fabricating false mechanical precision; if the lookup fails, say so plainly in the reply and in a warning so the user knows to double check the real datasheet before manufacturing.
+		return 'You are a PCB layout assistant inside a browser PCB editor. Each message gives the board size and a JSON list of components already placed. Answer with JSON: "reply" is one or two short sentences in the user\'s language, and "commands" is what actually changes the board - the reply text draws nothing by itself. If you say you added, moved or wired something, the matching command must be in the same response.
+Commands: ADD_FOOTPRINT (new part - describe the package in "layout" and the server generates the pins), CONNECT and DISCONNECT ("REF.PIN" to "REF.PIN", a straight track between two pins), MOVE_COMPONENT (ref, x, y in mm), DELETE_COMPONENT (ref), SET_VALUE (ref, value). Only use a ref from the provided list or one you added earlier in the same array. Never repeat a command, and never emit one that changes nothing such as connecting a pin to itself. Two or three commands is a normal answer; if you notice yourself writing the same command a second time, stop and close the array.
+PLACEMENT. Every track is a straight line between two exact pins and there is no autorouter. Put a new part near the pin it connects to, never on top of another part, and chain a shared net through the nearest already-connected pin instead of radiating from one hub.
 ' . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
 	}
+
 
 	private function chat_schema() {
 		$move_schema = array(
@@ -1659,21 +1697,6 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 		}
 		$pins = $this->center_pins( $pins );
 		$outline = null !== $generated ? $this->layout_outline( $layout, $pins ) : $outline_hint;
-		$silk = array();
-		if ( ! empty( $command['silk'] ) && is_array( $command['silk'] ) ) {
-			foreach ( array_slice( $command['silk'], 0, 64 ) as $line ) {
-				if ( ! is_array( $line ) ) {
-					continue;
-				}
-				$silk[] = array(
-					'x1'    => max( -200, min( 200, (float) ( $line['x1'] ?? 0 ) ) ),
-					'y1'    => max( -200, min( 200, (float) ( $line['y1'] ?? 0 ) ) ),
-					'x2'    => max( -200, min( 200, (float) ( $line['x2'] ?? 0 ) ) ),
-					'y2'    => max( -200, min( 200, (float) ( $line['y2'] ?? 0 ) ) ),
-					'width' => max( 0.05, min( 1, (float) ( $line['width'] ?? 0.12 ) ) ),
-				);
-			}
-		}
 		$clean_command = array(
 			'type'      => 'ADD_FOOTPRINT',
 			'ref'       => sanitize_text_field( (string) ( $command['ref'] ?? 'U1' ) ),
@@ -1689,9 +1712,6 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 			),
 			'pins'      => $pins,
 		);
-		if ( ! empty( $silk ) ) {
-			$clean_command['silk'] = $silk;
-		}
 		return $clean_command;
 	}
 
@@ -1792,11 +1812,26 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 		$local_refs = is_array( $known_refs ) ? $known_refs : array();
 		$known_pins = array();
 		$dropped    = array();
+		$seen       = array();
 		foreach ( $plan['commands'] as $command ) {
 			if ( ! is_array( $command ) || count( $out['commands'] ) >= 200 ) {
 				continue;
 			}
 			$type = $command['type'] ?? '';
+
+			// Model co the ket vao vong lap va lap lai y het mot lenh hang tram
+			// lan. Ap dung lan hai tro di deu vo nghia hoac pha ban mach.
+			if ( 'ADD_FOOTPRINT' !== $type ) {
+				$fingerprint = wp_json_encode( $command );
+				if ( isset( $seen[ $fingerprint ] ) ) {
+					continue;
+				}
+				$seen[ $fingerprint ] = true;
+			}
+			// Noi hoac cat mot chan voi chinh no khong co nghia gi.
+			if ( ( 'CONNECT' === $type || 'DISCONNECT' === $type ) && ( $command['from'] ?? '' ) === ( $command['to'] ?? '' ) ) {
+				continue;
+			}
 			if ( 'ADD_FOOTPRINT' === $type ) {
 				$clean_command = $this->sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height );
 				if ( ! $clean_command ) {
