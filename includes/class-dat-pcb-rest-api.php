@@ -37,6 +37,9 @@ class DAT_PCB_REST_API {
 		register_rest_route( $this->namespace, '/ai/component', array(
 			'methods' => WP_REST_Server::CREATABLE, 'callback' => array( $this, 'generate_component' ), 'permission_callback' => array( $this, 'can_manage' ),
 		) );
+		register_rest_route( $this->namespace, '/ai/chat', array(
+			'methods' => WP_REST_Server::CREATABLE, 'callback' => array( $this, 'ai_chat' ), 'permission_callback' => array( $this, 'can_manage' ),
+		) );
 	}
 
 	public function can_manage() {
@@ -124,6 +127,11 @@ class DAT_PCB_REST_API {
 			$params['_datasheet_file'] = $files['datasheet'];
 		}
 		return $this->respond( $this->ai->generate_component( is_array( $params ) ? $params : array() ) );
+	}
+
+	public function ai_chat( WP_REST_Request $request ) {
+		$params = $request->get_json_params();
+		return $this->respond( $this->ai->chat_message( is_array( $params ) ? $params : array() ) );
 	}
 
 	private function respond( $value ) {

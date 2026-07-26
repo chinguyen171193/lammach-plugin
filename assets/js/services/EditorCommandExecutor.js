@@ -14,8 +14,63 @@
 			if (command.type === 'ADD_FOOTPRINT') this.addFootprint(command, localPins);
 			if (command.type === 'ADD_COMPONENT') this.addComponent(command);
 			if (command.type === 'CONNECT') this.connect(command, localPins);
+			if (command.type === 'DISCONNECT') this.disconnect(command, localPins);
+			if (command.type === 'MOVE_COMPONENT') this.moveComponent(command);
+			if (command.type === 'DELETE_COMPONENT') this.deleteComponentByRef(command);
+			if (command.type === 'SET_VALUE') this.setValue(command);
 		}, this);
+		if (this.app.syncAnchoredTracks) this.app.syncAnchoredTracks();
 		this.app.markDirty();
+	};
+
+	EditorCommandExecutor.prototype.findComponentByRef = function (ref) {
+		return (this.app.state.components || []).filter(function (c) { return c.ref === ref; })[0] || null;
+	};
+
+	EditorCommandExecutor.prototype.moveComponent = function (command) {
+		var component = this.findComponentByRef(String(command.ref || ''));
+		if (!component) return;
+		var dx = Number(command.x || 0) - Number(component.x || 0);
+		var dy = Number(command.y || 0) - Number(component.y || 0);
+		if (!dx && !dy) return;
+		component.x = Number(command.x || 0);
+		component.y = Number(command.y || 0);
+		this.app.componentObjects(component.id).forEach(function (obj) {
+			global.DATPCBTracerTools.moveObject(obj, dx, dy);
+		});
+	};
+
+	EditorCommandExecutor.prototype.deleteComponentByRef = function (command) {
+		var component = this.findComponentByRef(String(command.ref || ''));
+		if (!component) return;
+		var idSet = {};
+		this.app.componentObjects(component.id).forEach(function (obj) { idSet[obj.id] = true; });
+		this.app.state.objects = this.app.state.objects.filter(function (obj) {
+			if (idSet[obj.id]) return false;
+			var g = obj.geometry || {};
+			if (obj.type === 'track' && (idSet[g.anchor1] || idSet[g.anchor2])) return false;
+			return true;
+		});
+		this.app.state.components = this.app.state.components.filter(function (c) { return c.id !== component.id; });
+		this.app.selected = this.app.selected.filter(function (id) { return !idSet[id]; });
+	};
+
+	EditorCommandExecutor.prototype.setValue = function (command) {
+		var component = this.findComponentByRef(String(command.ref || ''));
+		if (!component) return;
+		component.value = String(command.value || '');
+	};
+
+	EditorCommandExecutor.prototype.disconnect = function (command, localPins) {
+		var a = (localPins && localPins[command.from]) || this.findPin(command.from);
+		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
+		if (!a || !b || !a.id || !b.id) return;
+		this.app.state.objects = this.app.state.objects.filter(function (obj) {
+			if (obj.type !== 'track') return true;
+			var g = obj.geometry || {};
+			var matches = (g.anchor1 === a.id && g.anchor2 === b.id) || (g.anchor1 === b.id && g.anchor2 === a.id);
+			return !matches;
+		});
 	};
 
 	EditorCommandExecutor.prototype.nextAvailableRef = function (ref) {

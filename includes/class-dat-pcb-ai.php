@@ -131,6 +131,139 @@ class DAT_PCB_AI {
 		return rest_ensure_response( $this->sanitize_plan( $plan, $side, $x, $y, $board_width, $board_height ) );
 	}
 
+	public function chat_message( $params ) {
+		$message = isset( $params['message'] ) ? sanitize_textarea_field( $params['message'] ) : '';
+		if ( '' === trim( $message ) ) {
+			return new WP_Error( 'dat_pcb_ai_empty_message', 'Vui long nhap noi dung.', array( 'status' => 400 ) );
+		}
+
+		$side  = isset( $params['side'] ) && 'bottom' === $params['side'] ? 'bottom' : 'top';
+		$board = isset( $params['board'] ) && is_array( $params['board'] ) ? $params['board'] : array();
+		$x = isset( $params['x'] ) ? (float) $params['x'] : 20;
+		$y = isset( $params['y'] ) ? (float) $params['y'] : 18;
+		$board_width  = isset( $board['width_mm'] ) ? max( 1, (float) $board['width_mm'] ) : 100;
+		$board_height = isset( $board['height_mm'] ) ? max( 1, (float) $board['height_mm'] ) : 80;
+
+		// Uu tien template cuc bo (mien phi, khong can API key) cho yeu cau "tao moi"
+		// truoc khi phai goi OpenAI - giu dung nguyen tac da ap dung cho generate_component().
+		$circuit = $this->known_circuit_plan( $message, $side, $x, $y, $board_width, $board_height );
+		if ( $circuit ) {
+			$plan = $this->sanitize_plan( $circuit, $side, $x, $y, $board_width, $board_height );
+			return rest_ensure_response( array(
+				'reply'    => implode( ' ', $plan['warnings'] ),
+				'commands' => $plan['commands'],
+			) );
+		}
+		$template = $this->known_component_plan( $message, $side, $x, $y );
+		if ( $template ) {
+			$plan = $this->sanitize_plan( $template, $side, $x, $y, $board_width, $board_height );
+			return rest_ensure_response( array(
+				'reply'    => implode( ' ', $plan['warnings'] ),
+				'commands' => $plan['commands'],
+			) );
+		}
+
+		$api_key = $this->get_api_key();
+		if ( '' === $api_key ) {
+			return new WP_Error( 'dat_pcb_ai_missing_key', 'Khong nhan dien duoc yeu cau bang du lieu cuc bo. Can cau hinh OpenAI API key (DAT PCB Tracer - Cai dat) de chat AI xu ly cac yeu cau khac (sua/xoa linh kien co san, linh kien la...).', array( 'status' => 400 ) );
+		}
+
+		$known_refs = array();
+		$components = array();
+		if ( isset( $params['components'] ) && is_array( $params['components'] ) ) {
+			foreach ( array_slice( $params['components'], 0, 500 ) as $component ) {
+				if ( ! is_array( $component ) ) {
+					continue;
+				}
+				$ref = sanitize_text_field( (string) ( $component['ref'] ?? '' ) );
+				if ( '' === $ref ) {
+					continue;
+				}
+				$known_refs[ $ref ] = true;
+				$components[] = array(
+					'ref'      => $ref,
+					'name'     => sanitize_text_field( (string) ( $component['name'] ?? '' ) ),
+					'value'    => sanitize_text_field( (string) ( $component['value'] ?? '' ) ),
+					'package'  => sanitize_text_field( (string) ( $component['package'] ?? '' ) ),
+					'side'     => 'bottom' === ( $component['side'] ?? '' ) ? 'bottom' : 'top',
+					'x'        => round( (float) ( $component['x'] ?? 0 ), 3 ),
+					'y'        => round( (float) ( $component['y'] ?? 0 ), 3 ),
+					'rotation' => (float) ( $component['rotation'] ?? 0 ),
+				);
+			}
+		}
+
+		$history = array();
+		if ( isset( $params['history'] ) && is_array( $params['history'] ) ) {
+			foreach ( array_slice( $params['history'], -20 ) as $turn ) {
+				if ( ! is_array( $turn ) ) {
+					continue;
+				}
+				$role = 'assistant' === ( $turn['role'] ?? '' ) ? 'assistant' : 'user';
+				$content = sanitize_textarea_field( (string) ( $turn['content'] ?? '' ) );
+				if ( '' === $content ) {
+					continue;
+				}
+				$history[] = array( 'role' => $role, 'content' => $content );
+			}
+		}
+
+		$board_summary  = "Board size: {$board_width}mm x {$board_height}mm.\n";
+		$board_summary .= "Active side in editor: {$side}. Cursor/insertion point: {$x}mm, {$y}mm.\n";
+		$board_summary .= empty( $components )
+			? "No components on the board yet.\n"
+			: 'Existing components (JSON array): ' . wp_json_encode( array_values( $components ) ) . "\n";
+
+		$input = array();
+		foreach ( $history as $turn ) {
+			$input[] = array( 'role' => $turn['role'], 'content' => $turn['content'] );
+		}
+		$input[] = array( 'role' => 'user', 'content' => $board_summary . "\nUser request: " . $message );
+
+		$body = array(
+			'model'             => $this->get_model(),
+			'instructions'      => $this->build_chat_instructions(),
+			'input'             => $input,
+			'text'              => array(
+				'format' => array(
+					'type'   => 'json_schema',
+					'name'   => 'pcb_chat_response',
+					'strict' => true,
+					'schema' => $this->chat_schema(),
+				),
+			),
+			'max_output_tokens' => 3500,
+		);
+
+		$response = wp_remote_post(
+			'https://api.openai.com/v1/responses',
+			array(
+				'timeout' => 60,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $api_key,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $body ),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'dat_pcb_ai_request_failed', $response->get_error_message(), array( 'status' => 502 ) );
+		}
+		$code = wp_remote_retrieve_response_code( $response );
+		$raw  = wp_remote_retrieve_body( $response );
+		$data = json_decode( $raw, true );
+		if ( $code < 200 || $code >= 300 ) {
+			$err_message = isset( $data['error']['message'] ) ? $data['error']['message'] : 'OpenAI API error.';
+			return new WP_Error( 'dat_pcb_ai_api_error', sanitize_text_field( $err_message ), array( 'status' => 502 ) );
+		}
+		$text = $this->extract_output_text( $data );
+		$plan = json_decode( $text, true );
+		if ( ! is_array( $plan ) ) {
+			return new WP_Error( 'dat_pcb_ai_invalid_json', 'OpenAI khong tra ve JSON hop le.', array( 'status' => 502 ) );
+		}
+		return rest_ensure_response( $this->sanitize_chat_response( $plan, $side, $x, $y, $board_width, $board_height, $known_refs ) );
+	}
+
 	private function get_api_key() {
 		$key = get_option( self::OPTION_API_KEY, '' );
 		return is_string( $key ) ? trim( $key ) : '';
@@ -697,8 +830,8 @@ class DAT_PCB_AI {
 		return 'You generate PCB footprint and wiring commands for a browser PCB editor. Return only JSON that matches the schema. Use millimeters. Prefer real package conventions from the component name or datasheet. If the user asks for a full circuit or module (not just one bare part), return multiple ADD_FOOTPRINT commands - one per component (IC, passives, connectors) - laid out with non-overlapping x/y coordinates around the insertion point, plus CONNECT commands for every required electrical connection using "REF.PIN" strings, for example {"type":"CONNECT","from":"U1.1","to":"C1.1"}. Every ref used in a CONNECT command must exist as an ADD_FOOTPRINT command with that exact ref and pin number earlier in the same commands array. Keep coordinates relative to the provided insertion point. Include silk lines when known, and use an empty silk array when unknown. Include pin rotation and suppress_pin_name for every pin. Do not invent electrical connections you are not confident about. If uncertain about component values or wiring, add clear warnings and prefer a conservative, commonly used reference design.';
 	}
 
-	private function component_schema() {
-		$footprint_schema = array(
+	private function footprint_command_schema() {
+		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
 			'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'outline', 'silk', 'pins' ),
@@ -759,16 +892,22 @@ class DAT_PCB_AI {
 				),
 			),
 		);
-		$connect_schema = array(
+	}
+
+	private function connect_command_schema( $type_name = 'CONNECT' ) {
+		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
 			'required'             => array( 'type', 'from', 'to' ),
 			'properties'           => array(
-				'type' => array( 'type' => 'string', 'enum' => array( 'CONNECT' ) ),
+				'type' => array( 'type' => 'string', 'enum' => array( $type_name ) ),
 				'from' => array( 'type' => 'string', 'description' => 'Reference designator and pin number joined by a dot, e.g. U1.1' ),
 				'to'   => array( 'type' => 'string', 'description' => 'Reference designator and pin number joined by a dot, e.g. C1.2' ),
 			),
 		);
+	}
+
+	private function component_schema() {
 		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
@@ -779,7 +918,65 @@ class DAT_PCB_AI {
 				'commands' => array(
 					'type'  => 'array',
 					'items' => array(
-						'anyOf' => array( $footprint_schema, $connect_schema ),
+						'anyOf' => array( $this->footprint_command_schema(), $this->connect_command_schema() ),
+					),
+				),
+			),
+		);
+	}
+
+	private function build_chat_instructions() {
+		return 'You are a PCB layout assistant chatting with a user inside a browser-based PCB editor. Each message includes the current board size and a JSON list of components already placed (ref, name, value, package, side, x, y, rotation in millimeters). Reply with JSON matching the schema: a short "reply" string in the same language the user wrote in, explaining what you did or answering their question, and a "commands" array (can be empty) with the changes to apply. Available command types: ADD_FOOTPRINT (add a brand new footprint with full pin list, same shape as before), CONNECT (from "REF.PIN" to "REF.PIN", adds a straight copper track between two existing pins), DISCONNECT (from "REF.PIN" to "REF.PIN", removes an existing track directly wiring those two pins), MOVE_COMPONENT (ref, x, y - move an EXISTING component from the provided list to a new absolute position in millimeters), DELETE_COMPONENT (ref - remove an existing component and everything that belongs to it), SET_VALUE (ref, value - change an existing component value/label). Only reference a ref that is either in the provided component list or that you are adding earlier in the same commands array - never invent a ref that does not exist. If the user asks for something you cannot safely or confidently do, explain why in the reply and return an empty commands array instead of guessing.';
+	}
+
+	private function chat_schema() {
+		$move_schema = array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'ref', 'x', 'y' ),
+			'properties'           => array(
+				'type' => array( 'type' => 'string', 'enum' => array( 'MOVE_COMPONENT' ) ),
+				'ref'  => array( 'type' => 'string' ),
+				'x'    => array( 'type' => 'number' ),
+				'y'    => array( 'type' => 'number' ),
+			),
+		);
+		$delete_schema = array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'ref' ),
+			'properties'           => array(
+				'type' => array( 'type' => 'string', 'enum' => array( 'DELETE_COMPONENT' ) ),
+				'ref'  => array( 'type' => 'string' ),
+			),
+		);
+		$set_value_schema = array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'ref', 'value' ),
+			'properties'           => array(
+				'type'  => array( 'type' => 'string', 'enum' => array( 'SET_VALUE' ) ),
+				'ref'   => array( 'type' => 'string' ),
+				'value' => array( 'type' => 'string' ),
+			),
+		);
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'reply', 'commands' ),
+			'properties'           => array(
+				'reply'    => array( 'type' => 'string' ),
+				'commands' => array(
+					'type'  => 'array',
+					'items' => array(
+						'anyOf' => array(
+							$this->footprint_command_schema(),
+							$this->connect_command_schema( 'CONNECT' ),
+							$this->connect_command_schema( 'DISCONNECT' ),
+							$move_schema,
+							$delete_schema,
+							$set_value_schema,
+						),
 					),
 				),
 			),
@@ -804,6 +1001,69 @@ class DAT_PCB_AI {
 			}
 		}
 		return '';
+	}
+
+	private function sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height ) {
+		$pins = array();
+		if ( ! empty( $command['pins'] ) && is_array( $command['pins'] ) ) {
+			foreach ( array_slice( $command['pins'], 0, 128 ) as $pin ) {
+				if ( ! is_array( $pin ) ) {
+					continue;
+				}
+				$pins[] = array(
+					'number'   => sanitize_text_field( (string) ( $pin['number'] ?? '' ) ),
+					'name'     => sanitize_text_field( (string) ( $pin['name'] ?? '' ) ),
+					'x'        => max( -200, min( 200, (float) ( $pin['x'] ?? 0 ) ) ),
+					'y'        => max( -200, min( 200, (float) ( $pin['y'] ?? 0 ) ) ),
+					'shape'    => in_array( $pin['shape'] ?? '', array( 'round', 'rect', 'oval' ), true ) ? $pin['shape'] : 'round',
+					'width'    => max( 0.2, min( 20, (float) ( $pin['width'] ?? 1.6 ) ) ),
+					'height'   => max( 0.2, min( 20, (float) ( $pin['height'] ?? 1.6 ) ) ),
+					'diameter' => max( 0.2, min( 20, (float) ( $pin['diameter'] ?? 1.6 ) ) ),
+					'drill'    => max( 0, min( 10, (float) ( $pin['drill'] ?? 0.8 ) ) ),
+					'smd'      => ! empty( $pin['smd'] ),
+					'rotation' => max( -360, min( 360, (float) ( $pin['rotation'] ?? 0 ) ) ),
+					'suppress_pin_name' => ! empty( $pin['suppress_pin_name'] ),
+				);
+			}
+		}
+		if ( empty( $pins ) ) {
+			return null;
+		}
+		$outline = is_array( $command['outline'] ?? null ) ? $command['outline'] : array();
+		$silk = array();
+		if ( ! empty( $command['silk'] ) && is_array( $command['silk'] ) ) {
+			foreach ( array_slice( $command['silk'], 0, 64 ) as $line ) {
+				if ( ! is_array( $line ) ) {
+					continue;
+				}
+				$silk[] = array(
+					'x1'    => max( -200, min( 200, (float) ( $line['x1'] ?? 0 ) ) ),
+					'y1'    => max( -200, min( 200, (float) ( $line['y1'] ?? 0 ) ) ),
+					'x2'    => max( -200, min( 200, (float) ( $line['x2'] ?? 0 ) ) ),
+					'y2'    => max( -200, min( 200, (float) ( $line['y2'] ?? 0 ) ) ),
+					'width' => max( 0.05, min( 1, (float) ( $line['width'] ?? 0.12 ) ) ),
+				);
+			}
+		}
+		$clean_command = array(
+			'type'      => 'ADD_FOOTPRINT',
+			'ref'       => sanitize_text_field( (string) ( $command['ref'] ?? 'U1' ) ),
+			'component' => sanitize_text_field( (string) ( $command['component'] ?? '' ) ),
+			'value'     => sanitize_text_field( (string) ( $command['value'] ?? '' ) ),
+			'package'   => sanitize_text_field( (string) ( $command['package'] ?? '' ) ),
+			'side'      => 'bottom' === ( $command['side'] ?? $side ) ? 'bottom' : 'top',
+			'x'         => max( 0, min( $board_width, (float) ( $command['x'] ?? $x ) ) ),
+			'y'         => max( 0, min( $board_height, (float) ( $command['y'] ?? $y ) ) ),
+			'outline'   => array(
+				'width'  => max( 0, min( 200, (float) ( $outline['width'] ?? 0 ) ) ),
+				'height' => max( 0, min( 200, (float) ( $outline['height'] ?? 0 ) ) ),
+			),
+			'pins'      => $pins,
+		);
+		if ( ! empty( $silk ) ) {
+			$clean_command['silk'] = $silk;
+		}
+		return $clean_command;
 	}
 
 	private function sanitize_plan( $plan, $side, $x, $y, $board_width, $board_height ) {
@@ -844,69 +1104,97 @@ class DAT_PCB_AI {
 			if ( 'ADD_FOOTPRINT' !== ( $command['type'] ?? '' ) ) {
 				continue;
 			}
-			$pins = array();
-			if ( ! empty( $command['pins'] ) && is_array( $command['pins'] ) ) {
-				foreach ( array_slice( $command['pins'], 0, 128 ) as $pin ) {
-					if ( ! is_array( $pin ) ) {
-						continue;
-					}
-					$pins[] = array(
-						'number'   => sanitize_text_field( (string) ( $pin['number'] ?? '' ) ),
-						'name'     => sanitize_text_field( (string) ( $pin['name'] ?? '' ) ),
-						'x'        => max( -200, min( 200, (float) ( $pin['x'] ?? 0 ) ) ),
-						'y'        => max( -200, min( 200, (float) ( $pin['y'] ?? 0 ) ) ),
-						'shape'    => in_array( $pin['shape'] ?? '', array( 'round', 'rect', 'oval' ), true ) ? $pin['shape'] : 'round',
-						'width'    => max( 0.2, min( 20, (float) ( $pin['width'] ?? 1.6 ) ) ),
-						'height'   => max( 0.2, min( 20, (float) ( $pin['height'] ?? 1.6 ) ) ),
-						'diameter' => max( 0.2, min( 20, (float) ( $pin['diameter'] ?? 1.6 ) ) ),
-						'drill'    => max( 0, min( 10, (float) ( $pin['drill'] ?? 0.8 ) ) ),
-						'smd'      => ! empty( $pin['smd'] ),
-						'rotation' => max( -360, min( 360, (float) ( $pin['rotation'] ?? 0 ) ) ),
-						'suppress_pin_name' => ! empty( $pin['suppress_pin_name'] ),
-					);
-				}
-			}
-			if ( empty( $pins ) ) {
+			$clean_command = $this->sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height );
+			if ( ! $clean_command ) {
 				continue;
 			}
-			$outline = is_array( $command['outline'] ?? null ) ? $command['outline'] : array();
-			$silk = array();
-			if ( ! empty( $command['silk'] ) && is_array( $command['silk'] ) ) {
-				foreach ( array_slice( $command['silk'], 0, 64 ) as $line ) {
-					if ( ! is_array( $line ) ) {
-						continue;
-					}
-					$silk[] = array(
-						'x1'    => max( -200, min( 200, (float) ( $line['x1'] ?? 0 ) ) ),
-						'y1'    => max( -200, min( 200, (float) ( $line['y1'] ?? 0 ) ) ),
-						'x2'    => max( -200, min( 200, (float) ( $line['x2'] ?? 0 ) ) ),
-						'y2'    => max( -200, min( 200, (float) ( $line['y2'] ?? 0 ) ) ),
-						'width' => max( 0.05, min( 1, (float) ( $line['width'] ?? 0.12 ) ) ),
-					);
-				}
-			}
-			$clean_command = array(
-				'type'      => 'ADD_FOOTPRINT',
-				'ref'       => sanitize_text_field( (string) ( $command['ref'] ?? 'U1' ) ),
-				'component' => sanitize_text_field( (string) ( $command['component'] ?? '' ) ),
-				'value'     => sanitize_text_field( (string) ( $command['value'] ?? '' ) ),
-				'package'   => sanitize_text_field( (string) ( $command['package'] ?? '' ) ),
-				'side'      => 'bottom' === ( $command['side'] ?? $side ) ? 'bottom' : 'top',
-				'x'         => max( 0, min( $board_width, (float) ( $command['x'] ?? $x ) ) ),
-				'y'         => max( 0, min( $board_height, (float) ( $command['y'] ?? $y ) ) ),
-				'outline'   => array(
-					'width'  => max( 0, min( 200, (float) ( $outline['width'] ?? 0 ) ) ),
-					'height' => max( 0, min( 200, (float) ( $outline['height'] ?? 0 ) ) ),
-				),
-				'pins'      => $pins,
-			);
-			if ( ! empty( $silk ) ) {
-				$clean_command['silk'] = $silk;
-			}
-			foreach ( $pins as $pin ) {
+			foreach ( $clean_command['pins'] as $pin ) {
 				$known_pins[ $clean_command['ref'] . '.' . $pin['number'] ] = true;
 			}
 			$out['commands'][] = $clean_command;
+		}
+		return $out;
+	}
+
+	private function sanitize_chat_response( $plan, $side, $x, $y, $board_width, $board_height, $known_refs ) {
+		$out = array( 'reply' => '', 'commands' => array() );
+		if ( isset( $plan['reply'] ) ) {
+			$out['reply'] = sanitize_textarea_field( (string) $plan['reply'] );
+		}
+		if ( empty( $plan['commands'] ) || ! is_array( $plan['commands'] ) ) {
+			return $out;
+		}
+		$local_refs = is_array( $known_refs ) ? $known_refs : array();
+		$known_pins = array();
+		foreach ( $plan['commands'] as $command ) {
+			if ( ! is_array( $command ) || count( $out['commands'] ) >= 200 ) {
+				continue;
+			}
+			$type = $command['type'] ?? '';
+			if ( 'ADD_FOOTPRINT' === $type ) {
+				$clean_command = $this->sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height );
+				if ( ! $clean_command ) {
+					continue;
+				}
+				$local_refs[ $clean_command['ref'] ] = true;
+				foreach ( $clean_command['pins'] as $pin ) {
+					$known_pins[ $clean_command['ref'] . '.' . $pin['number'] ] = true;
+				}
+				$out['commands'][] = $clean_command;
+			} elseif ( 'CONNECT' === $type || 'DISCONNECT' === $type ) {
+				$from = sanitize_text_field( (string) ( $command['from'] ?? '' ) );
+				$to   = sanitize_text_field( (string) ( $command['to'] ?? '' ) );
+				if ( '' === $from || '' === $to ) {
+					continue;
+				}
+				$from_ref = strtok( $from, '.' );
+				$to_ref   = strtok( $to, '.' );
+				if ( ! isset( $local_refs[ $from_ref ] ) || ! isset( $local_refs[ $to_ref ] ) ) {
+					continue;
+				}
+				if ( 'CONNECT' === $type && ( ! isset( $known_pins[ $from ] ) || ! isset( $known_pins[ $to ] ) ) ) {
+					// Cho phep noi toi chan cua linh kien da co san tu truoc (khong nam trong known_pins
+					// vi server khong biet danh sach chan cua no), chi chan khi ca hai deu la linh kien
+					// moi tao trong luot nay nhung sai so chan.
+					$from_is_new = isset( $local_refs[ $from_ref ] ) && ! isset( $known_refs[ $from_ref ] );
+					$to_is_new   = isset( $local_refs[ $to_ref ] ) && ! isset( $known_refs[ $to_ref ] );
+					if ( ( $from_is_new && ! isset( $known_pins[ $from ] ) ) || ( $to_is_new && ! isset( $known_pins[ $to ] ) ) ) {
+						continue;
+					}
+				}
+				$out['commands'][] = array(
+					'type' => $type,
+					'from' => $from,
+					'to'   => $to,
+				);
+			} elseif ( 'MOVE_COMPONENT' === $type ) {
+				$ref = sanitize_text_field( (string) ( $command['ref'] ?? '' ) );
+				if ( '' === $ref || ! isset( $known_refs[ $ref ] ) ) {
+					continue;
+				}
+				$out['commands'][] = array(
+					'type' => 'MOVE_COMPONENT',
+					'ref'  => $ref,
+					'x'    => max( 0, min( $board_width, (float) ( $command['x'] ?? 0 ) ) ),
+					'y'    => max( 0, min( $board_height, (float) ( $command['y'] ?? 0 ) ) ),
+				);
+			} elseif ( 'DELETE_COMPONENT' === $type ) {
+				$ref = sanitize_text_field( (string) ( $command['ref'] ?? '' ) );
+				if ( '' === $ref || ! isset( $known_refs[ $ref ] ) ) {
+					continue;
+				}
+				$out['commands'][] = array( 'type' => 'DELETE_COMPONENT', 'ref' => $ref );
+			} elseif ( 'SET_VALUE' === $type ) {
+				$ref = sanitize_text_field( (string) ( $command['ref'] ?? '' ) );
+				if ( '' === $ref || ! isset( $known_refs[ $ref ] ) ) {
+					continue;
+				}
+				$out['commands'][] = array(
+					'type'  => 'SET_VALUE',
+					'ref'   => $ref,
+					'value' => sanitize_text_field( (string) ( $command['value'] ?? '' ) ),
+				);
+			}
 		}
 		return $out;
 	}

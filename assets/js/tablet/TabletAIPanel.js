@@ -1,16 +1,20 @@
 (function (global, document) {
 	'use strict';
 
-	// Tablet AI command panel. It calls services, never editor internals directly.
+	// Conversational AI panel. Talks to /ai/chat, which can both add new
+	// footprints/wiring and edit anything already on the board (move, delete,
+	// reconnect, rename). It calls services and the shared command executor,
+	// never editor internals directly.
 	function TabletAIPanel(app) {
 		this.app = app;
 		this.executor = new global.DATPCBEditorCommandExecutor(app);
 		this.width = 35;
+		this.busy = false;
+		this.messages = [];
 		this.button = document.createElement('button');
 		this.panel = document.createElement('aside');
-		this.history = document.createElement('div');
+		this.thread = document.createElement('div');
 		this.prompt = document.createElement('textarea');
-		this.file = document.createElement('input');
 		this.build();
 		this.bind();
 	}
@@ -27,28 +31,32 @@
 		resize.setAttribute('data-ai-resize', '1');
 		var header = document.createElement('div');
 		header.className = 'dat-tablet-ai-header';
-		header.textContent = 'AI';
+		header.textContent = 'AI - Trợ lý mạch';
 		var close = document.createElement('button');
 		close.type = 'button';
 		close.textContent = '×';
 		close.setAttribute('data-ai-close', '1');
 		header.appendChild(close);
-		this.prompt.placeholder = 'Prompt';
-		this.file.type = 'file';
-		this.file.accept = '.pdf,application/pdf';
-		this.file.setAttribute('aria-label', 'Datasheet PDF');
-		var generate = document.createElement('button');
-		generate.type = 'button';
-		generate.textContent = 'Generate';
-		generate.setAttribute('data-ai-generate', '1');
-		this.generateButton = generate;
-		this.history.className = 'dat-tablet-ai-history';
+		this.thread.className = 'dat-tablet-ai-thread';
+		var hint = document.createElement('div');
+		hint.className = 'dat-tablet-ai-hint';
+		hint.textContent = 'Ví dụ: "vẽ mạch ổn áp 5V lm2596", "di chuyển C1 sang trái 5mm", "xoá R2", "nối U1.4 với R1.1".';
+		this.thread.appendChild(hint);
+		var inputRow = document.createElement('div');
+		inputRow.className = 'dat-tablet-ai-input-row';
+		this.prompt.placeholder = 'Nhập yêu cầu...';
+		this.prompt.rows = 2;
+		var send = document.createElement('button');
+		send.type = 'button';
+		send.textContent = 'Gửi';
+		send.setAttribute('data-ai-send', '1');
+		this.sendButton = send;
+		inputRow.appendChild(this.prompt);
+		inputRow.appendChild(send);
 		this.panel.appendChild(resize);
 		this.panel.appendChild(header);
-		this.panel.appendChild(this.prompt);
-		this.panel.appendChild(this.file);
-		this.panel.appendChild(generate);
-		this.panel.appendChild(this.history);
+		this.panel.appendChild(this.thread);
+		this.panel.appendChild(inputRow);
 		this.app.root.appendChild(this.button);
 		this.app.root.appendChild(this.panel);
 	};
@@ -58,7 +66,13 @@
 		this.button.addEventListener('click', function () { self.open(); });
 		this.panel.addEventListener('click', function (e) {
 			if (e.target.getAttribute('data-ai-close')) self.close();
-			if (e.target.getAttribute('data-ai-generate')) self.generate();
+			if (e.target.getAttribute('data-ai-send')) self.send();
+		});
+		this.prompt.addEventListener('keydown', function (e) {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault();
+				self.send();
+			}
 		});
 		this.panel.querySelector('[data-ai-resize]').addEventListener('pointerdown', function (e) {
 			self.startResize(e);
@@ -73,96 +87,144 @@
 		this.panel.hidden = true;
 	};
 
-	TabletAIPanel.prototype.generate = function () {
-		if (!this.prompt.value || !this.prompt.value.trim()) return;
+	TabletAIPanel.prototype.buildBoardContext = function () {
+		return (this.app.state.components || []).map(function (c) {
+			return {
+				ref: c.ref || '',
+				name: c.name || '',
+				value: c.value || '',
+				package: c.package || '',
+				side: c.side || 'top',
+				x: Number(c.x || 0),
+				y: Number(c.y || 0),
+				rotation: Number(c.rotation || 0)
+			};
+		});
+	};
+
+	TabletAIPanel.prototype.send = function () {
+		var text = this.prompt.value.trim();
+		if (!text || this.busy) return;
+		this.prompt.value = '';
+		this.addBubble('user', text);
+		var priorHistory = this.messages.slice();
+		this.messages.push({ role: 'user', content: text });
+		this.setBusy(true);
+		var typing = this.addBubble('assistant', 'Đang suy nghĩ...', true);
 		var self = this;
-		var context = {
+		global.DATPCBTracerStorage.chatWithAI({
+			message: text,
+			history: priorHistory,
 			side: this.app.activeSide || 'top',
 			board: this.app.state && this.app.state.board,
-			x: this.app.cursor && this.app.cursor.x,
-			y: this.app.cursor && this.app.cursor.y,
-			file: this.file.files && this.file.files[0]
-		};
-		this.setBusy(true);
-		global.generateCircuit(this.prompt.value, context).then(function (result) {
+			x: this.app.cursor ? this.app.cursor.x : 20,
+			y: this.app.cursor ? this.app.cursor.y : 18,
+			components: this.buildBoardContext()
+		}).then(function (result) {
 			self.setBusy(false);
-			self.showPreview(result || {});
+			typing.remove();
+			self.handleResult(result || {});
 		}).catch(function (err) {
 			self.setBusy(false);
-			self.addHistory({ error: err && err.message ? err.message : 'AI request failed' }, 'error');
+			typing.remove();
+			self.addBubble('assistant', '⚠ ' + (err && err.message ? err.message : 'AI request failed'), false, 'error');
 		});
 	};
 
 	TabletAIPanel.prototype.setBusy = function (busy) {
-		this.generateButton.disabled = !!busy;
-		this.generateButton.textContent = busy ? 'Đang tạo...' : 'Generate';
+		this.busy = !!busy;
+		this.sendButton.disabled = this.busy;
+		this.sendButton.textContent = this.busy ? '...' : 'Gửi';
 	};
 
-	TabletAIPanel.prototype.showPreview = function (result) {
+	TabletAIPanel.prototype.handleResult = function (result) {
+		var reply = result.reply ? String(result.reply) : '';
 		var commands = Array.isArray(result.commands) ? result.commands : [];
-		var footprints = commands.filter(function (c) { return c && c.type === 'ADD_FOOTPRINT'; });
-		var connections = commands.filter(function (c) { return c && c.type === 'CONNECT'; });
-		if (!footprints.length) {
-			this.addHistory({ message: 'AI không trả về linh kiện nào để chèn.', raw: result }, 'warn');
-			return;
-		}
-		var self = this;
-		var card = document.createElement('div');
-		card.className = 'dat-tablet-ai-preview';
-		footprints.forEach(function (command) {
-			var line = document.createElement('div');
-			line.className = 'dat-tablet-ai-preview-item';
-			var pinCount = Array.isArray(command.pins) ? command.pins.length : 0;
-			line.textContent = (command.ref || '?') + ' · ' + (command.component || command.package || '?') + ' (' + (command.package || '?') + ') · ' + pinCount + ' chân · mặt ' + (command.side === 'bottom' ? 'Bottom' : 'Top');
-			card.appendChild(line);
+		this.messages.push({
+			role: 'assistant',
+			content: reply || (commands.length ? 'Đã đề xuất ' + commands.length + ' thay đổi.' : 'Không có thay đổi nào.')
 		});
-		if (connections.length) {
-			var connLine = document.createElement('div');
-			connLine.className = 'dat-tablet-ai-preview-item';
-			connLine.textContent = '🔗 ' + connections.length + ' đường nối tự động giữa các linh kiện trên';
-			card.appendChild(connLine);
+		this.addBubble('assistant', reply || (commands.length ? '' : 'AI không đề xuất thay đổi nào.'), false, '', commands);
+	};
+
+	TabletAIPanel.prototype.addBubble = function (role, text, isTyping, kind, commands) {
+		var bubble = document.createElement('div');
+		bubble.className = 'dat-tablet-ai-bubble dat-tablet-ai-bubble-' + role + (isTyping ? ' is-typing' : '') + (kind ? ' dat-tablet-ai-bubble-' + kind : '');
+		if (text) {
+			var textNode = document.createElement('div');
+			textNode.className = 'dat-tablet-ai-bubble-text';
+			textNode.textContent = text;
+			bubble.appendChild(textNode);
 		}
-		if (result.warnings && result.warnings.length) {
-			var warnTitle = document.createElement('div');
-			warnTitle.className = 'dat-tablet-ai-preview-warn-title';
-			warnTitle.textContent = 'Cảnh báo:';
-			card.appendChild(warnTitle);
-			result.warnings.forEach(function (warning) {
-				var w = document.createElement('div');
-				w.className = 'dat-tablet-ai-preview-warn';
-				w.textContent = '⚠ ' + warning;
-				card.appendChild(w);
+		if (commands && commands.length) {
+			bubble.appendChild(this.buildCommandSummary(commands));
+			var actions = document.createElement('div');
+			actions.className = 'dat-tablet-ai-bubble-actions';
+			var apply = document.createElement('button');
+			apply.type = 'button';
+			apply.textContent = 'Áp dụng';
+			apply.setAttribute('data-ai-apply', '1');
+			var discard = document.createElement('button');
+			discard.type = 'button';
+			discard.textContent = 'Bỏ qua';
+			discard.setAttribute('data-ai-discard', '1');
+			actions.appendChild(apply);
+			actions.appendChild(discard);
+			bubble.appendChild(actions);
+			var self = this;
+			apply.addEventListener('click', function () {
+				self.executor.execute(commands);
+				actions.remove();
+				bubble.appendChild(self.statusLabel('✓ Đã áp dụng'));
+			});
+			discard.addEventListener('click', function () {
+				actions.remove();
+				bubble.appendChild(self.statusLabel('Đã bỏ qua'));
 			});
 		}
-		var actions = document.createElement('div');
-		actions.className = 'dat-tablet-ai-preview-actions';
-		var insert = document.createElement('button');
-		insert.type = 'button';
-		insert.textContent = 'Chèn vào bản vẽ';
-		insert.setAttribute('data-ai-preview-insert', '1');
-		var discard = document.createElement('button');
-		discard.type = 'button';
-		discard.textContent = 'Huỷ';
-		discard.setAttribute('data-ai-preview-discard', '1');
-		actions.appendChild(insert);
-		actions.appendChild(discard);
-		card.appendChild(actions);
-		insert.addEventListener('click', function () {
-			self.executor.execute(commands);
-			card.remove();
-			self.addHistory({ inserted: footprints.map(function (c) { return c.ref; }), connections: connections.length }, 'ok');
-		});
-		discard.addEventListener('click', function () {
-			card.remove();
-		});
-		this.history.insertBefore(card, this.history.firstChild);
+		this.thread.appendChild(bubble);
+		this.thread.scrollTop = this.thread.scrollHeight;
+		return bubble;
 	};
 
-	TabletAIPanel.prototype.addHistory = function (result, kind) {
-		var item = document.createElement('pre');
-		item.className = kind ? 'dat-tablet-ai-history-' + kind : '';
-		item.textContent = JSON.stringify(result, null, 2);
-		this.history.insertBefore(item, this.history.firstChild);
+	TabletAIPanel.prototype.statusLabel = function (text) {
+		var label = document.createElement('div');
+		label.className = 'dat-tablet-ai-bubble-status';
+		label.textContent = text;
+		return label;
+	};
+
+	TabletAIPanel.prototype.buildCommandSummary = function (commands) {
+		var list = document.createElement('div');
+		list.className = 'dat-tablet-ai-command-summary';
+		var labels = {
+			ADD_FOOTPRINT: 'Thêm',
+			CONNECT: 'Nối',
+			DISCONNECT: 'Tháo nối',
+			MOVE_COMPONENT: 'Di chuyển',
+			DELETE_COMPONENT: 'Xoá',
+			SET_VALUE: 'Đổi giá trị'
+		};
+		commands.forEach(function (command) {
+			var line = document.createElement('div');
+			line.className = 'dat-tablet-ai-command-item';
+			var label = labels[command.type] || command.type;
+			if (command.type === 'ADD_FOOTPRINT') {
+				line.textContent = label + ': ' + (command.ref || '?') + ' (' + (command.component || command.package || '') + ')';
+			} else if (command.type === 'CONNECT' || command.type === 'DISCONNECT') {
+				line.textContent = label + ': ' + command.from + ' - ' + command.to;
+			} else if (command.type === 'MOVE_COMPONENT') {
+				line.textContent = label + ': ' + command.ref + ' -> (' + command.x + ', ' + command.y + ')';
+			} else if (command.type === 'DELETE_COMPONENT') {
+				line.textContent = label + ': ' + command.ref;
+			} else if (command.type === 'SET_VALUE') {
+				line.textContent = label + ': ' + command.ref + ' = ' + command.value;
+			} else {
+				line.textContent = label;
+			}
+			list.appendChild(line);
+		});
+		return list;
 	};
 
 	TabletAIPanel.prototype.startResize = function (e) {

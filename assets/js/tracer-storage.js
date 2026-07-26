@@ -44,6 +44,9 @@
 			var form = new FormData();
 			form.append('file', file);
 			return request('/upload', { method: 'POST', body: form });
+		},
+		chatWithAI: function (data) {
+			return request('/ai/chat', { method: 'POST', body: data });
 		}
 	};
 })(window);

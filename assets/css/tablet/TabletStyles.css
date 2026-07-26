@@ -282,107 +282,126 @@
 	cursor: pointer;
 }
 
-.tablet-mode .dat-tablet-ai-panel textarea {
-	min-height: 130px;
-	resize: vertical;
-	background: #0f171f;
-	color: #eef4f7;
-	border: 1px solid #53677d;
-	border-radius: 7px;
-	padding: 12px;
-	font-size: 16px;
-}
-
-.tablet-mode .dat-tablet-ai-panel input[type="file"] {
-	width: 100%;
-	min-height: 40px;
-	padding: 8px;
-	border: 1px solid #53677d;
-	border-radius: 7px;
-	background: #0f171f;
-	color: #eef4f7;
-}
-
-.tablet-mode .dat-tablet-ai-history {
+.tablet-mode .dat-tablet-ai-thread {
 	flex: 1;
 	overflow: auto;
 	-webkit-overflow-scrolling: touch;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
 }
 
-.tablet-mode .dat-tablet-ai-history pre {
-	white-space: pre-wrap;
+.tablet-mode .dat-tablet-ai-hint {
+	font-size: 12px;
+	color: #9fb1c0;
+	padding: 8px 10px;
+	border: 1px dashed rgba(255,255,255,.18);
+	border-radius: 8px;
+}
+
+.tablet-mode .dat-tablet-ai-bubble {
+	max-width: 88%;
+	border-radius: 10px;
+	padding: 8px 12px;
+	font-size: 14px;
+	line-height: 1.4;
+}
+
+.tablet-mode .dat-tablet-ai-bubble-user {
+	align-self: flex-end;
+	background: var(--tablet-accent, #f3b23f);
+	color: #10151c;
+}
+
+.tablet-mode .dat-tablet-ai-bubble-assistant {
+	align-self: flex-start;
 	background: #0f171f;
 	border: 1px solid rgba(255,255,255,.12);
-	border-radius: 7px;
-	padding: 10px;
 	color: #d8e6ee;
-	font-size: 12px;
 }
 
-.tablet-mode .dat-tablet-ai-history pre.dat-tablet-ai-history-error {
+.tablet-mode .dat-tablet-ai-bubble.is-typing .dat-tablet-ai-bubble-text {
+	opacity: .6;
+	font-style: italic;
+}
+
+.tablet-mode .dat-tablet-ai-bubble-error {
 	border-color: rgba(229, 57, 53, .6);
 	color: #ffb4b0;
 }
 
-.tablet-mode .dat-tablet-ai-history pre.dat-tablet-ai-history-warn {
-	border-color: rgba(243, 178, 63, .6);
-	color: #ffe0a3;
+.tablet-mode .dat-tablet-ai-bubble-text {
+	white-space: pre-wrap;
 }
 
-.tablet-mode .dat-tablet-ai-history pre.dat-tablet-ai-history-ok {
-	border-color: rgba(76, 195, 138, .6);
-	color: #c7f3dd;
-}
-
-.tablet-mode .dat-tablet-ai-preview {
+.tablet-mode .dat-tablet-ai-command-summary {
+	margin-top: 6px;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	background: #16222c;
-	border: 1px solid rgba(243, 178, 63, .5);
-	border-radius: 8px;
-	padding: 10px;
-	margin-bottom: 8px;
-	font-size: 13px;
-	color: #eef4f7;
+	gap: 3px;
 }
 
-.tablet-mode .dat-tablet-ai-preview-item {
-	font-weight: 600;
-}
-
-.tablet-mode .dat-tablet-ai-preview-warn-title {
-	margin-top: 4px;
-	font-weight: 700;
-	color: var(--tablet-accent);
-}
-
-.tablet-mode .dat-tablet-ai-preview-warn {
+.tablet-mode .dat-tablet-ai-command-item {
 	font-size: 12px;
 	color: #ffe0a3;
+	background: rgba(243, 178, 63, .1);
+	border-radius: 6px;
+	padding: 4px 8px;
 }
 
-.tablet-mode .dat-tablet-ai-preview-actions {
+.tablet-mode .dat-tablet-ai-bubble-actions {
 	display: flex;
 	gap: 8px;
-	margin-top: 6px;
+	margin-top: 8px;
 }
 
-.tablet-mode .dat-tablet-ai-preview-actions [data-ai-preview-insert] {
+.tablet-mode .dat-tablet-ai-bubble-actions [data-ai-apply] {
 	background: var(--tablet-good, #4cc38a);
 	color: #10151c;
 	font-weight: 700;
 	border: none;
 	border-radius: 7px;
 	padding: 8px 14px;
+	min-height: 40px;
 }
 
-.tablet-mode .dat-tablet-ai-preview-actions [data-ai-preview-discard] {
+.tablet-mode .dat-tablet-ai-bubble-actions [data-ai-discard] {
 	background: transparent;
 	border: 1px solid rgba(255,255,255,.3);
 	color: #eef4f7;
 	border-radius: 7px;
 	padding: 8px 14px;
+	min-height: 40px;
+}
+
+.tablet-mode .dat-tablet-ai-bubble-status {
+	margin-top: 6px;
+	font-size: 12px;
+	color: #9fb1c0;
+}
+
+.tablet-mode .dat-tablet-ai-input-row {
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+}
+
+.tablet-mode .dat-tablet-ai-input-row textarea {
+	flex: 1;
+	min-height: 56px;
+	max-height: 140px;
+	resize: vertical;
+	background: #0f171f;
+	color: #eef4f7;
+	border: 1px solid #53677d;
+	border-radius: 7px;
+	padding: 10px 12px;
+	font-size: 16px;
+}
+
+.tablet-mode .dat-tablet-ai-input-row button {
+	min-height: 56px;
+	flex: 0 0 auto;
 }
 
 .tablet-mode .dat-tablet-panel-flash {
