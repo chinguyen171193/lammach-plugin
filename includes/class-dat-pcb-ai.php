@@ -43,7 +43,7 @@ class DAT_PCB_AI {
 		$board_width = isset( $board['width_mm'] ) ? max( 1, (float) $board['width_mm'] ) : 100;
 		$board_height = isset( $board['height_mm'] ) ? max( 1, (float) $board['height_mm'] ) : 80;
 
-		$circuit = $this->known_circuit_plan( $prompt, $side, $x, $y );
+		$circuit = $this->known_circuit_plan( $prompt, $side, $x, $y, $board_width, $board_height );
 		if ( $circuit ) {
 			return rest_ensure_response( $this->sanitize_plan( $circuit, $side, $x, $y, $board_width, $board_height ) );
 		}
@@ -214,7 +214,7 @@ class DAT_PCB_AI {
 		return $command;
 	}
 
-	private function known_circuit_plan( $prompt, $side, $x, $y ) {
+	private function known_circuit_plan( $prompt, $side, $x, $y, $board_width = 100, $board_height = 80 ) {
 		$text = strtolower( (string) $prompt );
 		if ( false === strpos( $text, 'lm2596' ) ) {
 			return null;
@@ -223,6 +223,12 @@ class DAT_PCB_AI {
 		if ( ! $has_circuit_intent ) {
 			return null;
 		}
+
+		// Giu du le voi bien board de cac linh kien phu (lech +-28mm, +35mm)
+		// khong bi ham max/min trong sanitize_plan() ep ve sat canh board,
+		// vi ep tung linh kien rieng le se pha vo bo cuc tuong doi da tinh.
+		$x = max( 30, min( $board_width - 32, $x ) );
+		$y = max( 5, min( $board_height - 40, $y ) );
 
 		$voltage = 5.0;
 		if ( preg_match( '/(\d+(?:[.,]\d+)?)\s*v\b/i', $prompt, $vmatch ) ) {
@@ -235,24 +241,26 @@ class DAT_PCB_AI {
 		$r2_ohm = max( 100, (int) round( $r1_ohm * ( $voltage / 1.23 - 1 ) / 10 ) * 10 );
 		$r2_label = $r2_ohm >= 1000 ? ( rtrim( rtrim( number_format( $r2_ohm / 1000, 2, '.', '' ), '0' ), '.' ) . 'k' ) : $r2_ohm . 'R';
 
-		// LM2596 D2PAK-5 body la 10.16x15.24mm, pin o canh duoi (+y ~6.85mm tu tam),
-		// tab GND lon o canh tren. Dat cac linh kien phu thanh 1 hang phia duoi pin,
-		// cach xa than IC va tab de khong chong lan.
+		// LM2596 D2PAK-5 body la 10.16x15.24mm, pin o canh duoi theo thu tu trai->phai
+		// VIN, OUT, GND, FB, ON/OFF. Xep linh kien phu thanh 1 hang phia duoi, theo
+		// dung thu tu tin hieu (VIN -> nut chuyen mach OUT/L/D -> VOUT -> hoi tiep FB)
+		// de giam duong noi cheo/cat nhau. Day GND noi kieu chuoi trai->phai thay vi
+		// toa tia tu 1 diem de tranh cac duong dan de bi de/cat nhau tren man hinh.
 		$commands = array(
 			$this->template_to_command( $this->template_lm2596( true ), $side, $x, $y, 'U1' ),
-			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x - 22, $y + 20, 'C1' ),
-			$this->template_to_command( $this->template_sma( 'SS34' ), $side, $x - 6, $y + 20, 'D1' ),
-			$this->template_to_command( $this->template_radial_inductor( '33uH' ), $side, $x + 9, $y + 20, 'L1' ),
-			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x + 24, $y + 20, 'C2' ),
-			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 22, $y + 30, 'R1', '1k' ),
-			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 22, $y + 35, 'R2', $r2_label ),
+			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x - 24, $y + 22, 'C1' ),
+			$this->template_to_command( $this->template_sma( 'SS34' ), $side, $x - 9, $y + 22, 'D1' ),
+			$this->template_to_command( $this->template_radial_inductor( '33uH' ), $side, $x + 4, $y + 22, 'L1' ),
+			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x + 16, $y + 22, 'C2' ),
+			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x + 28, $y + 18, 'R2', $r2_label ),
+			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x + 28, $y + 24, 'R1', '1k' ),
 		);
 		$connects = array(
 			array( 'type' => 'CONNECT', 'from' => 'U1.1', 'to' => 'C1.1' ),
-			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'C1.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'C1.2', 'to' => 'D1.A' ),
+			array( 'type' => 'CONNECT', 'from' => 'D1.A', 'to' => 'U1.3' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'C2.2' ),
-			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'D1.A' ),
-			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'R1.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'C2.2', 'to' => 'R1.2' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.2', 'to' => 'L1.1' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.2', 'to' => 'D1.K' ),
 			array( 'type' => 'CONNECT', 'from' => 'L1.2', 'to' => 'C2.1' ),
