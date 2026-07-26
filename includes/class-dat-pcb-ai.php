@@ -11,6 +11,9 @@ class DAT_PCB_AI {
 	const OPTION_DEBUG       = 'dat_pcb_tracer_openai_debug';
 	const OPTION_LAST_LOG    = 'dat_pcb_tracer_openai_last_log';
 
+	// Da ghi luot goi nao trong request nay chua (de gop nhieu lan thu lai).
+	private $log_started = false;
+
 	// Dong gpt-5.6 vua suy luan tot hon han gpt-4.x vua ho tro built-in tool
 	// web_search, nen AI co the tu tra datasheet/pinout thay vi doan tu tri nho.
 	const DEFAULT_MODEL = 'gpt-5.6';
@@ -94,7 +97,12 @@ class DAT_PCB_AI {
 		if ( ! $this->debug_enabled() ) {
 			return;
 		}
-		$log  = '=== ' . gmdate( 'Y-m-d H:i:s' ) . " UTC ===\n";
+		// Mot yeu cau co the goi API nhieu lan (thu lai khi tool bi tu choi) - giu
+		// het cac luot de thay ro co bi tut ve che do khong web_search hay khong.
+		$log = $this->log_started ? $this->get_debug_log() . "\n" : '';
+		$this->log_started = true;
+
+		$log .= '=== ' . gmdate( 'Y-m-d H:i:s' ) . " UTC ===\n";
 		$log .= 'model: ' . ( $body['model'] ?? '?' ) . '   web_search: ' . ( isset( $body['tools'] ) ? 'on' : 'off' ) . "   HTTP: {$code}\n";
 
 		$last_input = is_array( $body['input'] ?? null ) ? end( $body['input'] ) : null;
@@ -362,7 +370,18 @@ class DAT_PCB_AI {
 		$plan = $this->post_and_decode( $api_key, $body );
 
 		$retryable = array( 'dat_pcb_ai_api_rejected', 'dat_pcb_ai_invalid_json' );
-		if ( is_wp_error( $plan ) && isset( $body['tools'] ) && in_array( $plan->get_error_code(), $retryable, true ) ) {
+		$failed    = function ( $result ) use ( $retryable ) {
+			return is_wp_error( $result ) && in_array( $result->get_error_code(), $retryable, true );
+		};
+
+		// Truoc khi bo han web_search, thu lai voi khai bao tool toi gian: neu API
+		// chi che mot tham so cau hinh thi van giu duoc kha nang tra datasheet,
+		// thay vi im lang tut ve che do khong tra cuu duoc gi.
+		if ( $failed( $plan ) && isset( $body['tools'] ) ) {
+			$body['tools'] = array( array( 'type' => 'web_search' ) );
+			$plan = $this->post_and_decode( $api_key, $body );
+		}
+		if ( $failed( $plan ) && isset( $body['tools'] ) ) {
 			unset( $body['tools'], $body['tool_choice'] );
 			$plan = $this->post_and_decode( $api_key, $body );
 		}
@@ -1001,7 +1020,7 @@ class DAT_PCB_AI {
 			return 'You have no internet access, no browsing tool, and no way to open a URL or search the web in this conversation - you can only use what is in your training data plus any datasheet file the user explicitly attaches to their message. Never claim or imply that you looked something up online, fetched a datasheet, or verified against "the official datasheet" unless the user actually attached a PDF to THIS message (its content will appear as a file in the input, not just mentioned in text) - saying that when you did not is actively misleading. If the user insists you "search the internet" or "look it up" for a part you are not confident about, say plainly in the reply that you cannot browse the internet from here, give your best conservative guess only if reasonable, and suggest they attach the real datasheet PDF using the attachment button so you can read it directly.';
 		}
 
-		return 'You have a web_search tool and you are expected to use it instead of guessing. Search before you commit to any pin layout you are not fully certain about: unfamiliar ICs, modules, connectors, relays, regulators, and anything with more than 8 pins. Search the exact manufacturer part number together with terms like "datasheet pinout package dimensions pin pitch", prefer the manufacturer\'s own datasheet PDF or a reputable distributor page over forum posts or image results, and derive the outline size, pin pitch and pin coordinates from what you actually read there. If the first result is ambiguous, search again with a different phrasing rather than settling for a guess. You may skip the search only for trivially standard parts (plain resistors, capacitors, 2.54mm headers) or when the user attached a datasheet PDF to this message - an attached datasheet always wins over anything you find online. In the reply, name the exact part number and package variant you based the footprint on and mention the source you read, in one short sentence, so the user can verify it. Never state that you read a datasheet you did not actually open in this conversation. If searching does not turn up a trustworthy pinout, say so plainly, fall back to a clearly-labelled generic pin arrangement, and add a warning telling the user to check the real datasheet before manufacturing.';
+		return 'You have a web_search tool and you are expected to use it instead of guessing. Search before you commit to any pin layout you are not fully certain about: unfamiliar ICs, modules, connectors, relays, regulators, and anything with more than 8 pins. Search the exact manufacturer part number together with terms like "datasheet pinout package dimensions pin pitch", prefer the manufacturer\'s own datasheet PDF or a reputable distributor page over forum posts or image results, and derive the outline size, pin pitch and pin coordinates from what you actually read there. If the first result is ambiguous, search again with a different phrasing rather than settling for a guess. You may skip the search only for trivially standard parts (plain resistors, capacitors, 2.54mm headers) or when the user attached a datasheet PDF to this message - an attached datasheet always wins over anything you find online. In the reply, name the exact part number and package variant you based the footprint on and mention the source you read, in one short sentence, so the user can verify it. Never state that you read a datasheet you did not actually open in this conversation - if the search tool did not run or returned nothing useful, do not cite a URL, and say instead that the numbers come from memory. Being unable to search is never a reason to place nothing: still emit the footprint from your best recollection of the package, say plainly in the reply that you could not verify it, and add a warning telling the user to check the real datasheet before manufacturing. An unverified footprint with an honest warning is useful; a confident sentence with nothing drawn on the board is the one outcome that helps nobody.';
 	}
 
 	/**
@@ -1135,7 +1154,7 @@ class DAT_PCB_AI {
 	}
 
 	private function build_chat_instructions() {
-		return 'You are a PCB layout assistant chatting with a user inside a browser-based PCB editor. Each message includes the current board size and a JSON list of components already placed (ref, name, value, package, side, x, y, rotation in millimeters). Reply with JSON matching the schema: a short "reply" string in the same language the user wrote in, explaining what you did or answering their question, and a "commands" array (can be empty) with the changes to apply. Available command types: ADD_FOOTPRINT (add a brand new footprint - describe the package in the layout object and the server generates the pins), CONNECT (from "REF.PIN" to "REF.PIN", adds a straight copper track between two existing pins), DISCONNECT (from "REF.PIN" to "REF.PIN", removes an existing track directly wiring those two pins), MOVE_COMPONENT (ref, x, y - move an EXISTING component from the provided list to a new absolute position in millimeters), DELETE_COMPONENT (ref - remove an existing component and everything that belongs to it), SET_VALUE (ref, value - change an existing component value/label). Only reference a ref that is either in the provided component list or that you are adding earlier in the same commands array - never invent a ref that does not exist. If the user asks for something you cannot safely or confidently do, explain why in the reply and return an empty commands array instead of guessing.
+		return 'You are a PCB layout assistant chatting with a user inside a browser-based PCB editor. Each message includes the current board size and a JSON list of components already placed (ref, name, value, package, side, x, y, rotation in millimeters). Reply with JSON matching the schema: a short "reply" string in the same language the user wrote in, explaining what you did or answering their question, and a "commands" array (can be empty) with the changes to apply. Available command types: ADD_FOOTPRINT (add a brand new footprint - describe the package in the layout object and the server generates the pins), CONNECT (from "REF.PIN" to "REF.PIN", adds a straight copper track between two existing pins), DISCONNECT (from "REF.PIN" to "REF.PIN", removes an existing track directly wiring those two pins), MOVE_COMPONENT (ref, x, y - move an EXISTING component from the provided list to a new absolute position in millimeters), DELETE_COMPONENT (ref - remove an existing component and everything that belongs to it), SET_VALUE (ref, value - change an existing component value/label). Only reference a ref that is either in the provided component list or that you are adding earlier in the same commands array - never invent a ref that does not exist. If the user asks for something genuinely unsafe or impossible, explain why in the reply and return an empty commands array. That escape hatch is NOT for uncertainty about a footprint: when the user asks for a part, always place it, using your best conservative geometry plus a warning, because an approximate footprint the user can check against a datasheet is far more useful than an empty board.
 Layout and routing quality matter a lot because every connection is drawn as a single straight track between two exact pin coordinates - there is no autorouter and nothing bends around parts. To keep the result readable: (1) when adding a part that connects to a specific pin of an existing IC, place that part\'s x/y close to that pin\'s absolute position (pin absolute position = component x/y plus the pin offset you gave it), not just clustered near the component center - this keeps the straight track short. (2) Never place a new footprint\'s body, or the straight line path between two pins you are about to CONNECT, on top of another existing component\'s body or pins. (3) When several existing pins share the same net (for example multiple grounds), do not wire them all to one central hub pin - instead chain them through whichever already-connected pin is physically nearest, so tracks run between neighbors instead of radiating long diagonals across the board. (4) Prefer arranging newly added parts in a single row or a small grid with clear spacing (at least the sum of both parts\' largest dimension) rather than scattering them at arbitrary angles around the IC.
 Pin geometry accuracy matters even more for footprints you build without an attached datasheet. For any part with more than 8 pins (microcontrollers, connectors with many pins, relays with unusual mechanical pinouts), do not trust your memory of the exact pin spacing - look the datasheet up first as described below, then feed the numbers you read into the layout object. Getting the package family, pin count and pitch right matters more than fabricating false mechanical precision; if the lookup fails, say so plainly in the reply and in a warning so the user knows to double check the real datasheet before manufacturing.
 ' . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
