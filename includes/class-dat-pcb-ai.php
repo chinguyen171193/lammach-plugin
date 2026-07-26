@@ -144,23 +144,32 @@ class DAT_PCB_AI {
 		$board_width  = isset( $board['width_mm'] ) ? max( 1, (float) $board['width_mm'] ) : 100;
 		$board_height = isset( $board['height_mm'] ) ? max( 1, (float) $board['height_mm'] ) : 80;
 
+		$file_input = $this->build_datasheet_file_input( isset( $params['_datasheet_file'] ) ? $params['_datasheet_file'] : null );
+		if ( is_wp_error( $file_input ) ) {
+			return $file_input;
+		}
+		$pdf_url = $file_input ? '' : $this->extract_pdf_url( $message );
+
 		// Uu tien template cuc bo (mien phi, khong can API key) cho yeu cau "tao moi"
 		// truoc khi phai goi OpenAI - giu dung nguyen tac da ap dung cho generate_component().
-		$circuit = $this->known_circuit_plan( $message, $side, $x, $y, $board_width, $board_height );
-		if ( $circuit ) {
-			$plan = $this->sanitize_plan( $circuit, $side, $x, $y, $board_width, $board_height );
-			return rest_ensure_response( array(
-				'reply'    => implode( ' ', $plan['warnings'] ),
-				'commands' => $plan['commands'],
-			) );
-		}
-		$template = $this->known_component_plan( $message, $side, $x, $y );
-		if ( $template ) {
-			$plan = $this->sanitize_plan( $template, $side, $x, $y, $board_width, $board_height );
-			return rest_ensure_response( array(
-				'reply'    => implode( ' ', $plan['warnings'] ),
-				'commands' => $plan['commands'],
-			) );
+		// Bo qua neu nguoi dung dinh kem datasheet - ho muon AI doc dung file do.
+		if ( ! $file_input && ! $pdf_url ) {
+			$circuit = $this->known_circuit_plan( $message, $side, $x, $y, $board_width, $board_height );
+			if ( $circuit ) {
+				$plan = $this->sanitize_plan( $circuit, $side, $x, $y, $board_width, $board_height );
+				return rest_ensure_response( array(
+					'reply'    => implode( ' ', $plan['warnings'] ),
+					'commands' => $plan['commands'],
+				) );
+			}
+			$template = $this->known_component_plan( $message, $side, $x, $y );
+			if ( $template ) {
+				$plan = $this->sanitize_plan( $template, $side, $x, $y, $board_width, $board_height );
+				return rest_ensure_response( array(
+					'reply'    => implode( ' ', $plan['warnings'] ),
+					'commands' => $plan['commands'],
+				) );
+			}
 		}
 
 		$api_key = $this->get_api_key();
@@ -218,7 +227,23 @@ class DAT_PCB_AI {
 		foreach ( $history as $turn ) {
 			$input[] = array( 'role' => $turn['role'], 'content' => $turn['content'] );
 		}
-		$input[] = array( 'role' => 'user', 'content' => $board_summary . "\nUser request: " . $message );
+		$user_text = $board_summary . "\nUser request: " . $message;
+		if ( $file_input || $pdf_url ) {
+			$content = array();
+			if ( $file_input ) {
+				$content[] = $file_input;
+			} elseif ( $pdf_url ) {
+				$content[] = array(
+					'type'     => 'input_file',
+					'file_url' => $pdf_url,
+					'detail'   => 'high',
+				);
+			}
+			$content[] = array( 'type' => 'input_text', 'text' => $user_text );
+			$input[] = array( 'role' => 'user', 'content' => $content );
+		} else {
+			$input[] = array( 'role' => 'user', 'content' => $user_text );
+		}
 
 		$body = array(
 			'model'             => $this->get_model(),

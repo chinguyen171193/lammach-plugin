@@ -11,10 +11,13 @@
 		this.width = 35;
 		this.busy = false;
 		this.messages = [];
+		this.pendingFile = null;
 		this.button = document.createElement('button');
 		this.panel = document.createElement('aside');
 		this.thread = document.createElement('div');
 		this.prompt = document.createElement('textarea');
+		this.fileInput = document.createElement('input');
+		this.attachment = document.createElement('div');
 		this.build();
 		this.bind();
 	}
@@ -42,21 +45,35 @@
 		hint.className = 'dat-tablet-ai-hint';
 		hint.textContent = 'Ví dụ: "vẽ mạch ổn áp 5V lm2596", "di chuyển C1 sang trái 5mm", "xoá R2", "nối U1.4 với R1.1".';
 		this.thread.appendChild(hint);
+		this.attachment.className = 'dat-tablet-ai-attachment';
+		this.attachment.hidden = true;
+		this.fileInput.type = 'file';
+		this.fileInput.accept = '.pdf,application/pdf';
+		this.fileInput.hidden = true;
+		this.fileInput.setAttribute('aria-label', 'Đính kèm datasheet PDF');
 		var inputRow = document.createElement('div');
 		inputRow.className = 'dat-tablet-ai-input-row';
 		this.prompt.placeholder = 'Nhập yêu cầu...';
 		this.prompt.rows = 2;
+		var attach = document.createElement('button');
+		attach.type = 'button';
+		attach.textContent = '📎';
+		attach.title = 'Đính kèm datasheet PDF';
+		attach.setAttribute('data-ai-attach', '1');
 		var send = document.createElement('button');
 		send.type = 'button';
 		send.textContent = 'Gửi';
 		send.setAttribute('data-ai-send', '1');
 		this.sendButton = send;
+		inputRow.appendChild(attach);
 		inputRow.appendChild(this.prompt);
 		inputRow.appendChild(send);
 		this.panel.appendChild(resize);
 		this.panel.appendChild(header);
 		this.panel.appendChild(this.thread);
+		this.panel.appendChild(this.attachment);
 		this.panel.appendChild(inputRow);
+		this.panel.appendChild(this.fileInput);
 		this.app.root.appendChild(this.button);
 		this.app.root.appendChild(this.panel);
 	};
@@ -67,6 +84,8 @@
 		this.panel.addEventListener('click', function (e) {
 			if (e.target.getAttribute('data-ai-close')) self.close();
 			if (e.target.getAttribute('data-ai-send')) self.send();
+			if (e.target.getAttribute('data-ai-attach')) self.fileInput.click();
+			if (e.target.getAttribute('data-ai-remove-attachment')) self.setPendingFile(null);
 		});
 		this.prompt.addEventListener('keydown', function (e) {
 			if (e.key === 'Enter' && !e.shiftKey) {
@@ -74,9 +93,32 @@
 				self.send();
 			}
 		});
+		this.fileInput.addEventListener('change', function () {
+			var file = self.fileInput.files && self.fileInput.files[0];
+			self.setPendingFile(file || null);
+		});
 		this.panel.querySelector('[data-ai-resize]').addEventListener('pointerdown', function (e) {
 			self.startResize(e);
 		});
+	};
+
+	TabletAIPanel.prototype.setPendingFile = function (file) {
+		this.pendingFile = file || null;
+		this.attachment.textContent = '';
+		if (!file) {
+			this.attachment.hidden = true;
+			this.fileInput.value = '';
+			return;
+		}
+		this.attachment.hidden = false;
+		var label = document.createElement('span');
+		label.textContent = '📎 ' + file.name;
+		var remove = document.createElement('button');
+		remove.type = 'button';
+		remove.textContent = '×';
+		remove.setAttribute('data-ai-remove-attachment', '1');
+		this.attachment.appendChild(label);
+		this.attachment.appendChild(remove);
 	};
 
 	TabletAIPanel.prototype.open = function () {
@@ -105,8 +147,10 @@
 	TabletAIPanel.prototype.send = function () {
 		var text = this.prompt.value.trim();
 		if (!text || this.busy) return;
+		var file = this.pendingFile;
 		this.prompt.value = '';
-		this.addBubble('user', text);
+		this.addBubble('user', text + (file ? '\n📎 ' + file.name : ''));
+		this.setPendingFile(null);
 		var priorHistory = this.messages.slice();
 		this.messages.push({ role: 'user', content: text });
 		this.setBusy(true);
@@ -119,7 +163,8 @@
 			board: this.app.state && this.app.state.board,
 			x: this.app.cursor ? this.app.cursor.x : 20,
 			y: this.app.cursor ? this.app.cursor.y : 18,
-			components: this.buildBoardContext()
+			components: this.buildBoardContext(),
+			file: file
 		}).then(function (result) {
 			self.setBusy(false);
 			typing.remove();

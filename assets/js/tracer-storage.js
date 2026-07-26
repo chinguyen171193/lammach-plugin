@@ -46,6 +46,18 @@
 			return request('/upload', { method: 'POST', body: form });
 		},
 		chatWithAI: function (data) {
+			if (data && data.file) {
+				var form = new FormData();
+				form.append('message', data.message || '');
+				form.append('side', data.side || 'top');
+				form.append('x', data.x || 0);
+				form.append('y', data.y || 0);
+				form.append('board', JSON.stringify(data.board || {}));
+				form.append('components', JSON.stringify(data.components || []));
+				form.append('history', JSON.stringify(data.history || []));
+				form.append('datasheet', data.file);
+				return request('/ai/chat', { method: 'POST', body: form });
+			}
 			return request('/ai/chat', { method: 'POST', body: data });
 		}
 	};

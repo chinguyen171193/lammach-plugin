@@ -131,6 +131,19 @@ class DAT_PCB_REST_API {
 
 	public function ai_chat( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
+		if ( ! is_array( $params ) ) {
+			$params = $request->get_params();
+		}
+		foreach ( array( 'board', 'components', 'history' ) as $key ) {
+			if ( isset( $params[ $key ] ) && is_string( $params[ $key ] ) ) {
+				$decoded = json_decode( wp_unslash( $params[ $key ] ), true );
+				$params[ $key ] = is_array( $decoded ) ? $decoded : array();
+			}
+		}
+		$files = $request->get_file_params();
+		if ( isset( $files['datasheet'] ) && is_array( $files['datasheet'] ) ) {
+			$params['_datasheet_file'] = $files['datasheet'];
+		}
 		return $this->respond( $this->ai->chat_message( is_array( $params ) ? $params : array() ) );
 	}
 
