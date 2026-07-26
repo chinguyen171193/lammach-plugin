@@ -11,8 +11,8 @@ class DAT_PCB_AI {
 	const OPTION_DEBUG       = 'dat_pcb_tracer_openai_debug';
 	const OPTION_LAST_LOG    = 'dat_pcb_tracer_openai_last_log';
 
-	// Da ghi luot goi nao trong request nay chua (de gop nhieu lan thu lai).
-	private $log_started = false;
+	// Gom cac luot goi API cua request nay lai de ghi log mot the.
+	private $last_exchange = '';
 
 	// Dong gpt-5.6 vua suy luan tot hon han gpt-4.x vua ho tro built-in tool
 	// web_search, nen AI co the tu tra datasheet/pinout thay vi doan tu tri nho.
@@ -94,15 +94,9 @@ class DAT_PCB_AI {
 	 * chi giu phan model sinh ra. Khong bao gio ghi API key.
 	 */
 	private function log_exchange( $body, $code, $raw ) {
-		if ( ! $this->debug_enabled() ) {
-			return;
-		}
 		// Mot yeu cau co the goi API nhieu lan (thu lai khi tool bi tu choi) - giu
 		// het cac luot de thay ro co bi tut ve che do khong web_search hay khong.
-		$log = $this->log_started ? $this->get_debug_log() . "\n" : '';
-		$this->log_started = true;
-
-		$log .= '=== ' . gmdate( 'Y-m-d H:i:s' ) . " UTC ===\n";
+		$log = '=== ' . gmdate( 'Y-m-d H:i:s' ) . " UTC ===\n";
 		$log .= 'model: ' . ( $body['model'] ?? '?' ) . '   web_search: ' . ( isset( $body['tools'] ) ? 'on' : 'off' ) . "   HTTP: {$code}\n";
 
 		$last_input = is_array( $body['input'] ?? null ) ? end( $body['input'] ) : null;
@@ -110,9 +104,24 @@ class DAT_PCB_AI {
 			$content = $last_input['content'] ?? '';
 			$log .= "--- yeu cau cuoi ---\n" . mb_substr( is_string( $content ) ? $content : wp_json_encode( $content ), 0, 1500 ) . "\n";
 		}
-
 		$log .= "--- phan hoi tho ---\n" . mb_substr( (string) $raw, 0, 40000 ) . "\n";
-		update_option( self::OPTION_LAST_LOG, $log, false );
+
+		$this->last_exchange .= ( '' === $this->last_exchange ? '' : "\n" ) . $log;
+		if ( $this->debug_enabled() ) {
+			$this->persist_debug_log();
+		}
+	}
+
+	/**
+	 * Luu lai luot goi gan nhat. Goi ca khi nguoi dung chua bat go loi cho truong
+	 * hop AI tra loi ma khong kem lenh nao - do la ca kho tim nhat, va bat nguoi
+	 * dung bat go loi roi tai hien lai dung luc thi gan nhu khong bao gio bat duoc.
+	 */
+	private function persist_debug_log( $note = '' ) {
+		if ( '' === $this->last_exchange ) {
+			return;
+		}
+		update_option( self::OPTION_LAST_LOG, ( '' === $note ? '' : $note . "\n\n" ) . $this->last_exchange, false );
 	}
 
 	public function generate_component( $params ) {
@@ -323,6 +332,9 @@ class DAT_PCB_AI {
 		$plan = $this->request_plan( $api_key, $body );
 		if ( is_wp_error( $plan ) ) {
 			return $plan;
+		}
+		if ( empty( $plan['commands'] ) ) {
+			$this->persist_debug_log( 'AI tra loi nhung khong kem lenh nao (commands rong).' );
 		}
 		return rest_ensure_response( $this->sanitize_chat_response( $plan, $side, $x, $y, $board_width, $board_height, $known_refs ) );
 	}
@@ -1027,7 +1039,7 @@ class DAT_PCB_AI {
 	 * Hop dong ve hinh hoc chan, dung chung cho ca hai prompt.
 	 */
 	private function footprint_geometry_instructions() {
-		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout to null and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch. Most important of all: an ADD_FOOTPRINT with layout set to null AND an empty pins array draws absolutely nothing, so never emit one - exactly one of the two must be filled in, and layout is the one you should almost always choose. Always put the real package name in the "package" field too (for example "TSSOP-20", "LQFP-32", "DIP-8"), because it is what the server falls back on when the layout is unusable. Finally, and this is the single most common way to fail the user: the commands array is what actually draws on the board, and the reply text draws nothing at all. If you tell the user you added, moved or wired something, the matching command MUST be in the commands array of the SAME response. Never answer "I have created U1" with an empty commands array - either emit the command or say plainly that you did not do it.';
+		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout.family to "none" and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch. Most important of all: an ADD_FOOTPRINT with layout.family "none" AND an empty pins array draws absolutely nothing, so never emit one - exactly one of the two must be filled in, and a real layout family is the one you should almost always choose. Always put the real package name in the "package" field too (for example "TSSOP-20", "LQFP-32", "DIP-8"), because it is what the server falls back on when the layout is unusable. Finally, and this is the single most common way to fail the user: the commands array is what actually draws on the board, and the reply text draws nothing at all. If you tell the user you added, moved or wired something, the matching command MUST be in the commands array of the SAME response. Never answer "I have created U1" with an empty commands array - either emit the command or say plainly that you did not do it.';
 	}
 
 	private function build_instructions() {
@@ -1041,15 +1053,15 @@ class DAT_PCB_AI {
 			'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'layout', 'outline', 'silk', 'pins' ),
 			'properties'           => array(
 				'layout'    => array(
-					'type'                 => array( 'object', 'null' ),
-					'description'          => 'Preferred way to define a footprint: describe the package and the server generates exact pin coordinates. Use null ONLY for a part whose pins do not fit any family below, and then fill the pins array by hand instead. Every numeric field accepts 0 meaning "not known - use a sane default for this family".',
+					'type'                 => 'object',
+					'description'          => 'Preferred way to define a footprint: describe the package and the server generates exact pin coordinates. Set family to "none" ONLY for a part whose pins do not fit any other family, and then fill the pins array by hand instead. Every numeric field accepts 0 meaning "not known - use a sane default for this family".',
 					'additionalProperties' => false,
 					'required'             => array( 'family', 'pin_count', 'pitch', 'row_spacing', 'rows', 'body_width', 'body_height', 'pin_names' ),
 					'properties'           => array(
 						'family'         => array(
 							'type'        => 'string',
-							'enum'        => array( 'dip', 'soic', 'qfp', 'qfn', 'header', 'chip', 'sot23', 'to220', 'radial', 'axial' ),
-							'description' => 'dip = through-hole dual inline IC. soic = any two-row gull-wing SMD IC (SOIC/SOP/SSOP/TSSOP/MSOP). qfp = quad flat pack with leads. qfn = quad flat no-lead. header = through-hole pin header or screw terminal. chip = two-terminal SMD passive (0603/0805/1206). sot23 = 3-lead small outline transistor. to220 = TO-220/TO-126 style inline power package. radial = two-lead radial through-hole part (electrolytic cap, LED). axial = two-lead axial through-hole part (resistor, diode).',
+							'enum'        => array( 'dip', 'soic', 'qfp', 'qfn', 'header', 'chip', 'sot23', 'to220', 'radial', 'axial', 'none' ),
+							'description' => 'none = irregular part, I am filling the pins array by hand instead. dip = through-hole dual inline IC. soic = any two-row gull-wing SMD IC (SOIC/SOP/SSOP/TSSOP/MSOP). qfp = quad flat pack with leads. qfn = quad flat no-lead. header = through-hole pin header or screw terminal. chip = two-terminal SMD passive (0603/0805/1206). sot23 = 3-lead small outline transistor. to220 = TO-220/TO-126 style inline power package. radial = two-lead radial through-hole part (electrolytic cap, LED). axial = two-lead axial through-hole part (resistor, diode).',
 						),
 						'pin_count'      => array( 'type' => 'integer', 'description' => 'Total number of electrical pins. Must be divisible by 4 for qfp/qfn, exactly 3 for sot23, exactly 2 for chip/radial/axial.' ),
 						'pitch'          => array( 'type' => 'number', 'description' => 'Centre-to-centre distance in mm between two adjacent pins along one row, read from the datasheet mechanical drawing (e.g. 2.54 for DIP, 1.27 for SOIC, 0.65 for TSSOP, 0.5 for LQFP).' ),
