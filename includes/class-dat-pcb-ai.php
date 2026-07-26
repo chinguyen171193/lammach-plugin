@@ -927,7 +927,8 @@ class DAT_PCB_AI {
 
 	private function build_chat_instructions() {
 		return 'You are a PCB layout assistant chatting with a user inside a browser-based PCB editor. Each message includes the current board size and a JSON list of components already placed (ref, name, value, package, side, x, y, rotation in millimeters). Reply with JSON matching the schema: a short "reply" string in the same language the user wrote in, explaining what you did or answering their question, and a "commands" array (can be empty) with the changes to apply. Available command types: ADD_FOOTPRINT (add a brand new footprint with full pin list, same shape as before), CONNECT (from "REF.PIN" to "REF.PIN", adds a straight copper track between two existing pins), DISCONNECT (from "REF.PIN" to "REF.PIN", removes an existing track directly wiring those two pins), MOVE_COMPONENT (ref, x, y - move an EXISTING component from the provided list to a new absolute position in millimeters), DELETE_COMPONENT (ref - remove an existing component and everything that belongs to it), SET_VALUE (ref, value - change an existing component value/label). Only reference a ref that is either in the provided component list or that you are adding earlier in the same commands array - never invent a ref that does not exist. If the user asks for something you cannot safely or confidently do, explain why in the reply and return an empty commands array instead of guessing.
-Layout and routing quality matter a lot because every connection is drawn as a single straight track between two exact pin coordinates - there is no autorouter and nothing bends around parts. To keep the result readable: (1) when adding a part that connects to a specific pin of an existing IC, place that part\'s x/y close to that pin\'s absolute position (pin absolute position = component x/y plus the pin offset you gave it), not just clustered near the component center - this keeps the straight track short. (2) Never place a new footprint\'s body, or the straight line path between two pins you are about to CONNECT, on top of another existing component\'s body or pins. (3) When several existing pins share the same net (for example multiple grounds), do not wire them all to one central hub pin - instead chain them through whichever already-connected pin is physically nearest, so tracks run between neighbors instead of radiating long diagonals across the board. (4) Prefer arranging newly added parts in a single row or a small grid with clear spacing (at least the sum of both parts\' largest dimension) rather than scattering them at arbitrary angles around the IC.';
+Layout and routing quality matter a lot because every connection is drawn as a single straight track between two exact pin coordinates - there is no autorouter and nothing bends around parts. To keep the result readable: (1) when adding a part that connects to a specific pin of an existing IC, place that part\'s x/y close to that pin\'s absolute position (pin absolute position = component x/y plus the pin offset you gave it), not just clustered near the component center - this keeps the straight track short. (2) Never place a new footprint\'s body, or the straight line path between two pins you are about to CONNECT, on top of another existing component\'s body or pins. (3) When several existing pins share the same net (for example multiple grounds), do not wire them all to one central hub pin - instead chain them through whichever already-connected pin is physically nearest, so tracks run between neighbors instead of radiating long diagonals across the board. (4) Prefer arranging newly added parts in a single row or a small grid with clear spacing (at least the sum of both parts\' largest dimension) rather than scattering them at arbitrary angles around the IC.
+Pin geometry accuracy matters even more for footprints you invent yourself (no datasheet was provided - you are recalling this from training data). Be conservative: (1) every pin x/y offset must stay within roughly the footprint outline\'s own half-width/half-height plus 1-2mm - never place a pin far outside the body you declared. (2) For any part with more than 8 pins (microcontrollers, connectors with many pins, relays with unusual mechanical pinouts), you very likely do not remember the exact real pin spacing precisely - use a simple, clearly-labelled generic pin arrangement (for example even pitch along the package edges) rather than inventing precise-looking but unverified numbers, and say so plainly in the reply and in a warning so the user knows to double check the real datasheet before manufacturing. Getting the general placement and net-level connectivity right matters more than fabricating false mechanical precision.';
 	}
 
 	private function chat_schema() {
@@ -1005,6 +1006,14 @@ Layout and routing quality matter a lot because every connection is drawn as a s
 	}
 
 	private function sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height ) {
+		// Gioi han vi tri chan theo kich thuoc outline AI da khai bao (neu co), de
+		// bat loi khi AI "nho nham" toa do chan lech qua xa so voi than linh kien
+		// (vi du IC nhieu chan/relay). Khong the sua het loi noi dung, nhung tranh
+		// duoc truong hop chan bay hoan toan ra ngoai than linh kien.
+		$outline_hint = is_array( $command['outline'] ?? null ) ? $command['outline'] : array();
+		$outline_span = max( (float) ( $outline_hint['width'] ?? 0 ), (float) ( $outline_hint['height'] ?? 0 ) );
+		$pin_limit = $outline_span > 0 ? max( 12, min( 150, $outline_span * 1.5 ) ) : 60;
+
 		$pins = array();
 		if ( ! empty( $command['pins'] ) && is_array( $command['pins'] ) ) {
 			foreach ( array_slice( $command['pins'], 0, 128 ) as $pin ) {
@@ -1014,12 +1023,12 @@ Layout and routing quality matter a lot because every connection is drawn as a s
 				$pins[] = array(
 					'number'   => sanitize_text_field( (string) ( $pin['number'] ?? '' ) ),
 					'name'     => sanitize_text_field( (string) ( $pin['name'] ?? '' ) ),
-					'x'        => max( -200, min( 200, (float) ( $pin['x'] ?? 0 ) ) ),
-					'y'        => max( -200, min( 200, (float) ( $pin['y'] ?? 0 ) ) ),
+					'x'        => max( -$pin_limit, min( $pin_limit, (float) ( $pin['x'] ?? 0 ) ) ),
+					'y'        => max( -$pin_limit, min( $pin_limit, (float) ( $pin['y'] ?? 0 ) ) ),
 					'shape'    => in_array( $pin['shape'] ?? '', array( 'round', 'rect', 'oval' ), true ) ? $pin['shape'] : 'round',
-					'width'    => max( 0.2, min( 20, (float) ( $pin['width'] ?? 1.6 ) ) ),
-					'height'   => max( 0.2, min( 20, (float) ( $pin['height'] ?? 1.6 ) ) ),
-					'diameter' => max( 0.2, min( 20, (float) ( $pin['diameter'] ?? 1.6 ) ) ),
+					'width'    => max( 0.15, min( 10, (float) ( $pin['width'] ?? 1.6 ) ) ),
+					'height'   => max( 0.15, min( 10, (float) ( $pin['height'] ?? 1.6 ) ) ),
+					'diameter' => max( 0.15, min( 10, (float) ( $pin['diameter'] ?? 1.6 ) ) ),
 					'drill'    => max( 0, min( 10, (float) ( $pin['drill'] ?? 0.8 ) ) ),
 					'smd'      => ! empty( $pin['smd'] ),
 					'rotation' => max( -360, min( 360, (float) ( $pin['rotation'] ?? 0 ) ) ),
@@ -1030,7 +1039,7 @@ Layout and routing quality matter a lot because every connection is drawn as a s
 		if ( empty( $pins ) ) {
 			return null;
 		}
-		$outline = is_array( $command['outline'] ?? null ) ? $command['outline'] : array();
+		$outline = $outline_hint;
 		$silk = array();
 		if ( ! empty( $command['silk'] ) && is_array( $command['silk'] ) ) {
 			foreach ( array_slice( $command['silk'], 0, 64 ) as $line ) {
