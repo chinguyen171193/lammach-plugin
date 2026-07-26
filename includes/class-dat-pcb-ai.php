@@ -964,7 +964,7 @@ class DAT_PCB_AI {
 	 * Hop dong ve hinh hoc chan, dung chung cho ca hai prompt.
 	 */
 	private function footprint_geometry_instructions() {
-		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout to null and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch.';
+		return 'HOW TO SHAPE A FOOTPRINT. The server, not you, computes pin coordinates whenever you fill the "layout" object - and you should fill it for essentially every real part. Give the package family, the pin count, and the numbers you can read straight off the mechanical drawing in the datasheet: pitch (centre to centre of two adjacent pins), row_spacing (lead span across the package, measured pad centre to pad centre - NOT the plastic body width), pad size and body size. Leave any number you do not actually know as 0 and the server substitutes a sane default for that family. Put the pin function names in pin_names in pin-number order starting at pin 1. The server then generates every coordinate, applies the standard datasheet numbering (pin 1 at the top left, counting counter-clockwise), centres the part on its own origin, and clamps pad sizes so neighbouring pads can never touch. That is dramatically more reliable than writing coordinates yourself, so do NOT hand-write the pins array for any part that fits one of the families. Set layout to null and fill pins by hand only for genuinely irregular parts - relays, modules, connectors with staggered or mixed pin geometry. When you do fill pins by hand: coordinates are millimetres relative to the part centre, +x is to the right and +y is DOWN, every pad must be smaller than the gap to its neighbour, and the whole pin group must be centred on the origin. Two sanity checks before you answer: a pad is never wider than the pitch, and the distance between pin 1 and the last pin of the same row is always (pins_in_row - 1) x pitch. Most important of all: an ADD_FOOTPRINT with layout set to null AND an empty pins array draws absolutely nothing, so never emit one - exactly one of the two must be filled in, and layout is the one you should almost always choose. Always put the real package name in the "package" field too (for example "TSSOP-20", "LQFP-32", "DIP-8"), because it is what the server falls back on when the layout is unusable.';
 	}
 
 	private function build_instructions() {
@@ -1191,6 +1191,72 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 	 * Thong so mac dinh cho tung ho package, dung khi AI de 0 (= khong biet).
 	 * 'shape' round -> pad tron (chan cam), rect -> pad chu nhat (chan dan SMD).
 	 */
+	/**
+	 * Quy ten vo ve dung ho package. Model rat hay tra ten thuong dung ("tssop",
+	 * "lqfp") thay vi ten ho trong enum, va truoc day mot chu lech la ca lenh bi
+	 * bo im lang.
+	 */
+	private function normalize_family( $family ) {
+		$family  = strtolower( trim( (string) $family ) );
+		$aliases = array(
+			'tssop' => 'soic', 'ssop' => 'soic', 'msop' => 'soic', 'sop' => 'soic', 'so' => 'soic', 'soj' => 'soic',
+			'lqfp'  => 'qfp', 'tqfp' => 'qfp',
+			'dfn'   => 'qfn', 'mlf' => 'qfn',
+			'pdip'  => 'dip', 'sdip' => 'dip',
+			'pinheader' => 'header', 'terminal' => 'header', 'screw' => 'header',
+			'smd'   => 'chip', 'sot' => 'sot23', 'sot-23' => 'sot23',
+			'to'    => 'to220', 'to-220' => 'to220',
+		);
+		return isset( $aliases[ $family ] ) ? $aliases[ $family ] : $family;
+	}
+
+	/**
+	 * Doan mo ta package tu chuoi ten vo ("TSSOP-20", "LQFP32", "DIP-8").
+	 *
+	 * Dung khi model khong dien noi layout: ten vo van con trong lenh, va no du de
+	 * dung footprint dung hon han viec khong ve gi ca. Giu lai moi so do model da
+	 * cho, chi bu phan thieu.
+	 */
+	private function infer_layout_from_package( $package, $existing ) {
+		$text     = strtoupper( (string) $package );
+		$patterns = array(
+			'~(?:TSSOP|SSOP|MSOP|SOIC|SOP)\s*-?\s*(\d+)~' => 'soic',
+			'~(?:LQFP|TQFP|QFP)\s*-?\s*(\d+)~'            => 'qfp',
+			'~(?:QFN|DFN|MLF)\s*-?\s*(\d+)~'              => 'qfn',
+			'~(?:PDIP|SDIP|DIP)\s*-?\s*(\d+)~'            => 'dip',
+		);
+		$family = '';
+		$count  = 0;
+		foreach ( $patterns as $pattern => $candidate ) {
+			if ( preg_match( $pattern, $text, $matches ) ) {
+				$family = $candidate;
+				$count  = (int) $matches[1];
+				break;
+			}
+		}
+		if ( '' === $family ) {
+			if ( preg_match( '~SOT\s*-?\s*23~', $text ) ) {
+				$family = 'sot23';
+				$count  = 3;
+			} elseif ( preg_match( '~TO\s*-?\s*(?:220|126)~', $text ) ) {
+				$family = 'to220';
+				$count  = 3;
+			} elseif ( preg_match( '~(?:HEADER|TERMINAL|CONN)\D*(\d+)~', $text, $matches ) ) {
+				$family = 'header';
+				$count  = (int) $matches[1];
+			} else {
+				return null;
+			}
+		}
+
+		$layout = is_array( $existing ) ? $existing : array();
+		$layout['family'] = $family;
+		if ( (int) ( $layout['pin_count'] ?? 0 ) < 1 ) {
+			$layout['pin_count'] = $count;
+		}
+		return $layout;
+	}
+
 	private function layout_defaults( $family ) {
 		$base = array(
 			'pitch'          => 2.54,
@@ -1222,7 +1288,7 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 	 * Moi so AI de 0 deu duoc hieu la "khong biet, lay mac dinh".
 	 */
 	private function layout_spec( $layout ) {
-		$family = (string) ( $layout['family'] ?? '' );
+		$family = $this->normalize_family( $layout['family'] ?? '' );
 		$spec   = $this->layout_defaults( $family );
 		if ( null === $spec ) {
 			return null;
@@ -1470,7 +1536,24 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 		// quy uoc danh so, nen khong can kep lai theo outline nhu chan AI tu dat.
 		$layout    = is_array( $command['layout'] ?? null ) ? $command['layout'] : null;
 		$generated = $this->pins_from_layout( $layout );
-		$raw_pins  = null !== $generated ? $generated : ( is_array( $command['pins'] ?? null ) ? $command['pins'] : array() );
+		$hand_pins = is_array( $command['pins'] ?? null ) ? $command['pins'] : array();
+
+		// Model thuong de trong ca hai: layout khong dung duoc VA pins rong (vi da
+		// duoc dan la dung tu liet ke chan). Truoc day ca lenh bi bo im lang trong
+		// khi cau tra loi van khoe "da tao xong". Ten vo van con trong lenh nen
+		// dung no dung footprint - sai chut van hon khong ve gi.
+		if ( null === $generated && empty( $hand_pins ) ) {
+			$inferred = $this->infer_layout_from_package( $command['package'] ?? '', $layout );
+			if ( null === $inferred ) {
+				$inferred = $this->infer_layout_from_package( $command['component'] ?? '', $layout );
+			}
+			$generated = $this->pins_from_layout( $inferred );
+			if ( null !== $generated ) {
+				$layout = $inferred;
+			}
+		}
+
+		$raw_pins = null !== $generated ? $generated : $hand_pins;
 
 		$outline_span = max( (float) ( $outline_hint['width'] ?? 0 ), (float) ( $outline_hint['height'] ?? 0 ) );
 		$pin_limit = 150;
@@ -1616,6 +1699,7 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 			}
 			$clean_command = $this->sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height );
 			if ( ! $clean_command ) {
+				$out['warnings'][] = 'Chua ve duoc ' . sanitize_text_field( (string) ( $command['ref'] ?? '?' ) ) . ': server khong dung duoc mo ta footprint. Hay nhac lai kieu vo va so chan.';
 				continue;
 			}
 			foreach ( $clean_command['pins'] as $pin ) {
@@ -1636,6 +1720,7 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 		}
 		$local_refs = is_array( $known_refs ) ? $known_refs : array();
 		$known_pins = array();
+		$dropped    = array();
 		foreach ( $plan['commands'] as $command ) {
 			if ( ! is_array( $command ) || count( $out['commands'] ) >= 200 ) {
 				continue;
@@ -1644,6 +1729,7 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 			if ( 'ADD_FOOTPRINT' === $type ) {
 				$clean_command = $this->sanitize_footprint_command( $command, $side, $x, $y, $board_width, $board_height );
 				if ( ! $clean_command ) {
+					$dropped[] = sanitize_text_field( (string) ( $command['ref'] ?? '?' ) );
 					continue;
 				}
 				$local_refs[ $clean_command['ref'] ] = true;
@@ -1705,6 +1791,12 @@ Pin geometry accuracy matters even more for footprints you build without an atta
 					'value' => sanitize_text_field( (string) ( $command['value'] ?? '' ) ),
 				);
 			}
+		}
+
+		// Khong bao gio de model khoe "da tao xong" trong khi server da bo lenh -
+		// nguoi dung nhin ban mach trong tron ma khong biet vi sao.
+		if ( ! empty( $dropped ) ) {
+			$out['reply'] = trim( $out['reply'] . ' [Chua ve duoc ' . implode( ', ', $dropped ) . ': server khong dung duoc mo ta footprint. Hay nhac lai kieu vo va so chan, vi du "TSSOP-20" hoac "DIP-8".]' );
 		}
 		return $out;
 	}
