@@ -22,11 +22,13 @@ class DAT_PCB_Admin {
 			$this->ai->update_settings(
 				isset( $_POST['dat_pcb_openai_api_key'] ) ? wp_unslash( $_POST['dat_pcb_openai_api_key'] ) : '',
 				isset( $_POST['dat_pcb_openai_model'] ) ? wp_unslash( $_POST['dat_pcb_openai_model'] ) : '',
-				! empty( $_POST['dat_pcb_clear_openai_api_key'] )
+				! empty( $_POST['dat_pcb_clear_openai_api_key'] ),
+				! empty( $_POST['dat_pcb_openai_web_search'] )
 			);
 			echo '<div class="notice notice-success is-dismissible"><p>Da luu cai dat.</p></div>';
 		}
-		$model = esc_attr( $this->ai->get_model() );
+		$model      = esc_attr( $this->ai->get_model() );
+		$web_search = $this->ai->web_search_enabled();
 		echo '<div class="wrap">';
 		echo '<h1>DAT PCB Tracer - OpenAI</h1>';
 		echo '<p>Cau hinh OpenAI de tao footprint linh kien tu ten linh kien hoac URL datasheet PDF.</p>';
@@ -42,7 +44,11 @@ class DAT_PCB_Admin {
 		echo '</td></tr>';
 		echo '<tr><th scope="row"><label for="dat-pcb-openai-model">Model</label></th><td>';
 		echo '<input id="dat-pcb-openai-model" name="dat_pcb_openai_model" type="text" class="regular-text" value="' . $model . '">';
-		echo '<p class="description">Vi du: gpt-4.1. Co the doi sang model khac khi tai khoan OpenAI cua ban ho tro.</p>';
+		echo '<p class="description">Mac dinh <code>gpt-5.6</code> (thong minh nhat, $5/$30 mot trieu token). Re hon: <code>gpt-5.6-terra</code> ($2.50/$15) hoac <code>gpt-5.6-luna</code> ($1/$6). Tra datasheet tren mang chi chay tu dong gpt-5.4 tro len.</p>';
+		echo '</td></tr>';
+		echo '<tr><th scope="row">Tra cuu Internet</th><td>';
+		echo '<label><input id="dat-pcb-openai-web-search" name="dat_pcb_openai_web_search" type="checkbox" value="1"' . checked( $web_search, true, false ) . '> Cho AI tu tim datasheet/pinout tren mang</label>';
+		echo '<p class="description">Khi bat, AI se tu tra so chan va kich thuoc package cua linh kien la thay vi doan theo tri nho. Moi luot chat se cham hon va ton them token cho ket qua tim kiem.</p>';
 		echo '</td></tr>';
 		echo '</tbody></table>';
 		submit_button( 'Luu cai dat', 'primary', 'dat_pcb_tracer_save_settings' );
