@@ -72,7 +72,7 @@
 				note: ref + '.' + String(pin.number || '') + (pin.name ? ' ' + pin.name : '')
 			});
 			pins.push({ number: String(pin.number || ''), name: String(pin.name || ''), object_id: padId });
-			if (localPins) localPins[requestedRef + '.' + String(pin.number || '')] = { x: px, y: py, side: side };
+			if (localPins) localPins[requestedRef + '.' + String(pin.number || '')] = { x: px, y: py, side: side, id: padId };
 		});
 		var outline = command.outline || {};
 		var ow = Number(outline.width || 0);
@@ -194,11 +194,14 @@
 		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
 		if (!a || !b) return;
 		var side = a.side || b.side || this.app.activeSide;
+		var geometry = { x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: this.app.options.trackWidth || 0.4, bow: 0 };
+		if (a.id) geometry.anchor1 = a.id;
+		if (b.id) geometry.anchor2 = b.id;
 		this.app.state.objects.push({
 			id: global.DATPCBTracerTools.makeId(),
 			type: 'track',
 			layer: side === 'bottom' ? 'bottom_copper' : 'top_copper',
-			geometry: { x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: this.app.options.trackWidth || 0.4, bow: 0 },
+			geometry: geometry,
 			style: {},
 			locked: false,
 			visible: true,
@@ -213,7 +216,7 @@
 		this.app.state.objects.some(function (obj) {
 			var g = obj.geometry || {};
 			if ((obj.type === 'pad' || obj.type === 'via') && g.ai_ref === ref && String(g.ai_pin) === String(pin)) {
-				found = { x: Number(g.x || 0), y: Number(g.y || 0) };
+				found = { x: Number(g.x || 0), y: Number(g.y || 0), side: g.side, id: obj.id };
 				return true;
 			}
 			return false;

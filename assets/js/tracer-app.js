@@ -702,6 +702,7 @@
 			var dx = p.x - this.drawing.last.x, dy = p.y - this.drawing.last.y;
 			this.selectedObjects().forEach(function (obj) { global.DATPCBTracerTools.moveObject(obj, dx, dy); });
 			this.refreshSelectedComponents();
+			this.syncAnchoredTracks();
 			this.drawing.last = p;
 			this.markDirty(false);
 		} else if (this.drawing.obj) {
@@ -849,6 +850,29 @@
 		}, this);
 	};
 
+	App.prototype.syncAnchoredTracks = function () {
+		var byId = {};
+		this.state.objects.forEach(function (obj) { byId[obj.id] = obj; });
+		this.state.objects.forEach(function (obj) {
+			if (obj.type !== 'track') return;
+			var g = obj.geometry || {};
+			if (g.anchor1) {
+				var a = byId[g.anchor1];
+				if (a && a.geometry) {
+					g.x1 = Number(a.geometry.x || 0);
+					g.y1 = Number(a.geometry.y || 0);
+				}
+			}
+			if (g.anchor2) {
+				var b = byId[g.anchor2];
+				if (b && b.geometry) {
+					g.x2 = Number(b.geometry.x || 0);
+					g.y2 = Number(b.geometry.y || 0);
+				}
+			}
+		});
+	};
+
 	App.prototype.deleteSelected = function () {
 		if (!this.selected.length) return;
 		this.history.push(this.state);
@@ -878,6 +902,10 @@
 		this.selectedObjects().forEach(function (obj) {
 			var copy = global.DATPCBTracerClone(obj);
 			copy.id = global.DATPCBTracerTools.makeId();
+			if (copy.type === 'track' && copy.geometry) {
+				delete copy.geometry.anchor1;
+				delete copy.geometry.anchor2;
+			}
 			var componentId = this.getComponentIdForObject(copy);
 			if (componentId) {
 				if (!componentMap[componentId]) {
@@ -1156,6 +1184,10 @@
 		this.selectedObjects().forEach(function (obj) {
 			var copy = global.DATPCBTracerClone(obj);
 			copy.id = global.DATPCBTracerTools.makeId();
+			if (copy.type === 'track' && copy.geometry) {
+				delete copy.geometry.anchor1;
+				delete copy.geometry.anchor2;
+			}
 			var componentId = this.getComponentIdForObject(copy);
 			if (componentId) {
 				if (!componentMap[componentId]) {
@@ -1610,6 +1642,7 @@
 				this.componentObjects(component.id).forEach(function (componentObj) {
 					global.DATPCBTracerTools.moveObject(componentObj, dx, dy);
 				});
+				this.syncAnchoredTracks();
 			}
 			if (key === 'side' && component.side !== prevSide) {
 				this.mirrorComponentGeometry(component);
@@ -1620,6 +1653,7 @@
 						componentObj.layer = component.side === 'bottom' ? 'bottom_copper' : 'top_copper';
 					}
 				});
+				this.syncAnchoredTracks();
 			}
 			if (key === 'ref') {
 				this.componentObjects(component.id).forEach(function (componentObj) {

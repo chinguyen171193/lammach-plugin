@@ -235,14 +235,17 @@ class DAT_PCB_AI {
 		$r2_ohm = max( 100, (int) round( $r1_ohm * ( $voltage / 1.23 - 1 ) / 10 ) * 10 );
 		$r2_label = $r2_ohm >= 1000 ? ( rtrim( rtrim( number_format( $r2_ohm / 1000, 2, '.', '' ), '0' ), '.' ) . 'k' ) : $r2_ohm . 'R';
 
+		// LM2596 D2PAK-5 body la 10.16x15.24mm, pin o canh duoi (+y ~6.85mm tu tam),
+		// tab GND lon o canh tren. Dat cac linh kien phu thanh 1 hang phia duoi pin,
+		// cach xa than IC va tab de khong chong lan.
 		$commands = array(
 			$this->template_to_command( $this->template_lm2596( true ), $side, $x, $y, 'U1' ),
-			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x - 15, $y, 'C1' ),
-			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x + 18, $y, 'C2' ),
-			$this->template_to_command( $this->template_radial_inductor( '33uH' ), $side, $x + 9, $y - 9, 'L1' ),
-			$this->template_to_command( $this->template_sma( 'SS34' ), $side, $x + 2, $y + 9, 'D1' ),
-			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 4, $y + 12, 'R1', '1k' ),
-			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 4, $y + 16, 'R2', $r2_label ),
+			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x - 22, $y + 20, 'C1' ),
+			$this->template_to_command( $this->template_sma( 'SS34' ), $side, $x - 6, $y + 20, 'D1' ),
+			$this->template_to_command( $this->template_radial_inductor( '33uH' ), $side, $x + 9, $y + 20, 'L1' ),
+			$this->template_to_command( $this->template_radial_cap( '220uF 25V', 5.0, 2.0 ), $side, $x + 24, $y + 20, 'C2' ),
+			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 22, $y + 30, 'R1', '1k' ),
+			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x - 22, $y + 35, 'R2', $r2_label ),
 		);
 		$connects = array(
 			array( 'type' => 'CONNECT', 'from' => 'U1.1', 'to' => 'C1.1' ),
