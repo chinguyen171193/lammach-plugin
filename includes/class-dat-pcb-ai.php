@@ -30,6 +30,12 @@ class DAT_PCB_AI {
 	// ra JSON sau khi da suy luan va tra cuu xong.
 	const MAX_OUTPUT_TOKENS = 24000;
 
+	// Muc suy luan cua gpt-5.x. De mac dinh (medium) thi model an het han muc 24k
+	// token cho phan suy luan roi tra ve status "incomplete" khong kem mot chu
+	// output nao - van bi tinh tien day du. Dien mot footprint theo schema khong
+	// can suy luan sau, nen 'low' vua ra duoc ket qua vua cat phan lon chi phi.
+	const REASONING_EFFORT = 'low';
+
 	public function get_model() {
 		$model = get_option( self::OPTION_MODEL, '' );
 		$model = is_string( $model ) ? trim( $model ) : '';
@@ -45,7 +51,11 @@ class DAT_PCB_AI {
 	}
 
 	public function web_search_enabled() {
-		return '0' !== (string) get_option( self::OPTION_WEB_SEARCH, '1' );
+		// Mac dinh TAT. Mot luot co web_search tren gpt-5.x doi model tim vai vong
+		// roi doc het ket qua, phan lon han muc token di vao do va khong con cho de
+		// in JSON - luot goi ve tay khong nhung van bi tinh tien. Ai can tra
+		// datasheet la that thi bat len trong trang cai dat.
+		return '1' === (string) get_option( self::OPTION_WEB_SEARCH, '0' );
 	}
 
 	public function debug_enabled() {
@@ -94,11 +104,16 @@ class DAT_PCB_AI {
 	 * Chi bat khi can go loi: cat bo instructions/schema (dai va da biet truoc) va
 	 * chi giu phan model sinh ra. Khong bao gio ghi API key.
 	 */
-	private function log_exchange( $body, $code, $raw ) {
+	private function log_exchange( $body, $code, $raw, $data = array() ) {
 		// Mot yeu cau co the goi API nhieu lan (thu lai khi tool bi tu choi) - giu
 		// het cac luot de thay ro co bi tut ve che do khong web_search hay khong.
 		$log = '=== ' . gmdate( 'Y-m-d H:i:s' ) . " UTC ===\n";
 		$log .= 'model: ' . ( $body['model'] ?? '?' ) . '   web_search: ' . ( isset( $body['tools'] ) ? 'on' : 'off' ) . "   HTTP: {$code}\n";
+		// Chi phi mot luot goi nam o day: token suy luan cua gpt-5.x tinh tien nhu
+		// token output ke ca khi khong co lay mot chu tra ve.
+		$log .= 'status: ' . ( $data['status'] ?? '?' )
+			. ( isset( $data['incomplete_details']['reason'] ) ? ' (' . $data['incomplete_details']['reason'] . ')' : '' )
+			. '   ' . $this->usage_summary( $data ) . "\n";
 
 		$last_input = is_array( $body['input'] ?? null ) ? end( $body['input'] ) : null;
 		if ( $last_input ) {
@@ -111,6 +126,22 @@ class DAT_PCB_AI {
 		if ( $this->debug_enabled() ) {
 			$this->persist_debug_log();
 		}
+	}
+
+	/**
+	 * So token cua mot luot goi, de nhin ra ngay luot nao dot tien ma khong ra gi.
+	 */
+	private function usage_summary( $data ) {
+		$usage = is_array( $data['usage'] ?? null ) ? $data['usage'] : array();
+		if ( empty( $usage ) ) {
+			return 'khong co so lieu token';
+		}
+		return sprintf(
+			'token vao %d, token ra %d (trong do %d token suy luan)',
+			(int) ( $usage['input_tokens'] ?? 0 ),
+			(int) ( $usage['output_tokens'] ?? 0 ),
+			(int) ( $usage['output_tokens_details']['reasoning_tokens'] ?? 0 )
+		);
 	}
 
 	/**
@@ -334,8 +365,8 @@ class DAT_PCB_AI {
 		if ( is_wp_error( $plan ) ) {
 			return $plan;
 		}
-		if ( empty( $plan['commands'] ) ) {
-			$this->persist_debug_log( 'AI tra loi nhung khong kem lenh nao (commands rong).' );
+		if ( empty( $plan['commands'] ) && empty( $plan['new_parts'] ) ) {
+			$this->persist_debug_log( 'AI tra loi nhung khong kem linh kien hay lenh nao.' );
 		}
 		return rest_ensure_response( $this->sanitize_chat_response( $plan, $side, $x, $y, $board_width, $board_height, $known_refs ) );
 	}
@@ -350,6 +381,10 @@ class DAT_PCB_AI {
 		return (bool) preg_match( '~^gpt-5~i', (string) $model );
 	}
 
+	private function is_reasoning_model( $model ) {
+		return (bool) preg_match( '~^gpt-5~i', (string) $model );
+	}
+
 	/**
 	 * Gan model, han muc token va (neu model ho tro) tool web_search vao body -
 	 * phan chung cua generate_component() va chat_message().
@@ -358,6 +393,15 @@ class DAT_PCB_AI {
 		$model = $this->get_model();
 		$body  = array_merge( array( 'model' => $model ), $body );
 		$body['max_output_tokens'] = self::MAX_OUTPUT_TOKENS;
+
+		if ( $this->is_reasoning_model( $model ) ) {
+			$body['reasoning'] = array( 'effort' => self::REASONING_EFFORT );
+			// Cau tra loi la JSON theo schema, khong can van ve dai dong: bot token
+			// output = bot tien, va con cho JSON du cho de in het truoc gioi han.
+			if ( isset( $body['text'] ) && is_array( $body['text'] ) ) {
+				$body['text']['verbosity'] = 'low';
+			}
+		}
 
 		if ( $this->web_search_enabled() && $this->model_supports_web_search( $model ) ) {
 			$body['tools'] = array(
@@ -381,20 +425,21 @@ class DAT_PCB_AI {
 	 */
 	private function request_plan( $api_key, $body ) {
 		$plan = $this->post_and_decode( $api_key, $body );
+		$code = is_wp_error( $plan ) ? $plan->get_error_code() : '';
 
-		$retryable = array( 'dat_pcb_ai_api_rejected', 'dat_pcb_ai_invalid_json' );
-		$failed    = function ( $result ) use ( $retryable ) {
-			return is_wp_error( $result ) && in_array( $result->get_error_code(), $retryable, true );
-		};
-
-		// Truoc khi bo han web_search, thu lai voi khai bao tool toi gian: neu API
-		// chi che mot tham so cau hinh thi van giu duoc kha nang tra datasheet,
-		// thay vi im lang tut ve che do khong tra cuu duoc gi.
-		if ( $failed( $plan ) && isset( $body['tools'] ) ) {
+		// 400 = API tu choi body truoc khi chay model, luot do khong tinh tien: thu
+		// lai voi khai bao tool toi gian de con giu kha nang tra datasheet, thay vi
+		// im lang tut ve che do khong tra cuu duoc gi.
+		if ( 'dat_pcb_ai_api_rejected' === $code && isset( $body['tools'] ) ) {
 			$body['tools'] = array( array( 'type' => 'web_search' ) );
 			$plan = $this->post_and_decode( $api_key, $body );
+			$code = is_wp_error( $plan ) ? $plan->get_error_code() : '';
 		}
-		if ( $failed( $plan ) && isset( $body['tools'] ) ) {
+
+		// Bo han web_search. Truong hop model that su chay roi moi hong (mai tim
+		// kiem roi tra van ban thay vi JSON) chi duoc thu lai dung mot lan: moi luot
+		// goi deu bi tinh tien ca phan suy luan, ke ca khi khong tra ve chu nao.
+		if ( in_array( $code, array( 'dat_pcb_ai_api_rejected', 'dat_pcb_ai_invalid_json' ), true ) && isset( $body['tools'] ) ) {
 			unset( $body['tools'], $body['tool_choice'] );
 			$plan = $this->post_and_decode( $api_key, $body );
 		}
@@ -429,7 +474,7 @@ class DAT_PCB_AI {
 		$code = wp_remote_retrieve_response_code( $response );
 		$raw  = wp_remote_retrieve_body( $response );
 		$data = json_decode( $raw, true );
-		$this->log_exchange( $body, $code, $raw );
+		$this->log_exchange( $body, $code, $raw, is_array( $data ) ? $data : array() );
 		if ( $code < 200 || $code >= 300 ) {
 			$message = isset( $data['error']['message'] ) ? $data['error']['message'] : 'OpenAI API error.';
 			$code_id = 400 === (int) $code ? 'dat_pcb_ai_api_rejected' : 'dat_pcb_ai_api_error';
@@ -497,12 +542,23 @@ class DAT_PCB_AI {
 		if ( null !== $salvaged ) {
 			return $salvaged;
 		}
-		if ( 'incomplete' === ( $data['status'] ?? '' ) && 'max_output_tokens' === ( $data['incomplete_details']['reason'] ?? '' ) ) {
-			return new WP_Error( 'dat_pcb_ai_truncated', 'AI dung het han muc token truoc khi kip tra ket qua. Hay chia yeu cau thanh tung phan nho hon.', array( 'status' => 502 ) );
-		}
 		$refusal = $this->extract_refusal( $data );
 		if ( '' !== $refusal ) {
 			return new WP_Error( 'dat_pcb_ai_refused', sanitize_text_field( $refusal ), array( 'status' => 502 ) );
+		}
+
+		// Luot goi khong hoan tat, hoac hoan tat ma khong co lay mot chu output:
+		// gan nhu luon la token suy luan (va ket qua web_search) an het han muc
+		// truoc khi model kip in JSON. Luot nay van bi tinh tien du, va thu lai y
+		// het thi chi mat tien them, nen bao thang va giu log de con xem lai.
+		$incomplete = 'completed' !== ( $data['status'] ?? 'completed' );
+		if ( $incomplete || '' === trim( (string) $text ) ) {
+			$this->persist_debug_log( 'AI khong tra ve noi dung nao (' . $this->usage_summary( $data ) . '). Luot goi nay van bi tinh tien.' );
+			return new WP_Error(
+				'dat_pcb_ai_truncated',
+				'AI dung het han muc token cho phan suy luan truoc khi kip tra ket qua (luot goi nay van bi tinh tien). Hay tat "Tra cuu Internet" trong DAT PCB Tracer - OpenAI, hoac chia yeu cau thanh tung phan nho hon.',
+				array( 'status' => 502 )
+			);
 		}
 		return new WP_Error( 'dat_pcb_ai_invalid_json', 'OpenAI khong tra ve JSON hop le.', array( 'status' => 502 ) );
 	}
@@ -1091,84 +1147,11 @@ class DAT_PCB_AI {
 	 * Hop dong ve hinh hoc chan, dung chung cho ca hai prompt.
 	 */
 	private function footprint_geometry_instructions() {
-		return 'FOOTPRINTS. Fill "layout" and the server computes every pin coordinate, applies datasheet numbering (pin 1 top left, counter-clockwise), centres the part on its origin, and keeps pads from touching. Give family, pin_count, pitch, and row_spacing - the lead span measured pad centre to pad centre, NOT the plastic body width - and leave any number you do not know as 0. Put pin function names in pin_names starting at pin 1. Set family "none" and fill "pins" by hand only for irregular parts such as relays, modules or staggered connectors; hand coordinates are millimetres from the part centre, +x right and +y DOWN, every pad smaller than the gap to its neighbour, and family "none" with an empty pins array draws nothing at all. Always fill "package" with the real package name like "TSSOP-20" or "LQFP-32", which the server falls back on when the layout is unusable.';
+		return 'FOOTPRINTS. You never write pin coordinates. Describe the package and the server computes every pin, applies datasheet numbering (pin 1 top left, counter-clockwise), centres the part on its origin, and keeps pads from touching. Give family, pin_count, pitch, and row_spacing - the lead span measured pad centre to pad centre, NOT the plastic body width - and leave any number you do not know as 0 to take the family default. Put pin function names in pin_names from pin 1, or an empty array if you do not know them. Always fill "package" with the real package name like "TSSOP-20" or "LQFP-32", which the server falls back on if the numbers are unusable. For an irregular part with no matching family, pick the closest one and say so in the reply - an approximate footprint the user can correct beats an empty board.';
 	}
 
 	private function build_instructions() {
-		return 'You generate PCB footprint and wiring commands for a browser PCB editor. Return only JSON that matches the schema. Use millimeters. Prefer real package conventions from the component name or datasheet. If the user asks for a full circuit or module (not just one bare part), return multiple ADD_FOOTPRINT commands - one per component (IC, passives, connectors) - laid out with non-overlapping x/y coordinates around the insertion point, plus CONNECT commands for every required electrical connection using "REF.PIN" strings, for example {"type":"CONNECT","from":"U1.1","to":"C1.1"}. Every ref used in a CONNECT command must exist as an ADD_FOOTPRINT command with that exact ref and pin number earlier in the same commands array. Keep coordinates relative to the provided insertion point. Include silk lines when known, and use an empty silk array when unknown. Include pin rotation and suppress_pin_name for every pin. Do not invent electrical connections you are not confident about. If uncertain about component values or wiring, add clear warnings and prefer a conservative, commonly used reference design.' . "\n" . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
-	}
-
-	private function footprint_command_schema() {
-		return array(
-			'type'                 => 'object',
-			'additionalProperties' => false,
-			'required'             => array( 'type', 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'layout', 'outline', 'pins' ),
-			'properties'           => array(
-				'layout'    => array(
-					'type'                 => 'object',
-					'description'          => 'Preferred way to define a footprint: describe the package and the server generates exact pin coordinates. Set family to "none" ONLY for a part whose pins do not fit any other family, and then fill the pins array by hand instead. Every numeric field accepts 0 meaning "not known - use a sane default for this family".',
-					'additionalProperties' => false,
-					'required'             => array( 'family', 'pin_count', 'pitch', 'row_spacing', 'rows', 'body_width', 'body_height', 'pin_names' ),
-					'properties'           => array(
-						'family'         => array(
-							'type'        => 'string',
-							'enum'        => array( 'dip', 'soic', 'qfp', 'qfn', 'header', 'chip', 'sot23', 'to220', 'radial', 'axial', 'none' ),
-							'description' => 'none = irregular part, I am filling the pins array by hand instead. dip = through-hole dual inline IC. soic = any two-row gull-wing SMD IC (SOIC/SOP/SSOP/TSSOP/MSOP). qfp = quad flat pack with leads. qfn = quad flat no-lead. header = through-hole pin header or screw terminal. chip = two-terminal SMD passive (0603/0805/1206). sot23 = 3-lead small outline transistor. to220 = TO-220/TO-126 style inline power package. radial = two-lead radial through-hole part (electrolytic cap, LED). axial = two-lead axial through-hole part (resistor, diode).',
-						),
-						'pin_count'      => array( 'type' => 'integer', 'description' => 'Total number of electrical pins. Must be divisible by 4 for qfp/qfn, exactly 3 for sot23, exactly 2 for chip/radial/axial.' ),
-						'pitch'          => array( 'type' => 'number', 'description' => 'Centre-to-centre distance in mm between two adjacent pins along one row, read from the datasheet mechanical drawing (e.g. 2.54 for DIP, 1.27 for SOIC, 0.65 for TSSOP, 0.5 for LQFP).' ),
-						'row_spacing'    => array( 'type' => 'number', 'description' => 'Centre-to-centre distance in mm between the LEFT and RIGHT pin rows. For dip/soic/qfp/qfn this is the lead span across the package (not the plastic body width). For a 2-row header it is the distance between the two rows. For chip/radial/axial it is the distance between the two pads. For sot23 it is the distance between the 2-lead side and the 1-lead side.' ),
-						'rows'           => array( 'type' => 'integer', 'description' => 'header only: 1 or 2 rows. Use 1 for every other family.' ),
-						'body_width'     => array( 'type' => 'number', 'description' => 'Plastic body width in mm (X axis) for the silkscreen outline. 0 = fit to the pins.' ),
-						'body_height'    => array( 'type' => 'number', 'description' => 'Plastic body height in mm (Y axis) for the silkscreen outline. 0 = fit to the pins.' ),
-						'pin_names'      => array(
-							'type'        => 'array',
-							'items'       => array( 'type' => 'string' ),
-							'description' => 'Pin function names in pin-number order starting at pin 1 (e.g. ["VSS","PA1","PA2",...]). Leave an entry empty when the name is unknown. The server numbers pins itself following the datasheet convention, so this array only supplies labels.',
-						),
-					),
-				),
-				'type'      => array( 'type' => 'string', 'enum' => array( 'ADD_FOOTPRINT' ) ),
-				'ref'       => array( 'type' => 'string' ),
-				'component' => array( 'type' => 'string' ),
-				'value'     => array( 'type' => 'string' ),
-				'package'   => array( 'type' => 'string' ),
-				'side'      => array( 'type' => 'string', 'enum' => array( 'top', 'bottom' ) ),
-				'x'         => array( 'type' => 'number' ),
-				'y'         => array( 'type' => 'number' ),
-				'outline'   => array(
-					'type'                 => 'object',
-					'additionalProperties' => false,
-					'required'             => array( 'width', 'height' ),
-					'properties'           => array(
-						'width'  => array( 'type' => 'number' ),
-						'height' => array( 'type' => 'number' ),
-					),
-				),
-				'pins'      => array(
-					'type'  => 'array',
-					'items' => array(
-						'type'                 => 'object',
-						'additionalProperties' => false,
-						'required'             => array( 'number', 'name', 'x', 'y', 'shape', 'width', 'height', 'diameter', 'drill', 'smd', 'rotation', 'suppress_pin_name' ),
-						'properties'           => array(
-							'number'   => array( 'type' => 'string' ),
-							'name'     => array( 'type' => 'string' ),
-							'x'        => array( 'type' => 'number' ),
-							'y'        => array( 'type' => 'number' ),
-							'shape'    => array( 'type' => 'string', 'enum' => array( 'round', 'rect', 'oval' ) ),
-							'width'    => array( 'type' => 'number' ),
-							'height'   => array( 'type' => 'number' ),
-							'diameter' => array( 'type' => 'number' ),
-							'drill'    => array( 'type' => 'number' ),
-							'smd'      => array( 'type' => 'boolean' ),
-							'rotation' => array( 'type' => 'number' ),
-							'suppress_pin_name' => array( 'type' => 'boolean' ),
-						),
-					),
-				),
-			),
-		);
+		return 'You generate PCB footprints for a browser PCB editor. Return only JSON matching the schema, in millimetres. Put every part in "new_parts" - that is the only way to place a footprint. If the user asks for a whole circuit or module rather than one bare part, list every component (IC, passives, connectors) in "new_parts" with non-overlapping x/y around the insertion point, then wire them in "commands" with CONNECT using "REF.PIN" strings such as {"type":"CONNECT","from":"U1.1","to":"C1.1"}. Every ref in a CONNECT must be one you listed in new_parts. Do not invent connections you are not confident about, and put anything the user should double-check into "warnings".' . "\n" . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
 	}
 
 	private function connect_command_schema( $type_name = 'CONNECT' ) {
@@ -1184,27 +1167,106 @@ class DAT_PCB_AI {
 		);
 	}
 
+	/**
+	 * Mo ta mot linh kien moi - phang hoan toan, khong object long nhau.
+	 *
+	 * Truoc day day la mot nhanh cua anyOf 6 nhanh trong mang "commands", va no la
+	 * nhanh to nhat: 12 truong bat buoc, mot object "layout" long ben trong, cong
+	 * mot mang "pins" toan object 12 truong. Log that cho thay model lap di lap lai
+	 * 5 nhanh nho con lai va khong mot lan nao chon nhanh nay. Tach ra thanh mang
+	 * rieng chi co mot dang duy nhat thi model khong con phai chon nhanh nua.
+	 */
+	private function footprint_spec_schema() {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'ref', 'component', 'value', 'package', 'side', 'x', 'y', 'family', 'pin_count', 'pitch', 'row_spacing', 'rows', 'body_width', 'body_height', 'pin_names' ),
+			'properties'           => array(
+				'ref'         => array( 'type' => 'string', 'description' => 'Reference designator, e.g. U1, R3, C2.' ),
+				'component'   => array( 'type' => 'string', 'description' => 'Manufacturer part number, e.g. STM8S003F3P6.' ),
+				'value'       => array( 'type' => 'string', 'description' => 'Label shown on the board, e.g. 10k, 100nF, STM8S003F3.' ),
+				'package'     => array( 'type' => 'string', 'description' => 'Real package name, e.g. "TSSOP-20", "LQFP-32", "DIP-8". The server falls back on this if the numbers below are unusable, so always fill it.' ),
+				'side'        => array( 'type' => 'string', 'enum' => array( 'top', 'bottom' ) ),
+				'x'           => array( 'type' => 'number', 'description' => 'Position of the part centre in mm on the board. Use the cursor point given in the message unless there is a reason not to.' ),
+				'y'           => array( 'type' => 'number', 'description' => 'Position of the part centre in mm. +y is DOWN.' ),
+				'family'      => array(
+					'type'        => 'string',
+					'enum'        => array( 'dip', 'soic', 'qfp', 'qfn', 'header', 'chip', 'sot23', 'to220', 'radial', 'axial' ),
+					'description' => 'dip = through-hole dual inline IC. soic = any two-row gull-wing SMD IC (SOIC/SOP/SSOP/TSSOP/MSOP). qfp = quad flat pack with leads. qfn = quad flat no-lead. header = through-hole pin header or screw terminal. chip = two-terminal SMD passive. sot23 = 3-lead small outline transistor. to220 = TO-220/TO-126 inline power package. radial = two-lead radial through-hole part. axial = two-lead axial through-hole part. Always pick the closest family - there is no "other".',
+				),
+				'pin_count'   => array( 'type' => 'integer', 'description' => 'Total electrical pins. Divisible by 4 for qfp/qfn, 3 for sot23, 2 for chip/radial/axial.' ),
+				'pitch'       => array( 'type' => 'number', 'description' => 'Centre-to-centre distance in mm between two adjacent pins in a row (2.54 for DIP, 1.27 for SOIC, 0.65 for TSSOP, 0.5 for LQFP). 0 = use the family default.' ),
+				'row_spacing' => array( 'type' => 'number', 'description' => 'Lead span in mm between the left and right pin rows, measured pad centre to pad centre - NOT the plastic body width. 0 = use the family default.' ),
+				'rows'        => array( 'type' => 'integer', 'description' => 'header only: 1 or 2 rows. Use 1 for every other family.' ),
+				'body_width'  => array( 'type' => 'number', 'description' => 'Plastic body width in mm for the outline. 0 = fit to the pins.' ),
+				'body_height' => array( 'type' => 'number', 'description' => 'Plastic body height in mm for the outline. 0 = fit to the pins.' ),
+				'pin_names'   => array(
+					'type'        => 'array',
+					'items'       => array( 'type' => 'string' ),
+					'description' => 'Pin function names in pin-number order from pin 1, e.g. ["VSS","PA1","PA2"]. Empty string where unknown, or an empty array if you do not know the pinout. The server numbers the pins itself.',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Dung lai lenh ADD_FOOTPRINT day du tu mo ta phang, de phan sinh chan va lam
+	 * sach phia sau giu nguyen khong phai sua.
+	 */
+	private function spec_to_footprint_command( $spec ) {
+		if ( ! is_array( $spec ) ) {
+			return null;
+		}
+		return array(
+			'type'      => 'ADD_FOOTPRINT',
+			'ref'       => $spec['ref'] ?? 'U1',
+			'component' => $spec['component'] ?? '',
+			'value'     => $spec['value'] ?? '',
+			'package'   => $spec['package'] ?? '',
+			'side'      => $spec['side'] ?? 'top',
+			'x'         => $spec['x'] ?? null,
+			'y'         => $spec['y'] ?? null,
+			'outline'   => array(),
+			'pins'      => array(),
+			'layout'    => array(
+				'family'      => $spec['family'] ?? '',
+				'pin_count'   => $spec['pin_count'] ?? 0,
+				'pitch'       => $spec['pitch'] ?? 0,
+				'row_spacing' => $spec['row_spacing'] ?? 0,
+				'rows'        => $spec['rows'] ?? 1,
+				'body_width'  => $spec['body_width'] ?? 0,
+				'body_height' => $spec['body_height'] ?? 0,
+				'pin_names'   => is_array( $spec['pin_names'] ?? null ) ? $spec['pin_names'] : array(),
+			),
+		);
+	}
+
 	private function component_schema() {
 		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
-			'required'             => array( 'version', 'warnings', 'commands' ),
+			'required'             => array( 'version', 'warnings', 'new_parts', 'commands' ),
 			'properties'           => array(
-				'version'  => array( 'type' => 'string', 'enum' => array( 'component-plan-1' ) ),
-				'warnings' => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-				'commands' => array(
-					'type'  => 'array',
-					'items' => array(
-						'anyOf' => array( $this->footprint_command_schema(), $this->connect_command_schema() ),
-					),
+				'version'   => array( 'type' => 'string', 'enum' => array( 'component-plan-1' ) ),
+				'warnings'  => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+				'new_parts' => array(
+					'type'        => 'array',
+					'items'       => $this->footprint_spec_schema(),
+					'description' => 'Every part to place. This is the only way to add a footprint.',
+				),
+				'commands'  => array(
+					'type'        => 'array',
+					'items'       => $this->connect_command_schema(),
+					'description' => 'Tracks between pins of the parts above. Empty array when there is nothing to wire.',
 				),
 			),
 		);
 	}
 
 	private function build_chat_instructions() {
-		return 'You are a PCB layout assistant inside a browser PCB editor. Each message gives the board size and a JSON list of components already placed. Answer with JSON: "reply" is one or two short sentences in the user\'s language, and "commands" is what actually changes the board - the reply text draws nothing by itself. If you say you added, moved or wired something, the matching command must be in the same response.
-Commands: ADD_FOOTPRINT (new part - describe the package in "layout" and the server generates the pins), CONNECT and DISCONNECT ("REF.PIN" to "REF.PIN", a straight track between two pins), MOVE_COMPONENT (ref, x, y in mm), DELETE_COMPONENT (ref), SET_VALUE (ref, value). Only use a ref from the provided list or one you added earlier in the same array. Never repeat a command, and never emit one that changes nothing such as connecting a pin to itself. Two or three commands is a normal answer; if you notice yourself writing the same command a second time, stop and close the array.
+		return 'You are a PCB layout assistant inside a browser PCB editor. Each message gives the board size and a JSON list of components already placed. Answer with JSON: "reply" is one or two short sentences in the user\'s language, "new_parts" holds every part you are adding, and "commands" holds edits to parts that already exist. The reply text draws nothing by itself - if you say you added, moved or wired something, it must appear in new_parts or commands in the same response.
+ADDING A PART goes in "new_parts" and nowhere else; there is no add command. When the user names a component, that is what they want, so put one entry in new_parts even if you are unsure of the exact pinout.
+"commands" edits existing parts only: CONNECT and DISCONNECT ("REF.PIN" to "REF.PIN", a straight track between two pins), MOVE_COMPONENT (ref, x, y in mm), DELETE_COMPONENT (ref), SET_VALUE (ref, value). Only use a ref from the provided list or one you just put in new_parts. Never repeat a command, and never emit one that changes nothing such as connecting a pin to itself. A couple of commands is a normal answer; if you notice yourself writing the same command a second time, stop and close the array.
 PLACEMENT. Every track is a straight line between two exact pins and there is no autorouter. Put a new part near the pin it connects to, never on top of another part, and chain a shared net through the nearest already-connected pin instead of radiating from one hub.
 ' . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
 	}
@@ -1244,14 +1306,18 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 		return array(
 			'type'                 => 'object',
 			'additionalProperties' => false,
-			'required'             => array( 'reply', 'commands' ),
+			'required'             => array( 'reply', 'new_parts', 'commands' ),
 			'properties'           => array(
-				'reply'    => array( 'type' => 'string' ),
-				'commands' => array(
-					'type'  => 'array',
-					'items' => array(
+				'reply'     => array( 'type' => 'string' ),
+				'new_parts' => array(
+					'type'        => 'array',
+					'items'       => $this->footprint_spec_schema(),
+					'description' => 'Parts to add to the board. This is the ONLY way to place a new footprint - the commands array below cannot do it. Empty array when you are not adding anything.',
+				),
+				'commands'  => array(
+					'type'        => 'array',
+					'items'       => array(
 						'anyOf' => array(
-							$this->footprint_command_schema(),
 							$this->connect_command_schema( 'CONNECT' ),
 							$this->connect_command_schema( 'DISCONNECT' ),
 							$move_schema,
@@ -1259,6 +1325,7 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 							$set_value_schema,
 						),
 					),
+					'description' => 'Edits to parts that already exist. Empty array when there is nothing to change.',
 				),
 			),
 		);
@@ -1761,10 +1828,24 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 				$out['warnings'][] = sanitize_text_field( (string) $warning );
 			}
 		}
-		if ( empty( $plan['commands'] ) || ! is_array( $plan['commands'] ) ) {
+		$known_pins = array();
+
+		// Linh kien moi den tu "new_parts"; xu ly truoc de CONNECT tim thay ref.
+		foreach ( ( is_array( $plan['new_parts'] ?? null ) ? $plan['new_parts'] : array() ) as $spec ) {
+			$clean_command = $this->sanitize_footprint_command( $this->spec_to_footprint_command( $spec ), $side, $x, $y, $board_width, $board_height );
+			if ( ! $clean_command ) {
+				$out['warnings'][] = 'Chua ve duoc ' . sanitize_text_field( (string) ( $spec['ref'] ?? '?' ) ) . ': server khong dung duoc mo ta footprint.';
+				continue;
+			}
+			foreach ( $clean_command['pins'] as $pin ) {
+				$known_pins[ $clean_command['ref'] . '.' . $pin['number'] ] = true;
+			}
+			$out['commands'][] = $clean_command;
+		}
+
+		if ( ! is_array( $plan['commands'] ?? null ) ) {
 			return $out;
 		}
-		$known_pins = array();
 		foreach ( $plan['commands'] as $command ) {
 			if ( ! is_array( $command ) ) {
 				continue;
@@ -1806,13 +1887,29 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 		if ( isset( $plan['reply'] ) ) {
 			$out['reply'] = sanitize_textarea_field( (string) $plan['reply'] );
 		}
-		if ( empty( $plan['commands'] ) || ! is_array( $plan['commands'] ) ) {
-			return $out;
+		if ( ! is_array( $plan['commands'] ?? null ) ) {
+			$plan['commands'] = array();
 		}
 		$local_refs = is_array( $known_refs ) ? $known_refs : array();
 		$known_pins = array();
 		$dropped    = array();
 		$seen       = array();
+
+		// Linh kien moi den tu "new_parts" va phai duoc xu ly truoc, de cac lenh
+		// CONNECT phia sau tim thay ref cua chung.
+		foreach ( ( is_array( $plan['new_parts'] ?? null ) ? $plan['new_parts'] : array() ) as $spec ) {
+			$clean_command = $this->sanitize_footprint_command( $this->spec_to_footprint_command( $spec ), $side, $x, $y, $board_width, $board_height );
+			if ( ! $clean_command ) {
+				$dropped[] = sanitize_text_field( (string) ( $spec['ref'] ?? '?' ) );
+				continue;
+			}
+			$local_refs[ $clean_command['ref'] ] = true;
+			foreach ( $clean_command['pins'] as $pin ) {
+				$known_pins[ $clean_command['ref'] . '.' . $pin['number'] ] = true;
+			}
+			$out['commands'][] = $clean_command;
+		}
+
 		foreach ( $plan['commands'] as $command ) {
 			if ( ! is_array( $command ) || count( $out['commands'] ) >= 200 ) {
 				continue;

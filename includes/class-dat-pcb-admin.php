@@ -53,7 +53,7 @@ class DAT_PCB_Admin {
 		echo '</td></tr>';
 		echo '<tr><th scope="row">Tra cuu Internet</th><td>';
 		echo '<label><input id="dat-pcb-openai-web-search" name="dat_pcb_openai_web_search" type="checkbox" value="1"' . checked( $web_search, true, false ) . '> Cho AI tu tim datasheet/pinout tren mang</label>';
-		echo '<p class="description">Khi bat, AI se tu tra so chan va kich thuoc package cua linh kien la thay vi doan theo tri nho. Moi luot chat se cham hon va ton them token cho ket qua tim kiem.</p>';
+		echo '<p class="description">Khi bat, AI se tu tra so chan va kich thuoc package cua linh kien la thay vi doan theo tri nho. <strong>Mac dinh tat vi rat ton tien</strong>: moi luot chat cham hon nhieu va thuong het han muc token cho phan tim kiem truoc khi kip ve linh kien - luot do khong ra ket qua nhung van bi tinh tien. Chi bat khi that su can tra datasheet.</p>';
 		echo '</td></tr>';
 		echo '<tr><th scope="row">Go loi</th><td>';
 		echo '<label><input id="dat-pcb-openai-debug" name="dat_pcb_openai_debug" type="checkbox" value="1"' . checked( $debug, true, false ) . '> Ghi lai luot goi AI gan nhat</label>';
