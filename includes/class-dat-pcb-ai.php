@@ -14,6 +14,11 @@ class DAT_PCB_AI {
 	// Gom cac luot goi API cua request nay lai de ghi log mot the.
 	private $last_exchange = '';
 
+	// Client LCSC dung lai trong ca request, va ghi chu ve linh kien nao lay duoc
+	// footprint that de bao lai cho nguoi dung.
+	private $lcsc       = null;
+	private $lcsc_notes = array();
+
 	// Dong gpt-5.6 vua suy luan tot hon han gpt-4.x vua ho tro built-in tool
 	// web_search, nen AI co the tu tra datasheet/pinout thay vi doan tu tri nho.
 	const DEFAULT_MODEL = 'gpt-5.6';
@@ -1213,21 +1218,68 @@ class DAT_PCB_AI {
 	 * Dung lai lenh ADD_FOOTPRINT day du tu mo ta phang, de phan sinh chan va lam
 	 * sach phia sau giu nguyen khong phai sua.
 	 */
+	/**
+	 * Thu lay footprint that tu thu vien LCSC theo ma linh kien.
+	 *
+	 * Day la bac 1-2: so lieu do nha san xuat cong bo, chinh xac hon han bat cu
+	 * thu gi AI dung lai tu ten ho package. That bai thi tra null va roi xuong
+	 * bo sinh tham so nhu cu.
+	 */
+	private function lcsc_footprint( $mpn, $ref ) {
+		$mpn = trim( (string) $mpn );
+		if ( '' === $mpn || ! class_exists( 'DAT_PCB_LCSC' ) ) {
+			return null;
+		}
+		if ( null === $this->lcsc ) {
+			$this->lcsc = new DAT_PCB_LCSC();
+		}
+		$footprint = $this->lcsc->footprint_for_mpn( $mpn );
+		if ( ! $footprint ) {
+			return null;
+		}
+
+		$this->lcsc_notes[] = sprintf(
+			'%s: dung footprint that tu thu vien LCSC (%s, %s).',
+			sanitize_text_field( (string) $ref ),
+			$footprint['lcsc'],
+			'' !== $footprint['package'] ? $footprint['package'] : $mpn
+		);
+		foreach ( $footprint['warnings'] as $warning ) {
+			$this->lcsc_notes[] = $warning;
+		}
+		return $footprint;
+	}
+
+	public function take_lcsc_notes() {
+		$notes = array_values( array_unique( $this->lcsc_notes ) );
+		$this->lcsc_notes = array();
+		return $notes;
+	}
+
 	private function spec_to_footprint_command( $spec ) {
 		if ( ! is_array( $spec ) ) {
 			return null;
 		}
-		return array(
+		$real = $this->lcsc_footprint( $spec['component'] ?? '', $spec['ref'] ?? '?' );
+		if ( $real ) {
+			// Co so lieu that thi tat bo sinh tham so di: de family rong khien
+			// pins_from_layout() tra null, va mang pins that duoc dung nguyen.
+			$spec['family']      = '';
+			$spec['pin_names']   = array();
+			$spec['body_width']  = 0;
+			$spec['body_height'] = 0;
+		}
+		$command = array(
 			'type'      => 'ADD_FOOTPRINT',
 			'ref'       => $spec['ref'] ?? 'U1',
 			'component' => $spec['component'] ?? '',
 			'value'     => $spec['value'] ?? '',
-			'package'   => $spec['package'] ?? '',
+			'package'   => $real && '' !== $real['package'] ? $real['package'] : ( $spec['package'] ?? '' ),
 			'side'      => $spec['side'] ?? 'top',
 			'x'         => $spec['x'] ?? null,
 			'y'         => $spec['y'] ?? null,
-			'outline'   => array(),
-			'pins'      => array(),
+			'outline'   => $real ? $real['outline'] : array(),
+			'pins'      => $real ? $real['pins'] : array(),
 			'layout'    => array(
 				'family'      => $spec['family'] ?? '',
 				'pin_count'   => $spec['pin_count'] ?? 0,
@@ -1239,6 +1291,7 @@ class DAT_PCB_AI {
 				'pin_names'   => is_array( $spec['pin_names'] ?? null ) ? $spec['pin_names'] : array(),
 			),
 		);
+		return $command;
 	}
 
 	private function component_schema() {
@@ -1842,6 +1895,9 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 			}
 			$out['commands'][] = $clean_command;
 		}
+		foreach ( $this->take_lcsc_notes() as $note ) {
+			$out['warnings'][] = $note;
+		}
 
 		if ( ! is_array( $plan['commands'] ?? null ) ) {
 			return $out;
@@ -1994,6 +2050,13 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 					'value' => sanitize_text_field( (string) ( $command['value'] ?? '' ) ),
 				);
 			}
+		}
+
+		// Cho biet chan nao la so lieu that cua nha san xuat, chan nao la AI dung
+		// lai - nguoi dung can biet cai nao dang tin hon truoc khi dat mach.
+		$notes = $this->take_lcsc_notes();
+		if ( ! empty( $notes ) ) {
+			$out['reply'] = trim( $out['reply'] . ' [' . implode( ' ', $notes ) . ']' );
 		}
 
 		// Khong bao gio de model khoe "da tao xong" trong khi server da bo lenh -

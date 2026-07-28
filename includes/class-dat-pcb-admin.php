@@ -29,11 +29,15 @@ class DAT_PCB_Admin {
 			if ( ! empty( $_POST['dat_pcb_clear_openai_log'] ) ) {
 				$this->ai->clear_debug_log();
 			}
+			$lcsc_setting = new DAT_PCB_LCSC();
+			$lcsc_setting->set_enabled( ! empty( $_POST['dat_pcb_lcsc_enabled'] ) );
 			echo '<div class="notice notice-success is-dismissible"><p>Da luu cai dat.</p></div>';
 		}
 		$model      = esc_attr( $this->ai->get_model() );
 		$web_search = $this->ai->web_search_enabled();
 		$debug      = $this->ai->debug_enabled();
+		$lcsc_api   = new DAT_PCB_LCSC();
+		$lcsc       = $lcsc_api->is_enabled();
 		echo '<div class="wrap">';
 		echo '<h1>DAT PCB Tracer - OpenAI</h1>';
 		echo '<p>Cau hinh OpenAI de tao footprint linh kien tu ten linh kien hoac URL datasheet PDF.</p>';
@@ -54,6 +58,10 @@ class DAT_PCB_Admin {
 		echo '<tr><th scope="row">Tra cuu Internet</th><td>';
 		echo '<label><input id="dat-pcb-openai-web-search" name="dat_pcb_openai_web_search" type="checkbox" value="1"' . checked( $web_search, true, false ) . '> Cho AI tu tim datasheet/pinout tren mang</label>';
 		echo '<p class="description">Khi bat, AI se tu tra so chan va kich thuoc package cua linh kien la thay vi doan theo tri nho. <strong>Mac dinh tat vi rat ton tien</strong>: moi luot chat cham hon nhieu va thuong het han muc token cho phan tim kiem truoc khi kip ve linh kien - luot do khong ra ket qua nhung van bi tinh tien. Chi bat khi that su can tra datasheet.</p>';
+		echo '</td></tr>';
+		echo '<tr><th scope="row">Thu vien LCSC</th><td>';
+		echo '<label><input name="dat_pcb_lcsc_enabled" type="checkbox" value="1"' . checked( $lcsc, true, false ) . '> Lay footprint that theo ma linh kien</label>';
+		echo '<p class="description">Khi bat, neu ma linh kien AI dua ra co trong thu vien LCSC thi dung so lieu that cua nha san xuat thay vi de AI tu dung theo ho package. Khong tim thay thi tu quay ve cach cu. Ket qua duoc cache 7 ngay.</p>';
 		echo '</td></tr>';
 		echo '<tr><th scope="row">Go loi</th><td>';
 		echo '<label><input id="dat-pcb-openai-debug" name="dat_pcb_openai_debug" type="checkbox" value="1"' . checked( $debug, true, false ) . '> Ghi lai luot goi AI gan nhat</label>';
