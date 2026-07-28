@@ -533,6 +533,12 @@
 			var radiusPx = Math.min(Number(g.radius || 0) * this.view.scale, width / 2, height / 2);
 			this.roundedRectPath(ctx, -width / 2, -height / 2, width, height, radiusPx);
 			ctx.fill();
+		} else if (g.shape === 'oval') {
+			// Gerber xuat pad 'oval' bang khau do O, ma chuan Gerber dinh nghia O la
+			// hinh vien nhon (chu nhat bo tron hai dau) chu khong phai e-lip. Ve
+			// dung cai se duoc san xuat, thay vi mot hinh nhon hai dau it dong hon.
+			this.roundedRectPath(ctx, -width / 2, -height / 2, width, height, Math.min(width, height) / 2);
+			ctx.fill();
 		} else {
 			ctx.ellipse(0, 0, width / 2, height / 2, 0, 0, Math.PI * 2);
 			ctx.fill();

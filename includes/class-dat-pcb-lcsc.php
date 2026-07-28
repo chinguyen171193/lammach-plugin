@@ -237,7 +237,11 @@ class DAT_PCB_LCSC {
 		if ( 'RECT' === $kind ) {
 			$shape = 'rect';
 		} else {
-			// OVAL/ELLIPSE: hai canh bang nhau thi la hinh tron.
+			// EasyEDA co ca OVAL lan ELLIPSE, tuc chung khac nhau: OVAL la hinh
+			// vien nhon (chu nhat bo tron hai dau), dung voi khau do 'O' cua
+			// Gerber. ELLIPSE that su hiem trong footprint that; editor khong co
+			// dang rieng cho no nen cung dung vien nhon - thua mot chut dong,
+			// an toan hon cho viec han.
 			$shape = abs( $width - $height ) < 0.001 ? 'round' : 'oval';
 		}
 
