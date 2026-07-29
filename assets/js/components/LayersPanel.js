@@ -20,15 +20,21 @@
 			{ id: 'pcb', label: 'Lớp PCB' },
 			{ id: 'objects', label: 'Đối tượng' }
 		];
+		// Chi giu ten tieng Viet va nhom tab. Mau KHONG dat o day: o mau canh ten
+		// lop phai dung mau lop that su duoc ve tren canvas, nen luon lay tu
+		// app.state.layers. Truoc day bang nay giu ban sao cung cua ca mau lan ten,
+		// va no da troi khoi thuc te - dong nay tung ghi 'Keepout' mau tim cho lop
+		// mechanical, trong khi canvas ve no mau xanh va Keepout la mot khai niem
+		// hoan toan khac (vung cam di day).
 		this.layerMeta = {
-			top_copper: { label: 'Lớp trên', color: '#2ecc71', group: 'copper' },
-			bottom_copper: { label: 'Lớp dưới', color: '#2d8cff', group: 'copper' },
-			annotation: { label: 'Silk Top', color: '#f2c84b', group: 'pcb' },
-			outline: { label: 'Outline', color: '#ff9f2d', group: 'pcb' },
-			drill: { label: 'Drill', color: '#8b6b4a', group: 'pcb' },
-			mechanical: { label: 'Keepout', color: '#8a5cf6', group: 'pcb' },
-			background_top: { label: 'Background Top', color: '#6b7280', group: 'pcb' },
-			background_bottom: { label: 'Background Bottom', color: '#4b5563', group: 'pcb' }
+			top_copper: { label: 'Đồng lớp trên', group: 'copper' },
+			bottom_copper: { label: 'Đồng lớp dưới', group: 'copper' },
+			annotation: { label: 'In lụa', group: 'pcb' },
+			outline: { label: 'Viền bo', group: 'pcb' },
+			drill: { label: 'Lỗ khoan', group: 'pcb' },
+			mechanical: { label: 'Cơ khí', group: 'pcb' },
+			background_top: { label: 'Ảnh nền mặt trên', group: 'pcb' },
+			background_bottom: { label: 'Ảnh nền mặt dưới', group: 'pcb' }
 		};
 		this.build();
 		this.bind();
@@ -246,7 +252,7 @@
 		var items = Object.keys(this.app.state.layers).map(function (key) {
 			var layer = this.app.state.layers[key];
 			var meta = this.layerMeta[key] || {};
-			return { type: 'layer', key: key, label: meta.label || layer.name || key, color: meta.color || layer.color || '#8b949e', group: meta.group || 'pcb', layer: layer };
+			return { type: 'layer', key: key, label: meta.label || layer.name || key, color: layer.color || '#8b949e', group: meta.group || 'pcb', layer: layer };
 		}, this);
 		if (this.activeTab === 'copper') items = items.filter(function (item) { return item.group === 'copper'; });
 		if (this.activeTab === 'pcb') items = items.filter(function (item) { return item.group === 'pcb'; });
