@@ -1151,12 +1151,25 @@ class DAT_PCB_AI {
 	/**
 	 * Hop dong ve hinh hoc chan, dung chung cho ca hai prompt.
 	 */
+	/**
+	 * Bat AI tra cuu so do mach tham khao that (typical application circuit trong
+	 * datasheet) cho mach quanh mot IC cu the, thay vi tu bia linh kien phu + gia
+	 * tri + cach noi hoan toan tu tri nho khi khong khop mach mau cuc bo nao
+	 * (hien tai chi co LM2596 la co mach mau viet cung - xem known_circuit_plan()).
+	 */
+	private function circuit_design_instructions() {
+		if ( ! ( $this->web_search_enabled() && $this->model_supports_web_search( $this->get_model() ) ) ) {
+			return 'CIRCUITS. When asked for a whole circuit or module around a specific part, not just that bare part, you cannot verify a reference design here - build the most common textbook topology for that part family from memory, say plainly in the reply and in a warning that the supporting values and wiring are unverified, and still place and wire everything. An unverified circuit the user can check beats an empty board.';
+		}
+		return 'CIRCUITS. When asked for a whole circuit or module around a specific part, not just that bare part, search for the manufacturer\'s own typical application / reference design in its datasheet before choosing supporting parts and wiring - search "<part number> datasheet typical application circuit". Take the supporting components, their values (feedback resistors, decoupling and bulk capacitors, inductor and diode ratings) and the connections from what you actually read there, and name the reference in the reply. If the search does not run or finds nothing useful, fall back to the most common textbook topology for that part family from memory, say plainly in the reply and in a warning that it is unverified, and still place and wire it - the same rule as for footprints: an unverified circuit the user can check beats an empty board.';
+	}
+
 	private function footprint_geometry_instructions() {
 		return 'FOOTPRINTS. You never write pin coordinates. Describe the package and the server computes every pin, applies datasheet numbering (pin 1 top left, counter-clockwise), centres the part on its origin, and keeps pads from touching. Give family, pin_count, pitch, and row_spacing - the lead span measured pad centre to pad centre, NOT the plastic body width - and leave any number you do not know as 0 to take the family default. Put pin function names in pin_names from pin 1, or an empty array if you do not know them. Always fill "package" with the real package name like "TSSOP-20" or "LQFP-32", which the server falls back on if the numbers are unusable. For an irregular part with no matching family, pick the closest one and say so in the reply - an approximate footprint the user can correct beats an empty board.';
 	}
 
 	private function build_instructions() {
-		return 'You generate PCB footprints for a browser PCB editor. Return only JSON matching the schema, in millimetres. Put every part in "new_parts" - that is the only way to place a footprint. If the user asks for a whole circuit or module rather than one bare part, list every component (IC, passives, connectors) in "new_parts" with non-overlapping x/y around the insertion point, then wire them in "commands" with CONNECT using "REF.PIN" strings such as {"type":"CONNECT","from":"U1.1","to":"C1.1"}. Every ref in a CONNECT must be one you listed in new_parts. Do not invent connections you are not confident about, and put anything the user should double-check into "warnings".' . "\n" . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
+		return 'You generate PCB footprints for a browser PCB editor. Return only JSON matching the schema, in millimetres. Put every part in "new_parts" - that is the only way to place a footprint. If the user asks for a whole circuit or module rather than one bare part, list every component (IC, passives, connectors) in "new_parts" with non-overlapping x/y around the insertion point, then wire them in "commands" with CONNECT using "REF.PIN" strings such as {"type":"CONNECT","from":"U1.1","to":"C1.1"}. Every ref in a CONNECT must be one you listed in new_parts. Do not invent connections you are not confident about, and put anything the user should double-check into "warnings".' . "\n" . $this->circuit_design_instructions() . "\n" . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
 	}
 
 	private function connect_command_schema( $type_name = 'CONNECT' ) {
@@ -1324,7 +1337,7 @@ class DAT_PCB_AI {
 ADDING A PART goes in "new_parts" and nowhere else; there is no add command. When the user names a component, that is what they want, so put one entry in new_parts even if you are unsure of the exact pinout.
 "commands" edits existing parts only: CONNECT and DISCONNECT ("REF.PIN" to "REF.PIN", a straight track between two pins), MOVE_COMPONENT (ref, x, y in mm), DELETE_COMPONENT (ref), SET_VALUE (ref, value). Only use a ref from the provided list or one you just put in new_parts. Never repeat a command, and never emit one that changes nothing such as connecting a pin to itself. A couple of commands is a normal answer; if you notice yourself writing the same command a second time, stop and close the array.
 PLACEMENT. Every track is a straight line between two exact pins and there is no autorouter. Put a new part near the pin it connects to, never on top of another part, and chain a shared net through the nearest already-connected pin instead of radiating from one hub.
-' . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
+' . $this->circuit_design_instructions() . "\n" . $this->footprint_geometry_instructions() . "\n" . $this->research_instructions();
 	}
 
 
