@@ -1594,20 +1594,24 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 	}
 
 	/**
-	 * Hai hang chan doi dien (DIP, SOIC/SOP/TSSOP): chan 1 o tren cung ben trai,
-	 * di xuong het cot trai roi vong len cot phai - dung quy uoc nguoc chieu kim
-	 * dong ho ma moi datasheet dung.
+	 * Hai hang chan doi dien (DIP, SOIC/SOP/TSSOP).
+	 *
+	 * Dat theo dung cach EasyEDA ve: hai hang NGANG, chieu dai than chay theo truc
+	 * x, chan 1 o goc duoi-trai roi chay sang phai, sang hang tren thi chay nguoc
+	 * lai - van la nguoc chieu kim dong ho. Truoc day sinh ra hai cot doc, dung ve
+	 * dien nhung xoay 90 do so voi footprint lay tu thu vien, nen cung mot con IC
+	 * lai nam hai kieu khac nhau tuy co tim thay trong thu vien hay khong.
 	 */
 	private function dual_row_pins( $count, $spec, $names ) {
-		$left  = (int) ceil( $count / 2 );
-		$right = $count - $left;
-		$top   = -( max( $left, $right ) - 1 ) * $spec['pitch'] / 2;
-		$pins  = array();
-		for ( $i = 0; $i < $left; $i++ ) {
-			$pins[] = $this->layout_pin( $i + 1, $names, -$spec['row_spacing'] / 2, $top + $i * $spec['pitch'], $spec, 'x' );
+		$bottom = (int) ceil( $count / 2 );
+		$top    = $count - $bottom;
+		$left   = -( max( $bottom, $top ) - 1 ) * $spec['pitch'] / 2;
+		$pins   = array();
+		for ( $i = 0; $i < $bottom; $i++ ) {
+			$pins[] = $this->layout_pin( $i + 1, $names, $left + $i * $spec['pitch'], $spec['row_spacing'] / 2, $spec, 'y' );
 		}
-		for ( $i = 0; $i < $right; $i++ ) {
-			$pins[] = $this->layout_pin( $left + $i + 1, $names, $spec['row_spacing'] / 2, $top + ( $right - 1 - $i ) * $spec['pitch'], $spec, 'x' );
+		for ( $i = 0; $i < $top; $i++ ) {
+			$pins[] = $this->layout_pin( $bottom + $i + 1, $names, $left + ( $top - 1 - $i ) * $spec['pitch'], -$spec['row_spacing'] / 2, $spec, 'y' );
 		}
 		return $pins;
 	}

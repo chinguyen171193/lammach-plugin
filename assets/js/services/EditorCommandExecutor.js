@@ -356,15 +356,21 @@
 				note: note
 			});
 		}
-		// Neu 2 chan da thang hang (cung X hoac cung Y) thi 1 doan la du va bam
-		// theo ca 2 dau. Neu khong, di theo 2 doan vuong goc (kieu chu L) giong
-		// PCB thuc te thay vi 1 duong cheo cat ngang qua linh kien khac.
+		// Thang hang san (cung X hoac cung Y) thi mot doan la du.
 		if (Math.abs(a.x - b.x) < 0.01 || Math.abs(a.y - b.y) < 0.01) {
 			pushSegment(a, b, a.id, b.id);
 			return;
 		}
-		var dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
-		var corner = dx >= dy ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
+		// Nguoc lai di mot doan cheo 45 do roi mot doan thang, dung quy uoc dinh
+		// tuyen cua EasyEDA va cua PCB noi chung. Goc vuong 90 do bi tranh vi goc
+		// nhon ben trong giu axit khi an mon va gay gian doan tro khang; duong cheo
+		// tuy y thi khong theo luoi 45 do nen kho sua tay ve sau.
+		var dx = b.x - a.x, dy = b.y - a.y;
+		var run = Math.min(Math.abs(dx), Math.abs(dy));
+		var corner = {
+			x: a.x + (dx < 0 ? -run : run),
+			y: a.y + (dy < 0 ? -run : run)
+		};
 		pushSegment(a, corner, a.id, null);
 		pushSegment(corner, b, null, b.id);
 	};

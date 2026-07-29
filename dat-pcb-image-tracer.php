@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PCB Image Tracer
  * Description: Trình chỉnh sửa PCB từ ảnh nền Top/Bottom, vẽ pad/via/track/drill/outline theo đơn vị mm.
- * Version: 1.9.1
+ * Version: 1.10.0
  * Author: DAT
  * Text Domain: dat-pcb-image-tracer
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'DAT_PCB_TRACER_VERSION', '1.9.1' );
+define( 'DAT_PCB_TRACER_VERSION', '1.10.0' );
 define( 'DAT_PCB_TRACER_FILE', __FILE__ );
 define( 'DAT_PCB_TRACER_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DAT_PCB_TRACER_URL', plugin_dir_url( __FILE__ ) );
