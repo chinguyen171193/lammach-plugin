@@ -24,6 +24,12 @@ class DAT_PCB_LCSC {
 	const TIMEOUT     = 15;
 	const CACHE_TTL   = 604800; // 7 ngay
 
+	// Cau dao ngat: khi bi CloudFront chan (403/429) thi ngung goi han mot lat.
+	// Da tu gay ra tinh trang nay khi khao sat: khoang 40 request lien tiep la bi
+	// chan sach, ke ca ma vua lay duoc phut truoc.
+	const BLOCK_KEY = 'dat_pcb_lcsc_blocked';
+	const BLOCK_TTL = 1800; // 30 phut
+
 	// CloudFront tra 403 neu thieu ba header nay.
 	private function headers() {
 		return array(
@@ -49,12 +55,23 @@ class DAT_PCB_LCSC {
 		if ( false !== $cached ) {
 			return is_array( $cached ) ? $cached : null;
 		}
+		// CloudFront chan theo IP khi bi goi don dap, va khi da chan thi chan het
+		// moi ma chu khong rieng ma nao. Luc do goi tiep chi to lam moi luot chat
+		// treo them 15 giay roi cung that bai - nghi han mot lat cho lanh.
+		if ( get_transient( self::BLOCK_KEY ) ) {
+			return null;
+		}
 
 		$response = wp_remote_get( $url, array(
 			'timeout' => self::TIMEOUT,
 			'headers' => $this->headers(),
 		) );
-		if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+		$code = is_wp_error( $response ) ? 0 : (int) wp_remote_retrieve_response_code( $response );
+		if ( 403 === $code || 429 === $code ) {
+			set_transient( self::BLOCK_KEY, 1, self::BLOCK_TTL );
+			return null;
+		}
+		if ( is_wp_error( $response ) || 200 !== $code ) {
 			// Cache ca that bai trong thoi gian ngan de mot ma hong khong lam
 			// moi luot chat deu phai cho het timeout.
 			set_transient( $cache_key, 'fail', 600 );
