@@ -430,6 +430,9 @@
 	};
 
 	Renderer.prototype.drawObjects = function (ctx) {
+		// So chan duoc gom lai va ve o cuoi, sau moi pad va moi duong in lua, de
+		// khong bi chinh pad ve sau do de len.
+		this.pinLabelQueue = [];
 		this.app.state.objects.forEach(function (obj) {
 			if (!obj.visible || !this.app.layerVisible(obj.layer)) return;
 			var layer = this.app.state.layers[obj.layer] || {};
@@ -448,6 +451,78 @@
 			if (this.app.activePinId && this.app.activePinId === obj.id) this.drawActivePin(ctx, obj);
 			ctx.restore();
 		}, this);
+		this.drawPinLabels(ctx);
+	};
+
+	// Khoang cach toi pad gan nhat, tinh mot lan cho ca khung hinh. Do la gioi han
+	// that su cua co chu: ve to hon khoang nay thi chac chan de sang chan ben canh.
+	// Chia o luoi de khong phai so tung cap mot khi ban mach co hang nghin pad.
+	Renderer.prototype.nearestPadGaps = function (items) {
+		var cell = 0, i, j;
+		for (i = 0; i < items.length; i++) cell = Math.max(cell, items[i].w, items[i].h);
+		cell = Math.max(cell, 0.1);
+		var buckets = {};
+		function key(x, y) { return Math.floor(x / cell) + ':' + Math.floor(y / cell); }
+		for (i = 0; i < items.length; i++) {
+			var k = key(items[i].x, items[i].y);
+			(buckets[k] || (buckets[k] = [])).push(i);
+		}
+		var gaps = new Array(items.length);
+		for (i = 0; i < items.length; i++) {
+			var a = items[i], best = Infinity;
+			var cx = Math.floor(a.x / cell), cy = Math.floor(a.y / cell);
+			for (var ox = -1; ox <= 1; ox++) {
+				for (var oy = -1; oy <= 1; oy++) {
+					var list = buckets[(cx + ox) + ':' + (cy + oy)];
+					if (!list) continue;
+					for (var n = 0; n < list.length; n++) {
+						j = list[n];
+						if (j === i) continue;
+						var d = Math.hypot(items[j].x - a.x, items[j].y - a.y);
+						if (d < best) best = d;
+					}
+				}
+			}
+			gaps[i] = best;
+		}
+		return gaps;
+	};
+
+	Renderer.prototype.drawPinLabels = function (ctx) {
+		var items = this.pinLabelQueue || [];
+		if (!items.length) return;
+		var gaps = this.nearestPadGaps(items);
+		ctx.save();
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.lineJoin = 'round';
+		for (var i = 0; i < items.length; i++) {
+			var it = items[i];
+			// Co chu vua trong pad, va luon nho hon khoang cach toi chan ben canh.
+			var size = Math.min(it.w * 0.6, it.h * 0.4);
+			if (isFinite(gaps[i])) size = Math.min(size, gaps[i] * 0.7);
+			// Duoi nguong doc duoc thi an han, giong cach luoi tu an khi zoom xa.
+			if (size < 7) continue;
+			size = Math.min(size, 16);
+			ctx.font = size + 'px sans-serif';
+			ctx.lineWidth = Math.max(2, size / 4);
+			ctx.strokeStyle = 'rgba(10,14,20,.85)';
+			ctx.fillStyle = '#ffffff';
+			ctx.strokeText(it.text, it.x, it.y);
+			ctx.fillText(it.text, it.x, it.y);
+
+			// Ten chuc nang nam ngoai pad nen chi hien khi con du cho that su.
+			if (!it.name) continue;
+			var nameSize = Math.min(size * 0.85, isFinite(gaps[i]) ? gaps[i] * 0.5 : size);
+			if (nameSize < 8) continue;
+			ctx.font = nameSize + 'px sans-serif';
+			ctx.lineWidth = Math.max(2, nameSize / 4);
+			ctx.strokeText(it.name, it.x, it.y + it.h / 2 + nameSize);
+			ctx.fillText(it.name, it.x, it.y + it.h / 2 + nameSize);
+			ctx.font = size + 'px sans-serif';
+			ctx.lineWidth = Math.max(2, size / 4);
+		}
+		ctx.restore();
 	};
 
 	Renderer.prototype.isRouteDraftObject = function (obj) {
@@ -558,33 +633,25 @@
 		this.drawPinLabel(ctx, obj);
 	};
 
+	// Khong ve ngay: chi xep hang. Moi pad mot nhan rieng dat o TAM pad, co chu do
+	// drawPinLabels() quyet dinh sau khi da biet khoang cach toi chan gan nhat.
+	// Truoc day nhan duoc ve ngay tai day, dat ngoai mep pad voi co chu tinh theo
+	// muc zoom, nen ca mot hang TSSOP don nhan len cung mot duong ngang va chong
+	// len nhau khi pitch nho hon be rong chu.
 	Renderer.prototype.drawPinLabel = function (ctx, obj) {
 		var g = obj.geometry || {};
 		var label = g.ai_pin || g.pin_number || '';
-		if (!label) return;
-		var width = Number(g.width || g.diameter || 1) * this.view.scale;
-		var height = Number(g.height || g.diameter || 1) * this.view.scale;
-		var padSize = Math.max(width, height);
-		// Chan qua nho/day dac tren man hinh (vi du TSSOP pitch nho) se lam chu de len
-		// nhau khong doc duoc - an bot nhan theo dung muc zoom, giong cach luoi grid
-		// da an khi zoom xa, thay vi luon ve du bat ke kich thuoc pad.
-		if (padSize < 14) return;
+		if (label === '' || label === null || typeof label === 'undefined') return;
+		if (!this.pinLabelQueue) this.pinLabelQueue = [];
 		var p = this.mmToScreen({ x: g.x, y: g.y });
-		ctx.save();
-		ctx.font = Math.max(9, Math.min(14, 1.25 * this.view.scale)) + 'px sans-serif';
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		ctx.lineWidth = 3;
-		ctx.strokeStyle = 'rgba(16,21,28,.9)';
-		ctx.fillStyle = '#ffffff';
-		ctx.strokeText(String(label).slice(0, 4), p.x, p.y - height / 2 - 8);
-		ctx.fillText(String(label).slice(0, 4), p.x, p.y - height / 2 - 8);
-		if (g.pin_name && !g.suppress_pin_name && padSize >= 20) {
-			ctx.font = Math.max(8, Math.min(12, 1.05 * this.view.scale)) + 'px sans-serif';
-			ctx.strokeText(String(g.pin_name).slice(0, 8), p.x, p.y + height / 2 + 8);
-			ctx.fillText(String(g.pin_name).slice(0, 8), p.x, p.y + height / 2 + 8);
-		}
-		ctx.restore();
+		this.pinLabelQueue.push({
+			text: String(label).slice(0, 4),
+			name: (g.pin_name && !g.suppress_pin_name) ? String(g.pin_name).slice(0, 8) : '',
+			x: p.x,
+			y: p.y,
+			w: Number(g.width || g.diameter || 1) * this.view.scale,
+			h: Number(g.height || g.diameter || 1) * this.view.scale
+		});
 	};
 
 	Renderer.prototype.drawPolyline = function (ctx, obj) {
