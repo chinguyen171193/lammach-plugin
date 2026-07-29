@@ -212,6 +212,22 @@
 			layer.line(g.x1, g.y1, g.x2, g.y2, width);
 			return;
 		}
+		// Cham danh dau chan 1 la hinh tron. points() khong sinh diem cho no, nen
+		// truoc day no hien tren man hinh ma bien mat khoi file san xuat. Rai
+		// thanh da giac de xuat duoc bang chinh cac doan thang.
+		if (g.shape === 'circle') {
+			var r = Number(g.radius || 0);
+			if (r <= 0) return;
+			var steps = Math.max(12, Math.ceil(r * 24));
+			var cx = Number(g.x || 0), cy = Number(g.y || 0), prev = null;
+			for (var s = 0; s <= steps; s++) {
+				var a = (s / steps) * Math.PI * 2;
+				var pt = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+				if (prev) layer.line(prev.x, prev.y, pt.x, pt.y, width);
+				prev = pt;
+			}
+			return;
+		}
 		var pts = this.points(g);
 		if (pts.length < 2) return;
 		for (var i = 1; i < pts.length; i++) {

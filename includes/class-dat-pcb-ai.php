@@ -1280,6 +1280,9 @@ class DAT_PCB_AI {
 			'y'         => $spec['y'] ?? null,
 			'outline'   => $real ? $real['outline'] : array(),
 			'pins'      => $real ? $real['pins'] : array(),
+			// In lua that cua nha san xuat. Khi co no thi editor khong tu ve khung
+			// bao quanh nua - EasyEDA khong he co khung do.
+			'silk'      => $real ? $real['silk'] : array(),
 			'layout'    => array(
 				'family'      => $spec['family'] ?? '',
 				'pin_count'   => $spec['pin_count'] ?? 0,
@@ -1815,7 +1818,9 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 		if ( empty( $pins ) ) {
 			return null;
 		}
-		$pins = $this->center_pins( $pins );
+		// In lua phai dich cung mot luong voi chan, neu khong no lech khoi pad.
+		$shift = $this->pin_shift( $pins );
+		$pins  = $this->center_pins( $pins, $shift );
 		$outline = null !== $generated ? $this->layout_outline( $layout, $pins ) : $outline_hint;
 		$clean_command = array(
 			'type'      => 'ADD_FOOTPRINT',
@@ -1832,6 +1837,38 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 			),
 			'pins'      => $pins,
 		);
+
+		// In lua that (chi den tu thu vien LCSC, AI khong duoc tu bia).
+		if ( ! empty( $command['silk'] ) && is_array( $command['silk'] ) ) {
+			$silk = array();
+			foreach ( array_slice( $command['silk'], 0, 256 ) as $item ) {
+				if ( ! is_array( $item ) ) {
+					continue;
+				}
+				$width = max( 0.05, min( 2, (float) ( $item['width'] ?? 0.12 ) ) );
+				if ( 'circle' === ( $item['shape'] ?? '' ) ) {
+					$silk[] = array(
+						'shape'  => 'circle',
+						'x'      => max( -200, min( 200, (float) ( $item['x'] ?? 0 ) - $shift[0] ) ),
+						'y'      => max( -200, min( 200, (float) ( $item['y'] ?? 0 ) - $shift[1] ) ),
+						'radius' => max( 0.02, min( 50, (float) ( $item['radius'] ?? 0.15 ) ) ),
+						'width'  => $width,
+					);
+					continue;
+				}
+				$silk[] = array(
+					'shape' => 'line',
+					'x1'    => max( -200, min( 200, (float) ( $item['x1'] ?? 0 ) - $shift[0] ) ),
+					'y1'    => max( -200, min( 200, (float) ( $item['y1'] ?? 0 ) - $shift[1] ) ),
+					'x2'    => max( -200, min( 200, (float) ( $item['x2'] ?? 0 ) - $shift[0] ) ),
+					'y2'    => max( -200, min( 200, (float) ( $item['y2'] ?? 0 ) - $shift[1] ) ),
+					'width' => $width,
+				);
+			}
+			if ( ! empty( $silk ) ) {
+				$clean_command['silk'] = $silk;
+			}
+		}
 		return $clean_command;
 	}
 
@@ -1843,7 +1880,7 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 	 * loi rat hay gap voi IC nhieu chan - ca cum chan se troi han ra ngoai than.
 	 * Template cuc bo von da can giua san nen buoc nay khong doi gi chung.
 	 */
-	private function center_pins( $pins ) {
+	private function pin_shift( $pins ) {
 		$min_x = null;
 		$max_x = null;
 		$min_y = null;
@@ -1856,16 +1893,22 @@ PLACEMENT. Every track is a straight line between two exact pins and there is no
 			$min_y = null === $min_y ? $pin['y'] - $half_h : min( $min_y, $pin['y'] - $half_h );
 			$max_y = null === $max_y ? $pin['y'] + $half_h : max( $max_y, $pin['y'] + $half_h );
 		}
-
 		$shift_x = ( $min_x + $max_x ) / 2;
 		$shift_y = ( $min_y + $max_y ) / 2;
-		// Da can giua san thi giu nguyen toa do goc, tranh lam tron thua.
+		// Da can giua san thi khong dich gi, tranh lam tron thua.
 		if ( abs( $shift_x ) < 0.01 && abs( $shift_y ) < 0.01 ) {
+			return array( 0.0, 0.0 );
+		}
+		return array( $shift_x, $shift_y );
+	}
+
+	private function center_pins( $pins, $shift ) {
+		if ( 0.0 === $shift[0] && 0.0 === $shift[1] ) {
 			return $pins;
 		}
 		foreach ( $pins as $i => $pin ) {
-			$pins[ $i ]['x'] = round( $pin['x'] - $shift_x, 4 );
-			$pins[ $i ]['y'] = round( $pin['y'] - $shift_y, 4 );
+			$pins[ $i ]['x'] = round( $pin['x'] - $shift[0], 4 );
+			$pins[ $i ]['y'] = round( $pin['y'] - $shift[1], 4 );
 		}
 		return $pins;
 	}

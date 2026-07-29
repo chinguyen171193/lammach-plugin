@@ -153,11 +153,19 @@
 		if (oh > 0) { minY = Math.min(minY, y - oh / 2); maxY = Math.max(maxY, y + oh / 2); }
 		if (!isFinite(minX)) { minX = x; maxX = x; }
 		if (!isFinite(minY)) { minY = y; maxY = y; }
-		// Tu ve lai silk tu bounding box that cua chan/outline, khong dung silk AI
-		// tu khai bao (co the khong khop voi vi tri chan that AI dat), de dam bao
-		// silk luon bao dung quanh than linh kien du AI cho toa do gi.
-		this.addAutoSilk(objects, minX, minY, maxX, maxY, side, componentId, ref);
-		if (ow > 0 && oh > 0) {
+		// In lua that cua nha san xuat (tu thu vien LCSC) neu co: no la duong bao
+		// than nam GIUA hai hang chan cong cham danh dau chan 1, dung nhu tren
+		// linh kien that. Chi khi khong co moi tu ve khung bao quanh - do la phao
+		// cho footprint AI tu dung, khong phai cach bieu dien dung.
+		var realSilk = Array.isArray(command.silk) ? command.silk : [];
+		if (realSilk.length) {
+			this.addRealSilk(objects, realSilk, x, y, mirror, side, componentId, ref);
+		} else {
+			this.addAutoSilk(objects, minX, minY, maxX, maxY, side, componentId, ref);
+		}
+		// Khung co khi chi de tham chieu; khi da co in lua that thi no trung lap
+		// va gay hieu nham la hai duong bao khac nhau.
+		if (!realSilk.length && ow > 0 && oh > 0) {
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
 				type: 'shape',
@@ -172,7 +180,10 @@
 		// Dat nhan ngay tren canh tren cung cua vung bao quanh chan/outline thuc te,
 		// thay vi dua vao "outline" AI khai bao (co the khong khop voi chan that),
 		// de nhan luon nam sat than linh kien du AI cho kich thuoc gi.
-		var labelText = ref + (command.package ? ' ' + String(command.package) : '');
+		// EasyEDA chi in ma linh kien (U1) len bo. Ten vo cua thu vien LCSC dai
+		// hang chuc ky tu ("TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL") nen de nguyen se
+		// choan het ban mach - giu no o note de tra cuu trong bang lop thay vi ve.
+		var labelText = ref;
 		objects.push({
 			id: global.DATPCBTracerTools.makeId(),
 			type: 'annotation',
@@ -201,6 +212,45 @@
 		});
 		Array.prototype.push.apply(this.app.state.objects, objects);
 		this.app.selected = objects.length ? objects.map(function (obj) { return obj.id; }) : this.app.selected;
+	};
+
+	// In lua that: toa do trong command la tuong doi so voi tam linh kien, doi
+	// sang toa do bo va lat theo mirror giong het cach dat chan.
+	EditorCommandExecutor.prototype.addRealSilk = function (objects, silk, x, y, mirror, side, componentId, ref) {
+		silk.forEach(function (item) {
+			var g;
+			if (item.shape === 'circle') {
+				g = {
+					shape: 'circle',
+					x: x + mirror * Number(item.x || 0),
+					y: y + Number(item.y || 0),
+					radius: Number(item.radius || 0.15),
+					strokeWidth: Number(item.width || 0.12)
+				};
+			} else {
+				g = {
+					shape: 'line',
+					x1: x + mirror * Number(item.x1 || 0),
+					y1: y + Number(item.y1 || 0),
+					x2: x + mirror * Number(item.x2 || 0),
+					y2: y + Number(item.y2 || 0),
+					strokeWidth: Number(item.width || 0.12)
+				};
+			}
+			g.side = side;
+			g.component_id = componentId;
+			g.component_ref = ref;
+			objects.push({
+				id: global.DATPCBTracerTools.makeId(),
+				type: 'shape',
+				layer: 'annotation',
+				geometry: g,
+				style: {},
+				locked: false,
+				visible: true,
+				note: ref + ' silk'
+			});
+		});
 	};
 
 	EditorCommandExecutor.prototype.addAutoSilk = function (objects, minX, minY, maxX, maxY, side, componentId, ref) {

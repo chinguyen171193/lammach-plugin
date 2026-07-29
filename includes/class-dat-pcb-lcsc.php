@@ -166,6 +166,7 @@ class DAT_PCB_LCSC {
 		$pins     = array();
 		$warnings = array();
 		$body     = array();
+		$silk     = array();
 
 		foreach ( $data_str['shape'] as $shape ) {
 			if ( ! is_string( $shape ) ) {
@@ -177,12 +178,22 @@ class DAT_PCB_LCSC {
 				if ( $pin ) {
 					$pins[] = $pin;
 				}
-			} elseif ( 'TRACK' === $parts[0] ) {
-				// Lop 3/4 la silk - dung de suy ra kich thuoc than linh kien.
-				$layer = (int) ( $parts[2] ?? 0 );
-				if ( 3 === $layer || 4 === $layer ) {
-					$this->extend_bounds( $body, $parts[4] ?? '', $origin_x, $origin_y );
+			} elseif ( 'TRACK' === $parts[0] && $this->is_silk_layer( $parts[2] ?? 0 ) ) {
+				// TRACK~rong~lop~net~toa do~...
+				$this->extend_bounds( $body, $parts[4] ?? '', $origin_x, $origin_y );
+				foreach ( $this->polyline_segments( $parts[4] ?? '', $origin_x, $origin_y, (float) $parts[1] * self::UNIT_MM ) as $line ) {
+					$silk[] = $line;
 				}
+			} elseif ( 'CIRCLE' === $parts[0] && count( $parts ) > 5 && $this->is_silk_layer( $parts[5] ) ) {
+				// CIRCLE~tam x~tam y~ban kinh~net rong~lop~... Day thuong la cham
+				// danh dau chan 1, thu bat buoc phai co tren ban mach that.
+				$silk[] = array(
+					'shape'  => 'circle',
+					'x'      => round( ( (float) $parts[1] - $origin_x ) * self::UNIT_MM, 3 ),
+					'y'      => round( ( (float) $parts[2] - $origin_y ) * self::UNIT_MM, 3 ),
+					'radius' => round( (float) $parts[3] * self::UNIT_MM, 3 ),
+					'width'  => round( max( 0.05, (float) $parts[4] * self::UNIT_MM ), 3 ),
+				);
 			}
 		}
 
@@ -194,9 +205,40 @@ class DAT_PCB_LCSC {
 			'component' => sanitize_text_field( (string) ( $result['title'] ?? '' ) ),
 			'package'   => sanitize_text_field( (string) ( $result['packageDetail']['title'] ?? ( $result['SMT_package'] ?? '' ) ) ),
 			'pins'      => $pins,
+			'silk'      => $silk,
 			'outline'   => $this->outline_from( $body, $pins ),
 			'warnings'  => array_values( array_unique( $warnings ) ),
 		);
+	}
+
+	/**
+	 * Chi lop 3/4 moi la in lua that su duoc in len bo. Lop 12 (Document) va 101
+	 * (ComponentPolarity) chi de xem trong EasyEDA, khong duoc san xuat.
+	 */
+	private function is_silk_layer( $layer ) {
+		$layer = (int) $layer;
+		return 3 === $layer || 4 === $layer;
+	}
+
+	/**
+	 * Cat mot duong gap khuc "x y x y ..." thanh tung doan thang.
+	 */
+	private function polyline_segments( $points, $origin_x, $origin_y, $width ) {
+		$numbers = preg_split( '~[\s,]+~', trim( (string) $points ), -1, PREG_SPLIT_NO_EMPTY );
+		$total   = count( $numbers ) - ( count( $numbers ) % 2 );
+		$lines   = array();
+		$width   = round( max( 0.05, $width ), 3 );
+		for ( $i = 0; $i + 3 < $total; $i += 2 ) {
+			$lines[] = array(
+				'shape' => 'line',
+				'x1'    => round( ( (float) $numbers[ $i ] - $origin_x ) * self::UNIT_MM, 3 ),
+				'y1'    => round( ( (float) $numbers[ $i + 1 ] - $origin_y ) * self::UNIT_MM, 3 ),
+				'x2'    => round( ( (float) $numbers[ $i + 2 ] - $origin_x ) * self::UNIT_MM, 3 ),
+				'y2'    => round( ( (float) $numbers[ $i + 3 ] - $origin_y ) * self::UNIT_MM, 3 ),
+				'width' => $width,
+			);
+		}
+		return $lines;
 	}
 
 	/**
