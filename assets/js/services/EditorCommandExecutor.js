@@ -7,13 +7,17 @@
 	}
 
 	EditorCommandExecutor.prototype.execute = function (commands) {
-		if (!Array.isArray(commands) || !commands.length) return;
+		if (!Array.isArray(commands) || !commands.length) return { warnings: [] };
 		this.app.history.push(this.app.state);
 		var localPins = {};
+		var warnings = [];
 		commands.forEach(function (command) {
 			if (command.type === 'ADD_FOOTPRINT') this.addFootprint(command, localPins);
 			if (command.type === 'ADD_COMPONENT') this.addComponent(command);
-			if (command.type === 'CONNECT') this.connect(command, localPins);
+			if (command.type === 'CONNECT') {
+				var warning = this.connect(command, localPins);
+				if (warning) warnings.push(warning);
+			}
 			if (command.type === 'DISCONNECT') this.disconnect(command, localPins);
 			if (command.type === 'MOVE_COMPONENT') this.moveComponent(command);
 			if (command.type === 'DELETE_COMPONENT') this.deleteComponentByRef(command);
@@ -21,6 +25,7 @@
 		}, this);
 		if (this.app.syncAnchoredTracks) this.app.syncAnchoredTracks();
 		this.app.markDirty();
+		return { warnings: warnings };
 	};
 
 	EditorCommandExecutor.prototype.findComponentByRef = function (ref) {
@@ -77,8 +82,12 @@
 		var link1 = a.id + '__' + b.id;
 		var link2 = b.id + '__' + a.id;
 		this.app.state.objects = this.app.state.objects.filter(function (obj) {
-			if (obj.type !== 'track') return true;
 			var g = obj.geometry || {};
+			// Mot luot CONNECT xuyen lop co the tao ra 2 doan mach + 1 via cung
+			// mang net_link - xoa het ca cum thay vi chi doan mach truc tiep, neu
+			// khong via se nam lai tren ban mach khong con noi voi gi.
+			if ('via' === obj.type) return g.net_link !== link1 && g.net_link !== link2;
+			if (obj.type !== 'track') return true;
 			if (g.net_link === link1 || g.net_link === link2) return false;
 			var directMatch = (g.anchor1 === a.id && g.anchor2 === b.id) || (g.anchor1 === b.id && g.anchor2 === a.id);
 			return !directMatch;
@@ -140,7 +149,11 @@
 				note: ref + '.' + String(pin.number || '') + (pin.name ? ' ' + pin.name : '')
 			});
 			pins.push({ number: String(pin.number || ''), name: String(pin.name || ''), object_id: padId });
-			if (localPins) localPins[requestedRef + '.' + String(pin.number || '')] = { x: px, y: py, side: side, id: padId };
+			// Chan xuyen lo (drill > 0) co vanh dong tren ca hai mat, nen dinh tuyen
+			// duoc toi tu lop nao cung xong; chan SMD chi tiep can duoc tu dung
+			// mat no han. RouteEngine can biet dieu nay de quyet dinh co bat buoc
+			// phai chen via hay khong khi hai chan can noi nam khac mat nhau.
+			if (localPins) localPins[requestedRef + '.' + String(pin.number || '')] = { x: px, y: py, side: side, id: padId, throughHole: Number(g.drill || 0) > 0 };
 			var halfW = Number(g.width || g.diameter || 1) / 2;
 			var halfH = Number(g.height || g.diameter || 1) / 2;
 			minX = Math.min(minX, px - halfW); maxX = Math.max(maxX, px + halfW);
@@ -330,49 +343,62 @@
 		this.app.selected = [label.id];
 	};
 
+	// Tra ve null khi ve xong sach se, hoac mot chuoi canh bao khi khong tim duoc
+	// duong nao hoan toan tranh vat can (van ve theo duong it dung nhat, khong
+	// bao gio bo trang - xem RouteEngine.js).
 	EditorCommandExecutor.prototype.connect = function (command, localPins) {
 		var a = (localPins && localPins[command.from]) || this.findPin(command.from);
 		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
-		if (!a || !b) return;
-		var side = a.side || b.side || this.app.activeSide;
-		var layer = side === 'bottom' ? 'bottom_copper' : 'top_copper';
+		if (!a || !b) return null;
 		var width = this.app.options.trackWidth || 0.4;
+		var clearance = this.app.options.clearance != null ? this.app.options.clearance : 0.2;
+		var viaDia = this.app.options.padDia || 1.0;
+		var viaDrill = this.app.options.drillDia || 0.5;
 		var note = 'AI connect ' + command.from + ' -> ' + command.to;
 		var linkId = (a.id && b.id) ? (a.id + '__' + b.id) : null;
 		var self = this;
-		function pushSegment(p1, p2, anchor1, anchor2) {
-			var geometry = { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, width: width, bow: 0 };
-			if (anchor1) geometry.anchor1 = anchor1;
-			if (anchor2) geometry.anchor2 = anchor2;
+
+		var route = global.DATPCBRouteEngine
+			? global.DATPCBRouteEngine.route(this.app.state, { a: a, b: b, trackWidth: width, clearance: clearance, viaDiameter: viaDia, viaDrill: viaDrill })
+			: null;
+		if (!route) {
+			// RouteEngine.js chua duoc nap vi ly do gi do - ve duong truc tiep
+			// tren mot lop nhu truoc thay vi khong ve gi ca.
+			var side = a.side || b.side || this.app.activeSide;
+			route = { legs: [{ layer: 'bottom' === side ? 'bottom_copper' : 'top_copper', x1: a.x, y1: a.y, x2: b.x, y2: b.y }], vias: [], clean: true };
+		}
+
+		route.vias.forEach(function (via) {
+			self.app.state.objects.push({
+				id: global.DATPCBTracerTools.makeId(),
+				type: 'via',
+				layer: 'bottom' === a.side ? 'bottom_copper' : 'top_copper',
+				geometry: { x: via.x, y: via.y, diameter: via.diameter, drill: via.drill, net_link: linkId },
+				style: {},
+				locked: false,
+				visible: true,
+				note: note + ' (via chuyen lop)'
+			});
+		});
+
+		route.legs.forEach(function (leg, i) {
+			var geometry = { x1: leg.x1, y1: leg.y1, x2: leg.x2, y2: leg.y2, width: width, bow: 0 };
+			if (0 === i) geometry.anchor1 = a.id;
+			if (i === route.legs.length - 1) geometry.anchor2 = b.id;
 			if (linkId) geometry.net_link = linkId;
 			self.app.state.objects.push({
 				id: global.DATPCBTracerTools.makeId(),
 				type: 'track',
-				layer: layer,
+				layer: leg.layer,
 				geometry: geometry,
 				style: {},
 				locked: false,
 				visible: true,
 				note: note
 			});
-		}
-		// Thang hang san (cung X hoac cung Y) thi mot doan la du.
-		if (Math.abs(a.x - b.x) < 0.01 || Math.abs(a.y - b.y) < 0.01) {
-			pushSegment(a, b, a.id, b.id);
-			return;
-		}
-		// Nguoc lai di mot doan cheo 45 do roi mot doan thang, dung quy uoc dinh
-		// tuyen cua EasyEDA va cua PCB noi chung. Goc vuong 90 do bi tranh vi goc
-		// nhon ben trong giu axit khi an mon va gay gian doan tro khang; duong cheo
-		// tuy y thi khong theo luoi 45 do nen kho sua tay ve sau.
-		var dx = b.x - a.x, dy = b.y - a.y;
-		var run = Math.min(Math.abs(dx), Math.abs(dy));
-		var corner = {
-			x: a.x + (dx < 0 ? -run : run),
-			y: a.y + (dy < 0 ? -run : run)
-		};
-		pushSegment(a, corner, a.id, null);
-		pushSegment(corner, b, null, b.id);
+		});
+
+		return route.clean ? null : ('Đường nối ' + command.from + ' → ' + command.to + ' có thể chạm vật thể khác, hãy kiểm tra lại bằng tay.');
 	};
 
 	EditorCommandExecutor.prototype.findPin = function (pinName) {
@@ -382,7 +408,7 @@
 		this.app.state.objects.some(function (obj) {
 			var g = obj.geometry || {};
 			if ((obj.type === 'pad' || obj.type === 'via') && g.ai_ref === ref && String(g.ai_pin) === String(pin)) {
-				found = { x: Number(g.x || 0), y: Number(g.y || 0), side: g.side, id: obj.id };
+				found = { x: Number(g.x || 0), y: Number(g.y || 0), side: g.side, id: obj.id, throughHole: Number(g.drill || 0) > 0 };
 				return true;
 			}
 			return false;

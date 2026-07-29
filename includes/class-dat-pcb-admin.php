@@ -120,7 +120,7 @@ class DAT_PCB_Admin {
 			wp_enqueue_script( 'dat-pcb-gerber-' . strtolower( $handle ), DAT_PCB_TRACER_URL . 'assets/js/gerber/' . $handle . '.js', array(), DAT_PCB_TRACER_VERSION, true );
 		}
 		wp_enqueue_script( 'dat-pcb-tracer-app', DAT_PCB_TRACER_URL . 'assets/js/tracer-app.js', array(), DAT_PCB_TRACER_VERSION, true );
-		foreach ( array( 'PromptParser', 'CircuitGenerator', 'AIService', 'EditorCommandExecutor' ) as $handle ) {
+		foreach ( array( 'PromptParser', 'CircuitGenerator', 'AIService', 'RouteEngine', 'EditorCommandExecutor' ) as $handle ) {
 			wp_enqueue_script( 'dat-pcb-service-' . strtolower( $handle ), DAT_PCB_TRACER_URL . 'assets/js/services/' . $handle . '.js', array(), DAT_PCB_TRACER_VERSION, true );
 		}
 		foreach ( array( 'TabletContextMenu', 'TabletGesture', 'TabletFloatingToolbar', 'TabletToolbar', 'TabletAIPanel', 'TabletMode' ) as $handle ) {

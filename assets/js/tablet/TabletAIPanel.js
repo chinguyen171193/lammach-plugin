@@ -218,9 +218,12 @@
 			bubble.appendChild(actions);
 			var self = this;
 			apply.addEventListener('click', function () {
-				self.executor.execute(commands);
+				var result = self.executor.execute(commands) || {};
 				actions.remove();
 				bubble.appendChild(self.statusLabel('✓ Đã áp dụng'));
+				(result.warnings || []).forEach(function (warning) {
+					bubble.appendChild(self.statusLabel('⚠ ' + warning));
+				});
 			});
 			discard.addEventListener('click', function () {
 				actions.remove();
