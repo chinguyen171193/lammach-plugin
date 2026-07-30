@@ -211,6 +211,19 @@ class DAT_PCB_LCSC {
 					'radius' => round( (float) $parts[3] * self::UNIT_MM, 3 ),
 					'width'  => round( max( 0.05, (float) $parts[4] * self::UNIT_MM ), 3 ),
 				);
+			} elseif ( 'SOLIDREGION' === $parts[0] && count( $parts ) > 3 && $this->is_silk_layer( $parts[1] ?? -1 ) ) {
+				// SOLIDREGION~lop~net~duong di~... Day la ky hieu ve dac (thuong
+				// la dau "+" danh dau cuc duong tren tu dien hoa/tantalum) - mat
+				// no thi nguoi lap co the han nguoc chieu, hong linh kien that su
+				// (khong chi xau). Chi doc duoc duong toan doan thang (M/L/Z); bo
+				// qua neu co cung tron/bezier (A/C/Q/S) - vi du ranh chu D quanh
+				// vien ngoai - de khong ve sai thanh da giac gan dung.
+				$poly = $this->parse_straight_polygon( $parts[3] ?? '' );
+				if ( $poly ) {
+					foreach ( $this->polyline_segments( $poly, $origin_x, $origin_y, 0.15 ) as $line ) {
+						$silk[] = $line;
+					}
+				}
 			}
 		}
 
@@ -256,6 +269,31 @@ class DAT_PCB_LCSC {
 			);
 		}
 		return $lines;
+	}
+
+	/**
+	 * Doc mot duong SOLIDREGION dang "M x y L x y L x y ... Z" (toan doan thang,
+	 * khong co cung tron/bezier A/C/Q/S) thanh chuoi toa do tho "x y x y ..." da
+	 * khep vong, san sang dua vao polyline_segments(). Tra ve null neu duong co
+	 * lenh cong (vd ranh chu D bo tron mep ngoai vien tu dien) - khong co du
+	 * lieu hinh hoc de xap xi dung, ve sai con te hon la bo qua.
+	 */
+	private function parse_straight_polygon( $path ) {
+		if ( preg_match( '~[ACQS]~i', (string) $path ) ) {
+			return null;
+		}
+		if ( ! preg_match_all( '~[ML]\s*(-?[\d.]+)[\s,]+(-?[\d.]+)~i', (string) $path, $matches, PREG_SET_ORDER ) || count( $matches ) < 3 ) {
+			return null;
+		}
+		$numbers = array();
+		foreach ( $matches as $m ) {
+			$numbers[] = $m[1];
+			$numbers[] = $m[2];
+		}
+		// Khep vong ve diem dau de canh cuoi cung cua da giac cung duoc ve.
+		$numbers[] = $numbers[0];
+		$numbers[] = $numbers[1];
+		return implode( ' ', $numbers );
 	}
 
 	/**
