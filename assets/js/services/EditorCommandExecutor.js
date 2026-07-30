@@ -11,21 +11,120 @@
 		this.app.history.push(this.app.state);
 		var localPins = {};
 		var warnings = [];
-		commands.forEach(function (command) {
+		var i = 0;
+		while (i < commands.length) {
+			var command = commands[i];
+			if (command.type === 'CONNECT') {
+				// Gom mot lo CONNECT lien tiep va xu ly ca lo cung nhau (sap thu tu
+				// + go-ve-lai neu can) thay vi tung cai doc lap theo dung thu tu
+				// mang - xem connectBatch(). Khong bao gio nhay qua lenh khac loai,
+				// giu nguyen thu tu tuong doi voi ADD_FOOTPRINT/MOVE/DELETE... du
+				// mang co xen ke the nao.
+				var end = i;
+				while (end < commands.length && commands[end].type === 'CONNECT') end++;
+				this.connectBatch(commands.slice(i, end), localPins, warnings);
+				i = end;
+				continue;
+			}
 			if (command.type === 'ADD_FOOTPRINT') this.addFootprint(command, localPins);
 			if (command.type === 'ADD_COMPONENT') this.addComponent(command);
-			if (command.type === 'CONNECT') {
-				var warning = this.connect(command, localPins);
-				if (warning) warnings.push(warning);
-			}
 			if (command.type === 'DISCONNECT') this.disconnect(command, localPins);
 			if (command.type === 'MOVE_COMPONENT') this.moveComponent(command);
 			if (command.type === 'DELETE_COMPONENT') this.deleteComponentByRef(command);
 			if (command.type === 'SET_VALUE') this.setValue(command);
-		}, this);
+			i++;
+		}
 		if (this.app.syncAnchoredTracks) this.app.syncAnchoredTracks();
 		this.app.markDirty();
 		return { warnings: warnings };
+	};
+
+	/**
+	 * Dinh tuyen mot lo CONNECT lien tiep cung nhau, thay vi tung cai doc lap:
+	 *
+	 * 1. Sap theo khoang cach ngan truoc - net de di truoc thi it co co hoi chan
+	 *    duong net kho hon di sau, dung nguyen tac net-ordering cua autorouter
+	 *    that (xem docs/routing tham khao da tra cuu).
+	 * 2. Go-ve-lai co gioi han: neu mot net trong lo bi cham vao track/via CHINH
+	 *    LO NAY vua dat (khong dung toi duong nguoi dung tu ve tay - chi go
+	 *    nhung gi AI vua tao trong luot nay), go ca hai net roi dinh tuyen lai:
+	 *    net dang loi truoc (de duoc uu tien khong gian vua mo), roi net bi go
+	 *    sau (no se tu tim duong khac vong qua, thay vi hai net tranh nhau mot
+	 *    cho). Gioi han tong so lan go (khong phai theo net) de luon dung lai du
+	 *    bao nhieu net ganh doi nhau.
+	 */
+	EditorCommandExecutor.prototype.connectBatch = function (batch, localPins, warnings) {
+		var self = this;
+		var entries = batch.map(function (command) {
+			var a = (localPins && localPins[command.from]) || self.findPin(command.from);
+			var b = (localPins && localPins[command.to]) || self.findPin(command.to);
+			var dist = (a && b) ? Math.hypot(b.x - a.x, b.y - a.y) : Infinity;
+			return { command: command, dist: dist };
+		});
+		entries.sort(function (p, q) { return p.dist - q.dist; });
+
+		var placed = [];
+		entries.forEach(function (entry) {
+			var result = self.routeConnect(entry.command, localPins);
+			if (result) placed.push({ command: entry.command, result: result });
+		});
+
+		var ownedIds = {};
+		function reindexOwned() {
+			ownedIds = {};
+			placed.forEach(function (p) { p.result.objectIds.forEach(function (id) { ownedIds[id] = true; }); });
+		}
+		reindexOwned();
+
+		// Hai net doi xung that su (vd hai duong thang phai cat nhau, khong co
+		// duong nao khac ma khong dung via) se go-roi-dat-lai ra dung ket qua cu
+		// moi lan - vi routeConnect() la ham xac dinh (deterministic), khong tu
+		// thu bien the khac. Ghi lai cap da thu de dung lai sau 1 lan, nhuong
+		// ngan sach cho cap khac trong lo con giai duoc, thay vi danh het ngan
+		// sach vao mot cap khong bao gio het "ban".
+		var triedPairs = {};
+		function pairKey(i, j) { return i < j ? i + ':' + j : j + ':' + i; }
+
+		var budget = 6;
+		var progress = true;
+		while (progress && budget > 0) {
+			progress = false;
+			for (var i = 0; i < placed.length && budget > 0; i++) {
+				var p = placed[i];
+				if (p.result.clean) continue;
+				var ownConflicts = p.result.conflicts.filter(function (id) { return ownedIds[id]; });
+				if (!ownConflicts.length) continue; // vat can khong phai cua lo nay - go cung vo ich
+
+				var victimIndex = -1;
+				for (var v = 0; v < placed.length; v++) {
+					if (v === i) continue;
+					if (placed[v].result.objectIds.some(function (id) { return ownConflicts.indexOf(id) !== -1; })) { victimIndex = v; break; }
+				}
+				if (-1 === victimIndex) continue;
+				var pk = pairKey(i, victimIndex);
+				if (triedPairs[pk]) continue;
+				triedPairs[pk] = true;
+				var victim = placed[victimIndex];
+
+				self.removeObjectsByIds(p.result.objectIds);
+				self.removeObjectsByIds(victim.result.objectIds);
+				budget--;
+
+				p.result = self.routeConnect(p.command, localPins) || p.result;
+				victim.result = self.routeConnect(victim.command, localPins) || victim.result;
+				reindexOwned();
+				progress = true;
+			}
+		}
+
+		placed.forEach(function (p) { if (p.result.warning) warnings.push(p.result.warning); });
+	};
+
+	EditorCommandExecutor.prototype.removeObjectsByIds = function (ids) {
+		if (!ids || !ids.length) return;
+		var idSet = {};
+		ids.forEach(function (id) { idSet[id] = true; });
+		this.app.state.objects = this.app.state.objects.filter(function (obj) { return !idSet[obj.id]; });
 	};
 
 	EditorCommandExecutor.prototype.findComponentByRef = function (ref) {
@@ -343,10 +442,22 @@
 		this.app.selected = [label.id];
 	};
 
-	// Tra ve null khi ve xong sach se, hoac mot chuoi canh bao khi khong tim duoc
-	// duong nao hoan toan tranh vat can (van ve theo duong it dung nhat, khong
-	// bao gio bo trang - xem RouteEngine.js).
+	// Vo mong giu nguyen API cu (tra ve null hoac 1 chuoi canh bao) cho bat ky
+	// noi nao con goi truc tiep connect() ngoai execute(). Logic that nam o
+	// routeConnect() ben duoi - no can tra ve nhieu hon 1 chuoi de connectBatch()
+	// lam duoc go-ve-lai (can biet id vat the vua tao + id vat can da cham).
 	EditorCommandExecutor.prototype.connect = function (command, localPins) {
+		var result = this.routeConnect(command, localPins);
+		return result ? result.warning : null;
+	};
+
+	// Tra ve null khi khong tim thay chan, hoac { warning, clean, objectIds,
+	// conflicts }. objectIds la id cua moi track/via VUA them (de sau nay co the
+	// go bo neu can go-ve-lai). conflicts la id cac vat the da lam duong khong
+	// sach (rong neu clean) - xem RouteEngine.js. Khong bao gio bo trang: neu
+	// khong tim duoc duong nao hoan toan tranh vat can, van ve theo duong it
+	// dung nhat va tra ve warning.
+	EditorCommandExecutor.prototype.routeConnect = function (command, localPins) {
 		var a = (localPins && localPins[command.from]) || this.findPin(command.from);
 		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
 		if (!a || !b) return null;
@@ -365,12 +476,15 @@
 			// RouteEngine.js chua duoc nap vi ly do gi do - ve duong truc tiep
 			// tren mot lop nhu truoc thay vi khong ve gi ca.
 			var side = a.side || b.side || this.app.activeSide;
-			route = { legs: [{ layer: 'bottom' === side ? 'bottom_copper' : 'top_copper', x1: a.x, y1: a.y, x2: b.x, y2: b.y }], vias: [], clean: true };
+			route = { legs: [{ layer: 'bottom' === side ? 'bottom_copper' : 'top_copper', x1: a.x, y1: a.y, x2: b.x, y2: b.y }], vias: [], clean: true, conflicts: [] };
 		}
 
+		var objectIds = [];
 		route.vias.forEach(function (via) {
+			var id = global.DATPCBTracerTools.makeId();
+			objectIds.push(id);
 			self.app.state.objects.push({
-				id: global.DATPCBTracerTools.makeId(),
+				id: id,
 				type: 'via',
 				layer: 'bottom' === a.side ? 'bottom_copper' : 'top_copper',
 				geometry: { x: via.x, y: via.y, diameter: via.diameter, drill: via.drill, net_link: linkId },
@@ -386,8 +500,10 @@
 			if (0 === i) geometry.anchor1 = a.id;
 			if (i === route.legs.length - 1) geometry.anchor2 = b.id;
 			if (linkId) geometry.net_link = linkId;
+			var id = global.DATPCBTracerTools.makeId();
+			objectIds.push(id);
 			self.app.state.objects.push({
-				id: global.DATPCBTracerTools.makeId(),
+				id: id,
 				type: 'track',
 				layer: leg.layer,
 				geometry: geometry,
@@ -398,7 +514,12 @@
 			});
 		});
 
-		return route.clean ? null : ('Đường nối ' + command.from + ' → ' + command.to + ' có thể chạm vật thể khác, hãy kiểm tra lại bằng tay.');
+		return {
+			warning: route.clean ? null : ('Đường nối ' + command.from + ' → ' + command.to + ' có thể chạm vật thể khác, hãy kiểm tra lại bằng tay.'),
+			clean: route.clean,
+			objectIds: objectIds,
+			conflicts: route.conflicts || []
+		};
 	};
 
 	EditorCommandExecutor.prototype.findPin = function (pinName) {

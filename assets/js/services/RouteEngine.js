@@ -104,6 +104,11 @@
 	RouteEngine.cornerVariants = function (x1, y1, x2, y2) {
 		var dx = x2 - x1, dy = y2 - y1;
 		if (Math.abs(dx) < 1e-6 || Math.abs(dy) < 1e-6) return [null];
+		// Da la duong cheo 45 do thang hang san (|dx|===|dy|) - khong can be goc.
+		// Truoc day van tinh "goc be" cho ca truong hop nay, va ca hai phuong an
+		// deu roi dung vao mot trong hai dau mut, tao ra mot doan zero-length rac
+		// trong ket qua (vd A(0,0)->B(10,10) sinh them doan (10,10)->(10,10)).
+		if (Math.abs(Math.abs(dx) - Math.abs(dy)) < 1e-6) return [null];
 		var run = Math.min(Math.abs(dx), Math.abs(dy));
 		var sx = dx < 0 ? -run : run, sy = dy < 0 ? -run : run;
 		return [
@@ -131,14 +136,43 @@
 			var sameNet = g.anchor1 === aId || g.anchor2 === aId || g.anchor1 === bId || g.anchor2 === bId;
 			if (sameNet) return;
 			if ('track' === obj.type) {
-				list.push({ kind: 'track', layer: obj.layer, halfWidth: Number(g.width || 0.4) / 2, g: g });
+				list.push({ kind: 'track', id: obj.id, layer: obj.layer, halfWidth: Number(g.width || 0.4) / 2, g: g });
 				return;
 			}
 			if ('pad' !== obj.type && 'via' !== obj.type && 'drill' !== obj.type) return;
 			var blocksBothLayers = 'via' === obj.type || 'drill' === obj.type || Number(g.drill || 0) > 0;
-			list.push({ kind: 'pad', layer: obj.layer, blocksBothLayers: blocksBothLayers, g: g });
+			list.push({ kind: 'pad', id: obj.id, layer: obj.layer, blocksBothLayers: blocksBothLayers, g: g });
 		});
 		return list;
+	}
+
+	// Nhu countViolations, nhung tra ve DANH SACH id vat can thuc su bi cham thay
+	// vi chi dem so luong - dung de biet chinh xac can go bo cai gi khi thu
+	// "go-ve-lai" (rip-up-and-retry), thay vi go mo mot vat the gan do.
+	function findConflicts(obstacles, candidate, minGap, clearance) {
+		var ids = [];
+		obstacles.forEach(function (o) {
+			var hit = false;
+			if ('track' === o.kind) {
+				candidate.legs.forEach(function (leg) {
+					if (leg.layer !== o.layer) return;
+					if (distSegToSeg(leg.x1, leg.y1, leg.x2, leg.y2, o.g.x1, o.g.y1, o.g.x2, o.g.y2) < minGap + o.halfWidth) hit = true;
+				});
+				(candidate.vias || []).forEach(function (via) {
+					if (distSegToSeg(via.x, via.y, via.x, via.y, o.g.x1, o.g.y1, o.g.x2, o.g.y2) < via.diameter / 2 + clearance + o.halfWidth) hit = true;
+				});
+			} else {
+				candidate.legs.forEach(function (leg) {
+					if (!o.blocksBothLayers && leg.layer !== o.layer) return;
+					if (distToObstacleShape(o.g, leg.x1, leg.y1, leg.x2, leg.y2) < minGap) hit = true;
+				});
+				(candidate.vias || []).forEach(function (via) {
+					if (distToObstacleShape(o.g, via.x, via.y, via.x, via.y) < via.diameter / 2 + clearance) hit = true;
+				});
+			}
+			if (hit) ids.push(o.id);
+		});
+		return ids;
 	}
 
 	// So lan mot phuong an (mang leg + via) vi pham khoang cach an toan voi cac
@@ -186,6 +220,15 @@
 		return { minX: box.minX - extra, maxX: box.maxX + extra, minY: box.minY - extra, maxY: box.maxY + extra };
 	}
 
+	// Mot diem (dang zero-length "doan") co nam trong khoang cach an toan cua
+	// vat can hay khong - dung khi chan o luoi, thay cho viec to nguyen hop bao.
+	function obstacleBlocksPoint(o, x, y, gap) {
+		if ('track' === o.kind) {
+			return distSegToSeg(x, y, x, y, o.g.x1, o.g.y1, o.g.x2, o.g.y2) < gap + o.halfWidth;
+		}
+		return distToObstacleShape(o.g, x, y, x, y) < gap;
+	}
+
 	/**
 	 * A* tren luoi vuong cuc bo quanh A va B, 8 huong (0/45/90) cong nuoc di
 	 * "xuyen via" (giu nguyen o, doi lop, tra them chi phi). Tra ve mang diem
@@ -214,13 +257,26 @@
 		var viaBlocked = new Uint8Array(cols * rows); // o khong dat via duoc (chan tren it nhat 1 lop trong pham vi via)
 		var viaExtra = viaDia / 2 + clearance;
 
+		// Hop bao (AABB) chi dung de gioi han vung can duyet, KHONG dung truc tiep
+		// lam vung chan - hop bao cua mot track CHEO dai la ca mot hinh vuong to
+		// gap nhieu lan dai hanh lang can chan that su (vd track cheo 10mm ra hop
+		// bao 10x10mm, trong khi hanh lang that chi rong ~1mm quanh duong cheo).
+		// To day ca hop bao se khoa nham mot vung rong quanh track cheo, co the
+		// chan luon diem xuat phat/dich neu no roi vao goc hop bao - da bat duoc
+		// loi nay khi hai duong cheo cat nhau khong tim ra loi thoat du con trong.
+		// Kiem tra khoang cach that toi tung o thay vi to nguyen hop bao, dung lai
+		// cac ham khoang cach da co (distSegToSeg cho track, distToObstacleShape
+		// cho pad/via qua mot diem thoai hoa thanh "doan zero").
 		obstacles.forEach(function (o) {
 			var box = inflatedAabb(o, minGap);
 			var c0 = toCol(box.minX), c1 = toCol(box.maxX), r0 = toRow(box.minY), r1 = toRow(box.maxY);
 			var layers = o.blocksBothLayers ? ['top_copper', 'bottom_copper'] : [o.layer];
-			var r, c, idx;
+			var r, c, idx, cx, cy;
 			for (r = r0; r <= r1; r++) {
+				cy = minY + r * cell;
 				for (c = c0; c <= c1; c++) {
+					cx = minX + c * cell;
+					if (!obstacleBlocksPoint(o, cx, cy, minGap)) continue;
 					idx = r * cols + c;
 					layers.forEach(function (ly) { blocked[ly][idx] = 1; });
 				}
@@ -228,7 +284,11 @@
 			var viaBox = inflatedAabb(o, viaExtra);
 			var vc0 = toCol(viaBox.minX), vc1 = toCol(viaBox.maxX), vr0 = toRow(viaBox.minY), vr1 = toRow(viaBox.maxY);
 			for (r = vr0; r <= vr1; r++) {
-				for (c = vc0; c <= vc1; c++) viaBlocked[r * cols + c] = 1;
+				cy = minY + r * cell;
+				for (c = vc0; c <= vc1; c++) {
+					cx = minX + c * cell;
+					if (obstacleBlocksPoint(o, cx, cy, viaExtra)) viaBlocked[r * cols + c] = 1;
+				}
 			}
 		});
 
@@ -491,7 +551,12 @@
 			best = { legs: [{ layer: layerA, x1: a.x, y1: a.y, x2: b.x, y2: b.y }], vias: [] };
 			bestScore = -1;
 		}
-		return { legs: best.legs, vias: best.vias, clean: 0 === bestScore };
+		var clean = 0 === bestScore;
+		// Id cua nhung vat the thuc su bi cham - de nguoi goi (rip-up-and-retry)
+		// biet chinh xac can go bo cai gi, chi tinh khi khong sach (tiet kiem cong
+		// khi da sach, truong hop pho bien nhat).
+		var conflicts = clean ? [] : findConflicts(obstacles, best, minGap, clearance);
+		return { legs: best.legs, vias: best.vias, clean: clean, conflicts: conflicts };
 	};
 
 	global.DATPCBRouteEngine = RouteEngine;
