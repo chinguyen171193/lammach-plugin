@@ -126,14 +126,24 @@
 	}
 
 	// Gom vat can lien quan mot lan (dung chung cho ca cham diem heuristic va cho
-	// luoi A*), ap dung dung quy uoc "cung luoi thi bo qua" da co tu truoc: mot
-	// vat the da noi truc tiep vao chan A hoac B thi coi la cung mang.
-	function collectObstacles(state, aId, bId) {
+	// luoi A*). "Cung mang" gio xet BAC CAU qua netGroup (xem buildNetGroups o
+	// EditorCommandExecutor.js) neu duoc truyen vao - vd A-B-C-D noi qua 3 lenh
+	// CONNECT rieng le van duoc nhan la mot mang, khong chi khi A/B trung truc
+	// tiep voi doi tuong dang xet. Khong co netGroup (goi truc tiep, ngoai
+	// connectBatch) thi lui ve kieu cu: chi loai khi trung dung mot trong hai dau.
+	function collectObstacles(state, aId, bId, netGroup) {
 		var list = [];
 		(state.objects || []).forEach(function (obj) {
 			if (obj.id === aId || obj.id === bId) return;
 			var g = obj.geometry || {};
-			var sameNet = g.anchor1 === aId || g.anchor2 === aId || g.anchor1 === bId || g.anchor2 === bId;
+			var sameNet;
+			if (netGroup) {
+				var groupA = netGroup(aId), groupB = netGroup(bId);
+				sameNet = (g.anchor1 && netGroup(g.anchor1) === groupA) || (g.anchor2 && netGroup(g.anchor2) === groupA)
+					|| (g.anchor1 && netGroup(g.anchor1) === groupB) || (g.anchor2 && netGroup(g.anchor2) === groupB);
+			} else {
+				sameNet = g.anchor1 === aId || g.anchor2 === aId || g.anchor1 === bId || g.anchor2 === bId;
+			}
 			if (sameNet) return;
 			if ('track' === obj.type) {
 				list.push({ kind: 'track', id: obj.id, layer: obj.layer, halfWidth: Number(g.width || 0.4) / 2, g: g });
@@ -525,7 +535,7 @@
 		}
 		candidates.sort(function (p, q) { return p.priority - q.priority; });
 
-		var obstacles = collectObstacles(state, a.id, b.id);
+		var obstacles = collectObstacles(state, a.id, b.id, spec.netGroup);
 
 		var best = null, bestScore = Infinity;
 		for (var i = 0; i < candidates.length; i++) {

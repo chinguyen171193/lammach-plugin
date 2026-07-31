@@ -59,13 +59,22 @@
 			var a = (localPins && localPins[command.from]) || self.findPin(command.from);
 			var b = (localPins && localPins[command.to]) || self.findPin(command.to);
 			var dist = (a && b) ? Math.hypot(b.x - a.x, b.y - a.y) : Infinity;
-			return { command: command, dist: dist };
+			return { command: command, a: a, b: b, dist: dist };
 		});
 		entries.sort(function (p, q) { return p.dist - q.dist; });
 
+		// Mang dien THAT cua lo nay: bac cau qua nhieu lenh CONNECT rieng le
+		// (A-B, B-C, C-D noi thanh mot mang du khong co lenh nao noi thang A-D),
+		// cong ca track da co san tren bo. Neu khong co buoc nay, RouteEngine chi
+		// biet "cung mang" khi hai dau trung dung mot doi tuong dang xet - mot
+		// mang chia lam nhieu doan CONNECT (rat pho bien: GND, mang hoi tiep...)
+		// se bi chinh cac doan cua no coi la vat can cua nhau, buoc phai ne
+		// tranh khong can thiet va sinh ra duong di vong xau.
+		var netGroup = buildNetGroups(this.app.state, entries);
+
 		var placed = [];
 		entries.forEach(function (entry) {
-			var result = self.routeConnect(entry.command, localPins);
+			var result = self.routeConnect(entry.command, localPins, netGroup);
 			if (result) placed.push({ command: entry.command, result: result });
 		});
 
@@ -110,8 +119,8 @@
 				self.removeObjectsByIds(victim.result.objectIds);
 				budget--;
 
-				p.result = self.routeConnect(p.command, localPins) || p.result;
-				victim.result = self.routeConnect(victim.command, localPins) || victim.result;
+				p.result = self.routeConnect(p.command, localPins, netGroup) || p.result;
+				victim.result = self.routeConnect(victim.command, localPins, netGroup) || victim.result;
 				reindexOwned();
 				progress = true;
 			}
@@ -126,6 +135,36 @@
 		ids.forEach(function (id) { idSet[id] = true; });
 		this.app.state.objects = this.app.state.objects.filter(function (obj) { return !idSet[obj.id]; });
 	};
+
+	/**
+	 * Union-find tren id pad: gieo tu (1) moi track da co san tren bo (anchor1
+	 * noi voi anchor2 - cung mot mang), va (2) tung lenh CONNECT trong lo hien
+	 * tai (dau a noi voi dau b, du chua ve). Tra ve ham netGroup(padId) - hai
+	 * pad cung mot nhom (cung ket qua tra ve) thi la cung mang dien, du khong
+	 * co lenh CONNECT nao noi THANG hai dau do voi nhau.
+	 */
+	function buildNetGroups(state, entries) {
+		var parent = {};
+		function find(x) {
+			if (!(x in parent)) parent[x] = x;
+			while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+			return x;
+		}
+		function union(x, y) {
+			if (!x || !y) return;
+			var rx = find(x), ry = find(y);
+			if (rx !== ry) parent[rx] = ry;
+		}
+		(state.objects || []).forEach(function (obj) {
+			if ('track' !== obj.type) return;
+			var g = obj.geometry || {};
+			if (g.anchor1 && g.anchor2) union(g.anchor1, g.anchor2);
+		});
+		entries.forEach(function (entry) {
+			if (entry.a && entry.b) union(entry.a.id, entry.b.id);
+		});
+		return find;
+	}
 
 	EditorCommandExecutor.prototype.findComponentByRef = function (ref) {
 		return (this.app.state.components || []).filter(function (c) { return c.ref === ref; })[0] || null;
@@ -457,7 +496,7 @@
 	// sach (rong neu clean) - xem RouteEngine.js. Khong bao gio bo trang: neu
 	// khong tim duoc duong nao hoan toan tranh vat can, van ve theo duong it
 	// dung nhat va tra ve warning.
-	EditorCommandExecutor.prototype.routeConnect = function (command, localPins) {
+	EditorCommandExecutor.prototype.routeConnect = function (command, localPins, netGroup) {
 		var a = (localPins && localPins[command.from]) || this.findPin(command.from);
 		var b = (localPins && localPins[command.to]) || this.findPin(command.to);
 		if (!a || !b) return null;
@@ -477,7 +516,7 @@
 		var self = this;
 
 		var route = global.DATPCBRouteEngine
-			? global.DATPCBRouteEngine.route(this.app.state, { a: a, b: b, trackWidth: width, clearance: clearance, viaDiameter: viaDia, viaDrill: viaDrill })
+			? global.DATPCBRouteEngine.route(this.app.state, { a: a, b: b, trackWidth: width, clearance: clearance, viaDiameter: viaDia, viaDrill: viaDrill, netGroup: netGroup })
 			: null;
 		if (!route) {
 			// RouteEngine.js chua duoc nap vi ly do gi do - ve duong truc tiep
