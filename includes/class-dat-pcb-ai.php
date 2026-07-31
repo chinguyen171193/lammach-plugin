@@ -725,6 +725,15 @@ class DAT_PCB_AI {
 
 	private function template_radial_cap( $value, $diameter = 5.0, $lead_spacing = 2.0 ) {
 		$half = $lead_spacing / 2;
+		// Tu dien hoa CO PHAN CUC - vet cat goc dung chung cho moi template chi
+		// danh dau "chan 1", khong ro rang bang dau "+" quy uoc that su nguoi lap
+		// mach quen thuoc hon. Ve them dau + ben canh chan duong (chan 1), giong
+		// het cach da lam voi in lua that tu thu vien LCSC.
+		$plus_x = -$half - 1.1;
+		$plus = array(
+			array( 'x1' => $plus_x - 0.35, 'y1' => 0, 'x2' => $plus_x + 0.35, 'y2' => 0, 'width' => 0.15 ),
+			array( 'x1' => $plus_x, 'y1' => -0.35, 'x2' => $plus_x, 'y2' => 0.35, 'width' => 0.15 ),
+		);
 		return $this->local_template(
 			'CAP',
 			'C',
@@ -735,7 +744,7 @@ class DAT_PCB_AI {
 				$this->pin( '2', '-', $half, 0, 'round', 1.3, 1.3, 0.7, false, true ),
 			),
 			'Tu dien radial cuc bo, kich thuoc gan dung. Kiem tra kich thuoc that cua linh kien truoc khi khoan lo.',
-			null,
+			array_merge( $this->silk_rectangle( $diameter, $diameter ), $plus ),
 			$value
 		);
 	}

@@ -463,8 +463,15 @@
 		if (!a || !b) return null;
 		var width = this.app.options.trackWidth || 0.4;
 		var clearance = this.app.options.clearance != null ? this.app.options.clearance : 0.2;
-		var viaDia = this.app.options.padDia || 1.0;
-		var viaDrill = this.app.options.drillDia || 0.5;
+		// Via chuyen lop tu router sinh ra phai vua voi duong mach no noi, khong
+		// phai kich thuoc pad cam tay (padDia mac dinh 1.6mm - to gap 4 lan
+		// trackWidth 0.4mm mac dinh, nhin roi mat va thua dong khong can thiet).
+		// Lo khoan ty le voi be rong duong (san 0.3mm de con san xuat duoc o fab
+		// pho thong), vanh dong quanh lo ~0.15mm moi ben - muc toi thieu thuong
+		// gap, khong phai rieng cho cong cu ve tay pad/via (van dung padDia/
+		// drillDia nhu cu, nguoi dung co the can chinh to hon neu muon).
+		var viaDrill = Math.max(0.3, Math.min(1.2, width * 0.75));
+		var viaDia = viaDrill + 0.3;
 		var note = 'AI connect ' + command.from + ' -> ' + command.to;
 		var linkId = (a.id && b.id) ? (a.id + '__' + b.id) : null;
 		var self = this;
