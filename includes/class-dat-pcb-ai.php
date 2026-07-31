@@ -698,11 +698,16 @@ class DAT_PCB_AI {
 			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x + 28, $y + 18, 'R2', $r2_label ),
 			$this->template_to_command( $this->template_chip2( '0805', 'RES', 'R' ), $side, $x + 28, $y + 24, 'R1', '1k' ),
 		);
+		// GND noi qua U1.6 (tab lon), khong phai U1.3 (chan GND nho giua hang chan)
+		// - tab la diem noi dat/nhiet uu tien cho linh kien cong suat chuyen mach
+		// nay, va truoc day day chinh la noi ca 3 duong nay vo tinh roi vao do (do
+		// loi trung so chan da sua o template_lm2596()) - gio ghi ro chu dich thay
+		// vi trung so an may.
 		$connects = array(
 			array( 'type' => 'CONNECT', 'from' => 'U1.1', 'to' => 'C1.1' ),
 			array( 'type' => 'CONNECT', 'from' => 'C1.2', 'to' => 'D1.A' ),
-			array( 'type' => 'CONNECT', 'from' => 'D1.A', 'to' => 'U1.3' ),
-			array( 'type' => 'CONNECT', 'from' => 'U1.3', 'to' => 'C2.2' ),
+			array( 'type' => 'CONNECT', 'from' => 'D1.A', 'to' => 'U1.6' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.6', 'to' => 'C2.2' ),
 			array( 'type' => 'CONNECT', 'from' => 'C2.2', 'to' => 'R1.2' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.2', 'to' => 'L1.1' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.2', 'to' => 'D1.K' ),
@@ -710,7 +715,7 @@ class DAT_PCB_AI {
 			array( 'type' => 'CONNECT', 'from' => 'L1.2', 'to' => 'R2.1' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.4', 'to' => 'R2.2' ),
 			array( 'type' => 'CONNECT', 'from' => 'U1.4', 'to' => 'R1.1' ),
-			array( 'type' => 'CONNECT', 'from' => 'U1.5', 'to' => 'U1.3' ),
+			array( 'type' => 'CONNECT', 'from' => 'U1.5', 'to' => 'U1.6' ),
 		);
 		return array(
 			'version'  => 'component-plan-1',
@@ -938,7 +943,10 @@ class DAT_PCB_AI {
 				$this->pin( '1', $names[0], -2.30, 2.85, 'rect', 1.15, 2.00, 0, true, true ),
 				$this->pin( '2', $names[1], 0.00, 2.85, 'rect', 1.15, 2.00, 0, true, true ),
 				$this->pin( '3', $names[2], 2.30, 2.85, 'rect', 1.15, 2.00, 0, true, true ),
-				$this->pin( '2', $names[1] ? $names[1] . '/TAB' : 'TAB', 0.00, -2.25, 'rect', 3.80, 2.80, 0, true, false ),
+				// So chan RIENG cho tab, khong trung voi chan 2 - trung so se lam
+				// findPin()/localPins gap that thuong nham lan tab voi chan nho (xem
+				// ghi chu dai o template_to252_3() ben duoi).
+				$this->pin( '4', $names[1] ? $names[1] . '/TAB' : 'TAB', 0.00, -2.25, 'rect', 3.80, 2.80, 0, true, false ),
 			)
 		);
 	}
@@ -1035,7 +1043,13 @@ class DAT_PCB_AI {
 				$this->pin( '1', $names[0], -2.28, 3.45, 'rect', 1.05, 2.40, 0, true, true ),
 				$this->pin( '2', $names[1], 0.00, 3.45, 'rect', 1.05, 2.40, 0, true, true ),
 				$this->pin( '3', $names[2], 2.28, 3.45, 'rect', 1.05, 2.40, 0, true, true ),
-				$this->pin( '2', $names[1] ? $names[1] . '/TAB' : 'TAB', 0.00, -2.15, 'rect', 5.80, 5.00, 0, true, false ),
+				// So chan RIENG cho tab (khong trung '2') - xem giai thich day du o
+				// duoi: pin trung so lam findPin()/localPins tra ve hai vi tri VAT
+				// LY khac nhau tuy CONNECT chay cung luot hay luot sau voi luc them
+				// linh kien, khong doan truoc duoc - day chinh la nguyen nhan cac
+				// duong noi toi "chan GND" bi bay lung tung, khong phai loi nguoi
+				// dung dat sai lenh.
+				$this->pin( '4', $names[1] ? $names[1] . '/TAB' : 'TAB', 0.00, -2.15, 'rect', 5.80, 5.00, 0, true, false ),
 			)
 		);
 	}
@@ -1050,7 +1064,7 @@ class DAT_PCB_AI {
 				$this->pin( '1', '', -2.54, 6.85, 'rect', 1.20, 3.10, 0, true, true ),
 				$this->pin( '2', '', 0.00, 6.85, 'rect', 1.20, 3.10, 0, true, true ),
 				$this->pin( '3', '', 2.54, 6.85, 'rect', 1.20, 3.10, 0, true, true ),
-				$this->pin( '2', 'TAB', 0.00, -2.10, 'rect', 10.40, 8.40, 0, true, false ),
+				$this->pin( '4', 'TAB', 0.00, -2.10, 'rect', 10.40, 8.40, 0, true, false ),
 			),
 			''
 		);
@@ -1078,7 +1092,12 @@ class DAT_PCB_AI {
 				$this->pin( '3', 'GND', 0.00, 6.85, 'rect', 1.05, 3.10, 0, true, true ),
 				$this->pin( '4', 'FB', 1.70, 6.85, 'rect', 1.05, 3.10, 0, true, true ),
 				$this->pin( '5', 'ON/OFF', 3.40, 6.85, 'rect', 1.05, 3.10, 0, true, true ),
-				$this->pin( '3', 'TAB/GND', 0.00, -2.10, 'rect', 10.40, 8.40, 0, true, false ),
+				// Pin 6, khong phai '3' trung voi chan GND nho o tren - xem ghi chu
+				// day du o template_to252_3(). known_circuit_plan() da duoc sua de
+				// tro thang vao U1.6 (tab) cho ca 3 duong noi GND, giu dung y do
+				// dien/nhiet ban dau (noi GND qua tab, khong phai chan nho) nhung
+				// gio la chu dich ro rang thay vi trung so an may.
+				$this->pin( '6', 'TAB/GND', 0.00, -2.10, 'rect', 10.40, 8.40, 0, true, false ),
 			),
 			'Dung footprint cuc bo LM2596 TO-263/KTT SMD. Tab lon la pad 3/GND; kiem tra datasheet cua nha san xuat truoc khi san xuat.',
 			$this->silk_rectangle( 10.16, 15.24, 1.8 )
