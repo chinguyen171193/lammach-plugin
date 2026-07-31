@@ -1,6 +1,12 @@
 (function (global) {
 	'use strict';
 
+	// Con tro chuot cho tung tay cam resize board - xem hitBoardHandle()/boardHandlePoints().
+	var BOARD_HANDLE_CURSORS = {
+		n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+		ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize'
+	};
+
 	function Renderer(canvas, app) {
 		this.canvas = canvas;
 		this.ctx = canvas.getContext('2d');
@@ -153,6 +159,16 @@
 			this.invalidate();
 			return;
 		}
+		if (this.app.tool === 'select') {
+			var handle = this.hitBoardHandle(e.clientX - rect.left, e.clientY - rect.top);
+			if (handle) {
+				e.preventDefault();
+				this.app.boardResizeStart(handle);
+				this.drag = { mode: 'resize-board', handle: handle, startMm: this.screenToMm(e.clientX - rect.left, e.clientY - rect.top) };
+				this.invalidate();
+				return;
+			}
+		}
 		this.app.cursor = p;
 		this.app.updateStatus();
 		this.app.history.push(this.app.state);
@@ -186,9 +202,17 @@
 			this.zoomBox.x2 = e.clientX - rect.left;
 			this.zoomBox.y2 = e.clientY - rect.top;
 			this.invalidate();
+		} else if (this.drag && this.drag.mode === 'resize-board') {
+			this.app.boardResizeMove(raw.x - this.drag.startMm.x, raw.y - this.drag.startMm.y);
+			this.invalidate();
 		} else if (this.drag) {
 			this.app.pointerMove(p, e);
 			this.invalidate();
+		} else if (this.app.tool === 'select') {
+			var hoverHandle = this.hitBoardHandle(e.clientX - rect.left, e.clientY - rect.top);
+			this.canvas.style.cursor = hoverHandle ? BOARD_HANDLE_CURSORS[hoverHandle] : '';
+		} else if (this.canvas.style.cursor) {
+			this.canvas.style.cursor = '';
 		}
 		this.app.updateStatus();
 	};
@@ -204,10 +228,13 @@
 	Renderer.prototype.onUp = function () {
 		if (this.drag && this.drag.mode === 'zoombox') {
 			this.finishZoomBox();
+		} else if (this.drag && this.drag.mode === 'resize-board') {
+			this.app.boardResizeEnd();
 		} else if (this.drag) {
 			this.app.pointerUp();
 		}
 		this.canvas.classList.remove('is-panning');
+		this.canvas.style.cursor = '';
 		this.drag = null;
 	};
 
@@ -257,10 +284,13 @@
 			this.app.selected = this.app.selected.filter(function (selectedId) { return selectedId !== id; });
 			this.app.drawing = null;
 			this.app.renderAll();
+		} else if (this.drag && this.drag.mode === 'resize-board') {
+			this.app.boardResizeEnd();
 		} else if (this.drag) {
 			this.app.pointerUp();
 		}
 		this.canvas.classList.remove('is-panning');
+		this.canvas.style.cursor = '';
 		this.drag = null;
 		this.pointerId = null;
 		this.invalidate();
@@ -308,16 +338,19 @@
 	Renderer.prototype.render = function () {
 		this.loadImages();
 		var ctx = this.ctx, w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+		var clean = this.app.options.cleanView;
 		ctx.clearRect(0, 0, w, h);
 		ctx.fillStyle = '#10151c';
 		ctx.fillRect(0, 0, w, h);
-		this.drawGrid(ctx, w, h);
+		if (!clean) this.drawGrid(ctx, w, h);
 		this.drawBoard(ctx);
-		this.drawImages(ctx);
+		if (!clean) this.drawImages(ctx);
 		this.drawObjects(ctx);
-		this.drawSnapCandidate(ctx);
-		this.drawMeasurement(ctx);
-		this.drawZoomBox(ctx);
+		if (!clean) {
+			this.drawSnapCandidate(ctx);
+			this.drawMeasurement(ctx);
+			this.drawZoomBox(ctx);
+		}
 	};
 
 	Renderer.prototype.drawZoomBox = function (ctx) {
@@ -405,10 +438,56 @@
 	Renderer.prototype.drawBoard = function (ctx) {
 		var b = this.app.state.board;
 		var p0 = this.mmToScreen({ x: 0, y: 0 });
+		var w = b.width_mm * this.view.scale, h = b.height_mm * this.view.scale;
 		ctx.save();
-		ctx.strokeStyle = '#ffd54a';
+		if (this.app.options.cleanView) {
+			// Xem 2D sach: to dac mau solder-mask cho giong PCB thuc thay vi chi vien vang.
+			ctx.fillStyle = '#164c34';
+			ctx.fillRect(p0.x, p0.y, w, h);
+			ctx.strokeStyle = '#90e0a5';
+		} else {
+			ctx.strokeStyle = '#ffd54a';
+		}
 		ctx.lineWidth = 2;
-		ctx.strokeRect(p0.x, p0.y, b.width_mm * this.view.scale, b.height_mm * this.view.scale);
+		ctx.strokeRect(p0.x, p0.y, w, h);
+		ctx.restore();
+		if (this.app.tool === 'select' && !this.app.options.cleanView) this.drawBoardHandles(ctx);
+	};
+
+	// Vi tri mm cua 8 tay cam resize board - 4 goc + 4 canh giua. Canh trai/tren la 'min'
+	// (App.boardResizeMove se dich toan bo noi dung khi keo), canh phai/duoi la 'max'.
+	Renderer.prototype.boardHandlePoints = function () {
+		var b = this.app.state.board, w = b.width_mm, h = b.height_mm;
+		return {
+			nw: { x: 0, y: 0 }, n: { x: w / 2, y: 0 }, ne: { x: w, y: 0 },
+			w: { x: 0, y: h / 2 }, e: { x: w, y: h / 2 },
+			sw: { x: 0, y: h }, s: { x: w / 2, y: h }, se: { x: w, y: h }
+		};
+	};
+
+	Renderer.prototype.hitBoardHandle = function (sx, sy) {
+		var points = this.boardHandlePoints();
+		var best = null, bestDist = 8;
+		for (var key in points) {
+			var p = this.mmToScreen(points[key]);
+			var d = Math.hypot(p.x - sx, p.y - sy);
+			if (d <= bestDist) { bestDist = d; best = key; }
+		}
+		return best;
+	};
+
+	Renderer.prototype.drawBoardHandles = function (ctx) {
+		var points = this.boardHandlePoints();
+		var size = 7;
+		ctx.save();
+		ctx.fillStyle = '#48e0a4';
+		ctx.strokeStyle = '#10151c';
+		ctx.lineWidth = 1;
+		for (var key in points) {
+			var p = this.mmToScreen(points[key]);
+			ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+			ctx.strokeRect(p.x - size / 2, p.y - size / 2, size, size);
+		}
 		ctx.restore();
 	};
 
@@ -447,8 +526,10 @@
 				ctx.shadowBlur = 8;
 			}
 			this.drawObject(ctx, obj);
-			if (this.app.selected.indexOf(obj.id) !== -1) this.drawSelection(ctx, obj);
-			if (this.app.activePinId && this.app.activePinId === obj.id) this.drawActivePin(ctx, obj);
+			if (!this.app.options.cleanView) {
+				if (this.app.selected.indexOf(obj.id) !== -1) this.drawSelection(ctx, obj);
+				if (this.app.activePinId && this.app.activePinId === obj.id) this.drawActivePin(ctx, obj);
+			}
 			ctx.restore();
 		}, this);
 		this.drawPinLabels(ctx);

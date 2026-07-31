@@ -69,7 +69,8 @@
 		this.selected = [];
 		this.activePinId = '';
 		this.cursor = { x: 0, y: 0 };
-		this.options = { gridVisible: true, snap: true, trackWidth: 0.4, padDia: 1.6, drillDia: 0.8, routeMode: '45', arcBow: 0.35 };
+		this.options = { gridVisible: true, snap: true, trackWidth: 0.4, padDia: 1.6, drillDia: 0.8, routeMode: '45', arcBow: 0.35, cleanView: false };
+		this._boardResize = null;
 		this.history = new global.DATPCBTracerHistory(100);
 		this.dirty = false;
 		this.drawing = null;
@@ -162,6 +163,9 @@
 				self.canvas.invalidate();
 			} else if (e.target.matches('[data-snap]')) {
 				self.options.snap = e.target.checked;
+			} else if (e.target.matches('[data-clean-view]')) {
+				self.options.cleanView = e.target.checked;
+				self.canvas.invalidate();
 			} else if (e.target.matches('[data-active-side]')) {
 				self.activeSide = e.target.value;
 			} else if (e.target.matches('[data-upload-side]') && e.target.files[0]) {
@@ -1369,6 +1373,88 @@
 		this.state.board.height_mm = Math.max(1, Number(qs(this.root, '[data-board-height]').value || 80));
 		this.markDirty();
 		this.canvas.fit();
+	};
+
+	// Canh nao cua board dang bi keo: 'min' = canh trai/tren (0,0), phai dich chuyen toan bo
+	// noi dung board de world-origin luon khop lai voi canh moi. 'max' = canh phai/duoi, chi
+	// doi width/height, khong dich gi ca.
+	var BOARD_RESIZE_EDGES = {
+		n: { y: 'min' }, s: { y: 'max' }, e: { x: 'max' }, w: { x: 'min' },
+		ne: { x: 'max', y: 'min' }, nw: { x: 'min', y: 'min' },
+		se: { x: 'max', y: 'max' }, sw: { x: 'min', y: 'max' }
+	};
+
+	App.prototype.boardResizeStart = function (handle) {
+		if (!BOARD_RESIZE_EDGES[handle]) return;
+		this.history.push(this.state);
+		this._boardResize = {
+			handle: handle,
+			startWidth: this.state.board.width_mm,
+			startHeight: this.state.board.height_mm,
+			appliedShiftX: 0,
+			appliedShiftY: 0
+		};
+	};
+
+	// totalDxMm/totalDyMm: do lech (mm, chua snap) so voi diem bat dau keo, khong phai so voi
+	// frame truoc - tinh lai width/height tu startWidth/startHeight moi frame de tranh troi so.
+	App.prototype.boardResizeMove = function (totalDxMm, totalDyMm) {
+		var rs = this._boardResize;
+		if (!rs) return;
+		var edges = BOARD_RESIZE_EDGES[rs.handle];
+		if (!edges) return;
+		var gmm = Number(this.state.board.grid_mm) || 0.5;
+		var dx = Math.round(totalDxMm / gmm) * gmm;
+		var dy = Math.round(totalDyMm / gmm) * gmm;
+
+		var newWidth = rs.startWidth, newHeight = rs.startHeight, shiftX = 0, shiftY = 0;
+		if (edges.x === 'max') {
+			newWidth = Math.max(1, rs.startWidth + dx);
+		} else if (edges.x === 'min') {
+			newWidth = Math.max(1, rs.startWidth - dx);
+			shiftX = newWidth - rs.startWidth;
+		}
+		if (edges.y === 'max') {
+			newHeight = Math.max(1, rs.startHeight + dy);
+		} else if (edges.y === 'min') {
+			newHeight = Math.max(1, rs.startHeight - dy);
+			shiftY = newHeight - rs.startHeight;
+		}
+
+		var incDx = shiftX - rs.appliedShiftX;
+		var incDy = shiftY - rs.appliedShiftY;
+		if (incDx || incDy) {
+			// Re-base toan bo noi dung theo canh trai/tren moi - phai dich ca object bi khoa
+			// (obj.locked), khac voi thao tac "move" thong thuong von bo qua object khoa.
+			this.state.objects.forEach(function (obj) {
+				var wasLocked = obj.locked;
+				obj.locked = false;
+				global.DATPCBTracerTools.moveObject(obj, incDx, incDy);
+				obj.locked = wasLocked;
+			});
+			(this.state.components || []).forEach(function (component) {
+				component.x = Number(component.x || 0) + incDx;
+				component.y = Number(component.y || 0) + incDy;
+			});
+			['top', 'bottom'].forEach(function (side) {
+				var img = this.state.images[side];
+				img.x = Number(img.x || 0) + incDx;
+				img.y = Number(img.y || 0) + incDy;
+			}, this);
+			rs.appliedShiftX = shiftX;
+			rs.appliedShiftY = shiftY;
+		}
+
+		this.state.board.width_mm = newWidth;
+		this.state.board.height_mm = newHeight;
+		this.markDirty(false);
+		this.renderProjectFields();
+	};
+
+	App.prototype.boardResizeEnd = function () {
+		if (!this._boardResize) return;
+		this._boardResize = null;
+		this.markDirty();
 	};
 
 	App.prototype.centerImage = function () {

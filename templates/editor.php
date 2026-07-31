@@ -50,6 +50,7 @@ $dat_pcb_user_label = is_user_logged_in() ? ( $dat_pcb_phone_verified ? 'User OK
 			<button type="button" data-action="calibrate">Cân chỉnh</button>
 			<button type="button" data-action="fit">Fit màn hình</button>
 			<button type="button" data-action="preview3d">Xem 3D</button>
+			<label class="dat-clean-view-toggle"><input type="checkbox" data-clean-view> Xem 2D sạch</label>
 			<button type="button" data-action="export">Xuất JSON</button>
 			<label class="dat-tablet-mode-toggle"><input type="checkbox" data-tablet-mode> Tablet Mode</label>
 			<label class="dat-upload-btn">Ảnh Top <input type="file" data-upload-side="top" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label>

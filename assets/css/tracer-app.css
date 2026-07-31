@@ -204,6 +204,15 @@
 .dat-upload-btn input {
 	display: none;
 }
+.dat-clean-view-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--dat-text);
+}
+.dat-clean-view-toggle input {
+	width: auto;
+}
 .dat-pcb-main {
 	display: grid;
 	grid-template-columns: 245px minmax(520px, 1fr) 285px;
