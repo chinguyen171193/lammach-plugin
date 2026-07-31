@@ -151,21 +151,11 @@
 		this.prompt.value = '';
 		this.addBubble('user', text + (file ? '\n📎 ' + file.name : ''));
 		this.setPendingFile(null);
-		var priorHistory = this.messages.slice();
 		this.messages.push({ role: 'user', content: text });
 		this.setBusy(true);
 		var typing = this.addBubble('assistant', 'Đang suy nghĩ...', true);
 		var self = this;
-		global.DATPCBTracerStorage.chatWithAI({
-			message: text,
-			history: priorHistory,
-			side: this.app.activeSide || 'top',
-			board: this.app.state && this.app.state.board,
-			x: this.app.cursor ? this.app.cursor.x : 20,
-			y: this.app.cursor ? this.app.cursor.y : 18,
-			components: this.buildBoardContext(),
-			file: file
-		}).then(function (result) {
+		this.requestAI(text, file).then(function (result) {
 			self.setBusy(false);
 			typing.remove();
 			self.handleResult(result || {});
@@ -173,6 +163,24 @@
 			self.setBusy(false);
 			typing.remove();
 			self.addBubble('assistant', '⚠ ' + (err && err.message ? err.message : 'AI request failed'), false, 'error');
+		});
+	};
+
+	// Goi /ai/chat mot lan, dung chung cho ca tin nhan nguoi go (send()) lan
+	// vong tu sua sau khi ap dung (autoFix()). Gia dinh "text" DA duoc day vao
+	// this.messages truoc khi goi, giong nhu send() van lam - de lich su gui len
+	// server luon khop voi nhung gi hien tren man hinh.
+	TabletAIPanel.prototype.requestAI = function (text, file) {
+		var priorHistory = this.messages.slice(0, -1);
+		return global.DATPCBTracerStorage.chatWithAI({
+			message: text,
+			history: priorHistory,
+			side: this.app.activeSide || 'top',
+			board: this.app.state && this.app.state.board,
+			x: this.app.cursor ? this.app.cursor.x : 20,
+			y: this.app.cursor ? this.app.cursor.y : 18,
+			components: this.buildBoardContext(),
+			file: file || null
 		});
 	};
 
@@ -190,6 +198,56 @@
 			content: reply || (commands.length ? 'Đã đề xuất ' + commands.length + ' thay đổi.' : 'Không có thay đổi nào.')
 		});
 		this.addBubble('assistant', reply || (commands.length ? '' : 'AI không đề xuất thay đổi nào.'), false, '', commands);
+	};
+
+	// So vong tu sua toi da cho MOT lan nguoi dung yeu cau. Moi vong them la mot
+	// luot goi OpenAI nua (them thoi gian cho + chi phi) - 4 la muc nguoi dung da
+	// chon, du de sua loi don gian nhung khong de mot yeu cau am tham chay qua
+	// lau/qua nhieu tien neu AI cu lap lai loi cu.
+	var MAX_FIX_ROUNDS = 4;
+
+	// Tu dong gui lai cho AI danh sach canh bao vua thu duoc sau khi ap dung, de
+	// no tu dieu chinh (doi vi tri, doi cach noi, chon footprint khac...) va ap
+	// dung tiep NGAY, khong cho nguoi dung bam them lan nao - dung y nguoi dung
+	// yeu cau: "thu - kiem tra - sua - lap lai" nhu mot agent, co gioi han vong.
+	TabletAIPanel.prototype.autoFix = function (warnings, round) {
+		var self = this;
+		var text = 'Ket qua vua ap dung len bo mach con ' + warnings.length + ' canh bao:\n- '
+			+ warnings.join('\n- ')
+			+ '\nHay dieu chinh (di chuyen linh kien, doi cach noi day, chon lai footprint...) de khac phuc cac canh bao nay.';
+		this.messages.push({ role: 'user', content: text });
+		var status = this.addBubble('assistant', '🔁 AI đang tự kiểm tra và sửa (vòng ' + round + '/' + MAX_FIX_ROUNDS + ')...', true);
+		this.requestAI(text, null).then(function (result) {
+			status.remove();
+			result = result || {};
+			var reply = result.reply ? String(result.reply) : '';
+			var commands = Array.isArray(result.commands) ? result.commands : [];
+			self.messages.push({ role: 'assistant', content: reply || 'Đã tự điều chỉnh.' });
+
+			if (!commands.length) {
+				self.addBubble('assistant', (reply || 'AI không đề xuất thay đổi nào thêm.') + ' — dừng tự sửa, còn ' + warnings.length + ' cảnh báo, hãy kiểm tra bằng tay:', false, 'error');
+				return;
+			}
+
+			var applied = self.executor.execute(commands) || {};
+			var nextWarnings = applied.warnings || [];
+			var bubble = self.addBubble('assistant', reply, false, '', null);
+			bubble.appendChild(self.statusLabel('✓ Đã tự áp dụng (vòng ' + round + '/' + MAX_FIX_ROUNDS + ')'));
+
+			if (!nextWarnings.length) {
+				bubble.appendChild(self.statusLabel('✓ Hết cảnh báo'));
+				return;
+			}
+			if (round >= MAX_FIX_ROUNDS) {
+				nextWarnings.forEach(function (w) { bubble.appendChild(self.statusLabel('⚠ ' + w)); });
+				bubble.appendChild(self.statusLabel('Đã thử tự sửa ' + MAX_FIX_ROUNDS + ' vòng, vẫn còn cảnh báo trên - hãy kiểm tra bằng tay.'));
+				return;
+			}
+			self.autoFix(nextWarnings, round + 1);
+		}).catch(function (err) {
+			status.remove();
+			self.addBubble('assistant', '⚠ Dừng tự sửa: ' + (err && err.message ? err.message : 'AI request failed') + '. Còn ' + warnings.length + ' cảnh báo trước đó, hãy kiểm tra bằng tay.', false, 'error');
+		});
 	};
 
 	TabletAIPanel.prototype.addBubble = function (role, text, isTyping, kind, commands) {
@@ -221,9 +279,14 @@
 				var result = self.executor.execute(commands) || {};
 				actions.remove();
 				bubble.appendChild(self.statusLabel('✓ Đã áp dụng'));
-				(result.warnings || []).forEach(function (warning) {
+				var warnings = result.warnings || [];
+				warnings.forEach(function (warning) {
 					bubble.appendChild(self.statusLabel('⚠ ' + warning));
 				});
+				// Nguoi dung da duyet buoc dau (bam Ap dung); tu day tro di, neu
+				// con canh bao thi AI tu kiem tra va sua tiep khong can bam them -
+				// dung nhu mot agent: thu, doc canh bao, sua, lap lai co gioi han.
+				if (warnings.length) self.autoFix(warnings, 1);
 			});
 			discard.addEventListener('click', function () {
 				actions.remove();
