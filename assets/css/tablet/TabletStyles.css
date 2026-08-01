@@ -2794,3 +2794,30 @@
 	background: rgba(255, 193, 7, .18);
 	color: #ffc107;
 }
+
+.tablet-mode .dat-view-side-switch {
+	grid-template-columns: repeat(2, 56px);
+	gap: 5px;
+	padding: 4px;
+	border-radius: 8px;
+}
+
+.tablet-mode .dat-view-side-switch button {
+	width: 56px;
+	height: 48px;
+	min-width: 56px;
+	min-height: 48px;
+	padding: 0;
+	border-radius: 8px;
+	border: 1px solid rgba(148, 163, 184, .22);
+	background: rgba(13, 18, 23, .74);
+	color: #edf3f6;
+	font-weight: 750;
+	touch-action: manipulation;
+}
+
+.tablet-mode .dat-view-side-switch button.is-active {
+	border-color: rgba(72, 224, 164, .82);
+	background: rgba(72, 224, 164, .18);
+	color: #48e0a4;
+}

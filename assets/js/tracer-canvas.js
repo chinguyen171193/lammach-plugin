@@ -441,14 +441,17 @@
 		var w = b.width_mm * this.view.scale, h = b.height_mm * this.view.scale;
 		ctx.save();
 		if (this.app.options.cleanView) {
-			// Xem 2D sach: to dac mau solder-mask cho giong PCB thuc thay vi chi vien vang.
-			ctx.fillStyle = '#164c34';
+			// Xem 2D sach: to dac mau solder-mask giong PCB thuc. Vien truoc day
+			// mau bac ha sang qua muc (#90e0a5, ro nhu wireframe) - PCB that khong
+			// co vien sang nhu vay, chi la mep cat mo, nen doi thanh vien toi mo.
+			ctx.fillStyle = '#0e6b40';
 			ctx.fillRect(p0.x, p0.y, w, h);
-			ctx.strokeStyle = '#90e0a5';
+			ctx.strokeStyle = 'rgba(0,0,0,.45)';
+			ctx.lineWidth = 1.5;
 		} else {
 			ctx.strokeStyle = '#ffd54a';
+			ctx.lineWidth = 2;
 		}
-		ctx.lineWidth = 2;
 		ctx.strokeRect(p0.x, p0.y, w, h);
 		ctx.restore();
 		if (this.app.tool === 'select' && !this.app.options.cleanView) this.drawBoardHandles(ctx);
@@ -521,6 +524,10 @@
 			// luot tung mat that. Che do ve binh thuong van giu ca 2 mat (mo mat
 			// khong active) de tien doi chieu khi dang chinh sua.
 			if (cleanView && inactiveSideCopper) return;
+			// Lop 'mechanical' o day chi la khung THAM CHIEU EditorCommandExecutor
+			// tu ve khi footprint khong co in lua that (xem addAutoSilk) - khong
+			// phai net thuc te tren PCB, nen an trong ban xem sach.
+			if (cleanView && obj.layer === 'mechanical') return;
 			var layer = this.app.state.layers[obj.layer] || {};
 			var drawColor = this.resolveObjectColor(obj, layer);
 			var isRouteDraft = this.isRouteDraftObject(obj);

@@ -83,6 +83,7 @@
 		this.personalLibrary = global.DATPCBPersonalLibrary ? new global.DATPCBPersonalLibrary(this) : null;
 		this.buildFileMenu();
 		this.bind();
+		this.updateSideControls();
 		this.renderAll();
 		this.loadInitial();
 		this.startAutosave();
@@ -147,6 +148,11 @@
 				self.setRouteMode(routeModeButton.getAttribute('data-route-mode'));
 				return;
 			}
+			var sideButton = e.target.closest('[data-view-side]');
+			if (sideButton && self.root.contains(sideButton)) {
+				self.setActiveSide(sideButton.getAttribute('data-view-side'));
+				return;
+			}
 			var toolNode = e.target.closest('[data-tool]');
 			var actionNode = e.target.closest('[data-action]');
 			var tool = toolNode && toolNode.getAttribute('data-tool');
@@ -167,8 +173,7 @@
 				self.options.cleanView = e.target.checked;
 				self.canvas.invalidate();
 			} else if (e.target.matches('[data-active-side]')) {
-				self.activeSide = e.target.value;
-				self.canvas.invalidate();
+				self.setActiveSide(e.target.value);
 			} else if (e.target.matches('[data-upload-side]') && e.target.files[0]) {
 				self.uploadImage(e.target.getAttribute('data-upload-side'), e.target.files[0]);
 			} else if (e.target.matches('[data-prop]')) {
@@ -262,6 +267,28 @@
 			var active = button.getAttribute('data-route-mode') === mode;
 			button.classList.toggle('is-active', active);
 			button.setAttribute('aria-pressed', active ? 'true' : 'false');
+		});
+	};
+
+	// Dung chung cho ca select [data-active-side] (trong tab Properties) lan
+	// nut Top/Bottom moi tren toolbar (de thay/doi mat ngay, khong can mo panel
+	// bi thu gon) - doi ben o dau cung dong bo ca hai va ve lai canvas ngay,
+	// vi Xem 2D sach chi hien dong cua mat dang active.
+	App.prototype.setActiveSide = function (side) {
+		this.activeSide = side === 'bottom' ? 'bottom' : 'top';
+		this.updateSideControls();
+		this.canvas.invalidate();
+	};
+
+	App.prototype.updateSideControls = function () {
+		var side = this.activeSide;
+		Array.prototype.forEach.call(this.root.querySelectorAll('[data-view-side]'), function (button) {
+			var active = button.getAttribute('data-view-side') === side;
+			button.classList.toggle('is-active', active);
+			button.setAttribute('aria-pressed', active ? 'true' : 'false');
+		});
+		Array.prototype.forEach.call(this.root.querySelectorAll('[data-active-side]'), function (select) {
+			if (select.value !== side) select.value = side;
 		});
 	};
 

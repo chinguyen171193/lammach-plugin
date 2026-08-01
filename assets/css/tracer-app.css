@@ -201,6 +201,25 @@
 	background: rgba(255, 193, 7, .18);
 	color: #ffd76c;
 }
+.dat-view-side-switch {
+	display: inline-grid;
+	grid-template-columns: repeat(2, minmax(52px, auto));
+	gap: 4px;
+	align-items: center;
+	padding: 3px;
+	border: 1px solid rgba(255,255,255,.12);
+	border-radius: 8px;
+	background: rgba(7, 12, 17, .5);
+}
+.dat-view-side-switch button {
+	min-width: 52px;
+	padding-inline: 8px;
+}
+.dat-view-side-switch button.is-active {
+	border-color: #48e0a4;
+	background: rgba(72, 224, 164, .18);
+	color: #7dffc8;
+}
 .dat-upload-btn input {
 	display: none;
 }
