@@ -444,6 +444,10 @@
 	color: #ffe0a3;
 }
 
+.tablet-mode .dat-tablet-ai-attachment[hidden] {
+	display: none;
+}
+
 .tablet-mode .dat-tablet-ai-attachment button {
 	min-height: 28px;
 	min-width: 28px;

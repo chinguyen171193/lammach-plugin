@@ -82,6 +82,20 @@
 		this.app.root.appendChild(this.button);
 		this.app.root.appendChild(this.panel);
 		this.app.root.appendChild(this.inputBar);
+		this.syncInputBarHeight();
+		if (global.ResizeObserver) {
+			var self = this;
+			new global.ResizeObserver(function () { self.syncInputBarHeight(); }).observe(this.inputBar);
+		}
+	};
+
+	// Panel's "bottom" phai luon khop chieu cao THUC TE cua inputBar (attachment
+	// hien/an, textarea to nho...) - hardcode mot con so co dinh se lech bat cu
+	// luc nao inputBar cao/thap hon gia dinh, khien inputBar de len phan cuoi
+	// panel va che mat tin nhan cuoi cung.
+	TabletAIPanel.prototype.syncInputBarHeight = function () {
+		var h = this.inputBar.offsetHeight;
+		if (h) this.panel.style.bottom = h + 'px';
 	};
 
 	TabletAIPanel.prototype.bind = function () {
@@ -132,6 +146,7 @@
 	TabletAIPanel.prototype.open = function () {
 		this.panel.hidden = false;
 		this.inputBar.hidden = false;
+		this.syncInputBarHeight();
 	};
 
 	TabletAIPanel.prototype.close = function () {
@@ -348,14 +363,14 @@
 		return list;
 	};
 
-	// Panel dung o day man hinh, canh duoi co dinh cach day 80px (dung bang
-	// chieu cao thanh nhap ben duoi) - keo tay cam TREN DINH panel len/xuong se
-	// doi chieu cao (vh), khong doi chieu rong nua vi panel da la full-width.
+	// Panel dung ngay tren inputBar (canh duoi = chieu cao THUC TE cua inputBar,
+	// xem syncInputBarHeight) - keo tay cam TREN DINH panel len/xuong se doi
+	// chieu cao (vh), khong doi chieu rong nua vi panel da la full-width.
 	TabletAIPanel.prototype.startResize = function (e) {
 		var self = this;
 		e.preventDefault();
 		function move(ev) {
-			var panelBottomY = global.innerHeight - 80;
+			var panelBottomY = global.innerHeight - self.inputBar.offsetHeight;
 			var heightPx = panelBottomY - ev.clientY;
 			self.height = Math.max(20, Math.min(60, (heightPx / global.innerHeight) * 100));
 			self.panel.style.height = self.height + 'vh';
