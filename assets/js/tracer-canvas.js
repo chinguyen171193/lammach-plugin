@@ -527,6 +527,7 @@
 		// So chan duoc gom lai va ve o cuoi, sau moi pad va moi duong in lua, de
 		// khong bi chinh pad ve sau do de len.
 		this.pinLabelQueue = [];
+		this.drillHoleQueue = [];
 		var cleanView = this.app.options.cleanView;
 		this.app.state.objects.forEach(function (obj) {
 			if (!obj.visible || !this.app.layerVisible(obj.layer)) return;
@@ -558,6 +559,9 @@
 			}
 			ctx.restore();
 		}, this);
+		// Lo khoan ve truoc nhan so chan: lo phai an moi duong mach chay de len no,
+		// nhung nhan so chan (chi che do chinh sua) van phai doc duoc tren cung.
+		this.drawDrillHoles(ctx);
 		// So chan duoc ve DE ngay giua pad, phu kin ca lo khoan - tien khi dang
 		// dau day, nhung bo mach that khong in so trong long pad (in lua nam ngoai
 		// than linh kien), nen ban xem sach bo han di.
@@ -722,9 +726,8 @@
 		ctx.rotate((Number(g.rotation || 0) * Math.PI) / 180);
 		ctx.beginPath();
 		if (obj.type === 'drill') {
-			ctx.arc(0, 0, width / 2, 0, Math.PI * 2);
-			ctx.fillStyle = '#050505';
-			ctx.fill();
+			// Than lo khoan doc lap cung xep hang ve sau cung (xem queueDrillHole)
+			// vi cung bi duong mach ve sau de len y het lo khoan cua pad/via.
 		} else if (obj.type === 'via') {
 			ctx.arc(0, 0, width / 2, 0, Math.PI * 2);
 			ctx.fill();
@@ -751,23 +754,40 @@
 			ctx.ellipse(0, 0, width / 2, height / 2, 0, 0, Math.PI * 2);
 			ctx.fill();
 		}
+		ctx.restore();
 		var drill = Number(g.drill || 0);
-		if (drill > 0) {
-			// To hang mau toi (drillFillColor) thay vi destination-out: khong phu
-			// thuoc vao thu nam duoi the <canvas>, va van doc ra la lo thung xuyen
-			// qua board chu khong phai vet bit mau board.
+		if (obj.type === 'drill') this.queueDrillHole(ctx, p, width / 2);
+		else if (drill > 0) this.queueDrillHole(ctx, p, (drill * this.view.scale) / 2);
+		this.drawPinLabel(ctx, obj);
+	};
+
+	// Lo khoan KHONG duoc ve ngay tai day: duong mach nao nam sau trong danh sach
+	// doi tuong se ve de len va lap lo lai (dung loi "duong mach vao lo khong bi
+	// mat" nguoi dung bao). Xep hang de drawDrillHoles() ve sau cung, giong het
+	// cach pinLabelQueue da lam de nhan so chan khong bi pad ve sau che mat.
+	Renderer.prototype.queueDrillHole = function (ctx, p, radius) {
+		if (!this.drillHoleQueue) this.drillHoleQueue = [];
+		this.drillHoleQueue.push({ x: p.x, y: p.y, r: radius, alpha: ctx.globalAlpha });
+	};
+
+	Renderer.prototype.drawDrillHoles = function (ctx) {
+		var holes = this.drillHoleQueue || [];
+		if (!holes.length) return;
+		ctx.save();
+		for (var i = 0; i < holes.length; i++) {
+			var hole = holes[i];
+			ctx.globalAlpha = hole.alpha;
 			ctx.beginPath();
-			ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2);
+			ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
 			ctx.fillStyle = this.drillFillColor();
 			ctx.fill();
 			ctx.beginPath();
-			ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2);
+			ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
 			ctx.strokeStyle = '#050505';
 			ctx.lineWidth = Math.max(1, 0.06 * this.view.scale);
 			ctx.stroke();
 		}
 		ctx.restore();
-		this.drawPinLabel(ctx, obj);
 	};
 
 	// Khong ve ngay: chi xep hang. Moi pad mot nhan rieng dat o TAM pad, co chu do
