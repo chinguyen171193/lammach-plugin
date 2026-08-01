@@ -32,8 +32,14 @@
 			return ['topMask'];
 		},
 
+		// Truoc day nhanh dau kiem tra 'bottom_silk' - mot khoa lop CHUA TUNG ton
+		// tai trong schema - nen no la code chet, chi con geometry.side chay that.
+		// Gio in lua co lop rieng that su nen kiem tra dung ten lop, van giu
+		// geometry.side lam duong lui cho vat the cu con nam tren lop 'annotation'.
 		silkLayerForObject: function (obj) {
-			if (obj.layer === 'bottom_silk' || (obj.geometry && obj.geometry.side === 'bottom')) return 'bottomSilk';
+			if (obj.layer === 'silk_bottom') return 'bottomSilk';
+			if (obj.layer === 'silk_top') return 'topSilk';
+			if (obj.geometry && obj.geometry.side === 'bottom') return 'bottomSilk';
 			return 'topSilk';
 		}
 	};

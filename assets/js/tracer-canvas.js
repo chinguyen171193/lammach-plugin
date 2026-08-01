@@ -590,8 +590,8 @@
 	// Tra ve '' khi khong xac dinh duoc: vat the dung chung cho ca hai mat (vien
 	// bo, lo khoan, ghi chu nguoi dung tu ve) - nhung thu do luon phai hien.
 	Renderer.prototype.objectSide = function (obj) {
-		if (obj.layer === 'top_copper') return 'top';
-		if (obj.layer === 'bottom_copper') return 'bottom';
+		if (obj.layer === 'top_copper' || obj.layer === 'silk_top') return 'top';
+		if (obj.layer === 'bottom_copper' || obj.layer === 'silk_bottom') return 'bottom';
 		var g = obj.geometry || {};
 		if (g.side === 'top' || g.side === 'bottom') return g.side;
 		var component = this.app.getComponentById(this.app.getComponentIdForObject(obj));
@@ -605,6 +605,10 @@
 	// len ro rang; via giu nguyen vi no xuyen ca 2 mat, khong thuoc rieng mat nao.
 	Renderer.prototype.isInactiveSide = function (obj) {
 		if (obj.type === 'via') return false;
+		// Pad xuyen lo (co lo khoan) cung xuyen qua ban mach: bo mach that co vong
+		// dong o CA HAI mat, nen no phai hien du dang xem mat nao. Chi pad dan be
+		// mat (SMD, khong lo khoan) moi thuoc rieng mot mat.
+		if (obj.type === 'pad' && Number((obj.geometry || {}).drill || 0) > 0) return false;
 		var side = this.objectSide(obj);
 		if (!side) return false;
 		return side !== (this.app.activeSide === 'bottom' ? 'bottom' : 'top');

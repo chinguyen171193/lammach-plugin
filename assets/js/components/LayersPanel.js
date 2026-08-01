@@ -29,7 +29,11 @@
 		this.layerMeta = {
 			top_copper: { label: 'Đồng lớp trên', group: 'copper' },
 			bottom_copper: { label: 'Đồng lớp dưới', group: 'copper' },
-			annotation: { label: 'In lụa', group: 'pcb' },
+			silk_top: { label: 'In lụa mặt trên', group: 'pcb' },
+			silk_bottom: { label: 'In lụa mặt dưới', group: 'pcb' },
+			// In lua da tach ra hai lop rieng o tren; 'annotation' gio chi con la
+			// ghi chu nguoi dung tu ve, khong phai net duoc in len bo mach.
+			annotation: { label: 'Ghi chú', group: 'pcb' },
 			outline: { label: 'Viền bo', group: 'pcb' },
 			drill: { label: 'Lỗ khoan', group: 'pcb' },
 			mechanical: { label: 'Cơ khí', group: 'pcb' },
@@ -156,8 +160,11 @@
 				this.app.canvas.invalidate();
 				return;
 			}
-			if (key === 'top_copper') this.app.activeSide = 'top';
-			if (key === 'bottom_copper') this.app.activeSide = 'bottom';
+			// Qua setActiveSide() chu khong gan thang app.activeSide: no con dong bo
+			// nut Top/Bottom tren thanh cong cu va ve lai canvas, neu gan thang thi
+			// nut kia se chi sai mat.
+			if (key === 'top_copper' || key === 'silk_top') this.app.setActiveSide('top');
+			if (key === 'bottom_copper' || key === 'silk_bottom') this.app.setActiveSide('bottom');
 			this.render();
 		}.bind(this));
 

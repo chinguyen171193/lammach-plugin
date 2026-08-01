@@ -6,6 +6,13 @@
 		this.app = app;
 	}
 
+	// In lua thuoc han ve mot mat cua bo mach, nen no co lop rieng cho tung mat
+	// thay vi dung chung lop 'annotation' voi ghi chu nguoi dung tu ve. Nho vay
+	// moi bat/tat - doi mau - va xuat Gerber (GTO/GBO) rieng tung mat duoc.
+	function silkLayerFor(side) {
+		return side === 'bottom' ? 'silk_bottom' : 'silk_top';
+	}
+
 	EditorCommandExecutor.prototype.execute = function (commands) {
 		if (!Array.isArray(commands) || !commands.length) return { warnings: [] };
 		this.app.history.push(this.app.state);
@@ -338,7 +345,7 @@
 		objects.push({
 			id: global.DATPCBTracerTools.makeId(),
 			type: 'annotation',
-			layer: 'annotation',
+			layer: silkLayerFor(side),
 			geometry: { x: minX, y: minY - 1.6, text: labelText, size: 1.2, side: side, component_id: componentId, component_ref: ref },
 			style: {},
 			locked: false,
@@ -394,7 +401,7 @@
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
 				type: 'shape',
-				layer: 'annotation',
+				layer: silkLayerFor(side),
 				geometry: g,
 				style: {},
 				locked: false,
@@ -420,7 +427,7 @@
 			objects.push({
 				id: global.DATPCBTracerTools.makeId(),
 				type: 'shape',
-				layer: 'annotation',
+				layer: silkLayerFor(side),
 				geometry: {
 					shape: 'line',
 					x1: line.x1,

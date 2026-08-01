@@ -74,6 +74,8 @@ class DAT_PCB_Project {
 			'outline'           => array( 'name' => 'Board Outline', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#ffd54a' ),
 			'top_copper'        => array( 'name' => 'Top Copper', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#e53935' ),
 			'bottom_copper'     => array( 'name' => 'Bottom Copper', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#1e88e5' ),
+			'silk_top'          => array( 'name' => 'Silkscreen Top', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#f8f8f2' ),
+			'silk_bottom'       => array( 'name' => 'Silkscreen Bottom', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#f8f8f2' ),
 			'drill'             => array( 'name' => 'Drill', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#151515' ),
 			'mechanical'        => array( 'name' => 'Mechanical', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#7de0ff' ),
 			'annotation'        => array( 'name' => 'Annotation', 'visible' => true, 'locked' => false, 'opacity' => 1, 'color' => '#f8f8f2' ),

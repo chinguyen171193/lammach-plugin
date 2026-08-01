@@ -50,6 +50,8 @@
 				outline: { name: 'Board Outline', visible: true, locked: false, opacity: 1, color: '#ffd54a' },
 				top_copper: { name: 'Top Copper', visible: true, locked: false, opacity: 1, color: '#e53935' },
 				bottom_copper: { name: 'Bottom Copper', visible: true, locked: false, opacity: 1, color: '#1e88e5' },
+				silk_top: { name: 'Silkscreen Top', visible: true, locked: false, opacity: 1, color: '#f8f8f2' },
+				silk_bottom: { name: 'Silkscreen Bottom', visible: true, locked: false, opacity: 1, color: '#f8f8f2' },
 				drill: { name: 'Drill', visible: true, locked: false, opacity: 1, color: '#151515' },
 				mechanical: { name: 'Mechanical', visible: true, locked: false, opacity: 1, color: '#7de0ff' },
 				annotation: { name: 'Annotation', visible: true, locked: false, opacity: 1, color: '#f8f8f2' }
@@ -235,6 +237,37 @@
 	App.prototype.normalizeState = function () {
 		if (!Array.isArray(this.state.components)) this.state.components = [];
 		if (!Array.isArray(this.state.objects)) this.state.objects = [];
+		this.migrateSilkLayers();
+	};
+
+	// Truoc day in lua dung chung lop 'annotation' voi ghi chu nguoi dung tu ve,
+	// nen khong the bat/tat hay doi mau in lua tung mat rieng. Chuyen nhung vat
+	// the THUC SU la in lua sang lop silk_top/silk_bottom moi. Nhan dien bang
+	// chinh cac dau ma EditorCommandExecutor van ghi khi dung footprint
+	// (style.role, geometry.silk, hoac co component_id chu quan); ghi chu nguoi
+	// dung tu ve khong mang dau nao trong so do nen o nguyen tren 'annotation'.
+	App.prototype.migrateSilkLayers = function () {
+		var self = this;
+		// Du an luu tu truoc chua co hai lop nay. Neu thieu, layerVisible() se tra
+		// ve false cho moi vat the vua chuyen sang va in lua bien mat sach - nen
+		// phai bo sung lop truoc khi doi lop cua bat ky vat the nao.
+		if (!this.state.layers) this.state.layers = {};
+		var fallbackLayers = defaultProject().layers;
+		['silk_top', 'silk_bottom'].forEach(function (key) {
+			if (!self.state.layers[key]) self.state.layers[key] = fallbackLayers[key];
+		});
+		this.state.objects.forEach(function (obj) {
+			if (!obj || obj.layer !== 'annotation') return;
+			var g = obj.geometry || {};
+			var isSilk = g.silk || (obj.style && obj.style.role === 'silkscreen') || g.component_id;
+			if (!isSilk) return;
+			var side = g.side;
+			if (side !== 'top' && side !== 'bottom') {
+				var component = self.getComponentById(g.component_id || '');
+				side = component && component.side === 'bottom' ? 'bottom' : 'top';
+			}
+			obj.layer = side === 'bottom' ? 'silk_bottom' : 'silk_top';
+		});
 	};
 
 	App.prototype.layerVisible = function (key) {
@@ -714,7 +747,7 @@
 			drillDia: this.options.drillDia
 		});
 		if (this.activeLayer && this.state.layers[this.activeLayer] && !this.state.layers[this.activeLayer].locked) {
-			if (['top_copper', 'bottom_copper', 'outline', 'drill', 'mechanical', 'annotation'].indexOf(this.activeLayer) !== -1) obj.layer = this.activeLayer;
+			if (['top_copper', 'bottom_copper', 'silk_top', 'silk_bottom', 'outline', 'drill', 'mechanical', 'annotation'].indexOf(this.activeLayer) !== -1) obj.layer = this.activeLayer;
 		}
 		this.state.objects.push(obj);
 		this.selected = [obj.id];

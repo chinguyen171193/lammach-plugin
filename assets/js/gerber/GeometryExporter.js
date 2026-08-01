@@ -171,6 +171,14 @@
 
 	GeometryExporter.prototype.exportShape = function (obj) {
 		var g = obj.geometry || {};
+		// Nam tren lop in lua thi xuat thang, khong doi hoi dau style.role/g.silk.
+		// Chinh hai dau do la ly do in lua THAT tu thu vien LCSC (addRealSilk khong
+		// dat ca hai) lau nay roi vao nhanh canh bao "chua xuat" ben duoi va bien
+		// mat khoi file san xuat, du van hien tren man hinh.
+		if (obj.layer === 'silk_top' || obj.layer === 'silk_bottom') {
+			this.exportSilkscreenShape(obj);
+			return;
+		}
 		if (obj.layer === 'annotation') {
 			if ((obj.style && obj.style.role === 'silkscreen') || g.silk) {
 				this.exportSilkscreenShape(obj);
