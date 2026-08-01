@@ -435,11 +435,16 @@
 		ctx.restore();
 	};
 
-	// Mau nen "thuc" tai thoi diem ve - dung chung cho ca hinh chu nhat board
-	// (drawBoard) lan lo khoan pad/via (drawPadLike), de lo khoan luon trung
-	// khop mau board thay vi tuy vao nhung gi nam duoi canvas (xem drawPadLike).
+	// Mau mat board (mau son mask khi xem sach, mau nen editor khi dang ve).
 	Renderer.prototype.boardFillColor = function () {
 		return this.app.options.cleanView ? '#0e6b40' : '#10151c';
+	};
+
+	// Lo khoan la lo THUNG qua ban mach - nhin xuyen qua nen phai toi, khong
+	// phai mau mat board. To bang boardFillColor() se thanh "bit kin bang mau
+	// board", dung la thu vua bi bao sai o ban truoc.
+	Renderer.prototype.drillFillColor = function () {
+		return this.app.options.cleanView ? '#07130d' : '#10151c';
 	};
 
 	Renderer.prototype.drawBoard = function (ctx) {
@@ -553,7 +558,10 @@
 			}
 			ctx.restore();
 		}, this);
-		this.drawPinLabels(ctx);
+		// So chan duoc ve DE ngay giua pad, phu kin ca lo khoan - tien khi dang
+		// dau day, nhung bo mach that khong in so trong long pad (in lua nam ngoai
+		// than linh kien), nen ban xem sach bo han di.
+		if (!cleanView) this.drawPinLabels(ctx);
 	};
 
 	// Doi "Mat ve" (Top/Bottom) truoc gio khong doi gi tren canvas - dong top
@@ -653,12 +661,12 @@
 	Renderer.prototype.resolveObjectColor = function (obj, layer) {
 		if (this.app.options.cleanView && (obj.layer === 'top_copper' || obj.layer === 'bottom_copper')) {
 			// PCB that: son mask xanh phu kin track va than via, chi lo dong that
-			// (vang-dong) o pad - noi mask co lo ho de han linh kien. Track/via chi
-			// con thay mo qua lop mask, khong sang ro nhu dong tran; lo khoan via
-			// van hien vi drawPadLike tu ve rieng vien toi quanh drill (khong phu
-			// thuoc mau nay).
+			// (vang-dong) o pad - noi mask co lo ho de han linh kien. Duong mach
+			// duoi mask KHONG trang/xam: no van la mau xanh cua mask, chi hoi sang
+			// hon nen vi lop dong ben duoi lam mask noi go len. Dung mau trang mo
+			// se ra vet trang nhu ve chi, sai hoan toan so voi bo mach that.
 			if (obj.type === 'pad') return '#d6a94a';
-			return 'rgba(255,255,255,.08)';
+			return '#148554';
 		}
 		if (obj.type === 'via') return '#d6a94a';
 		if (obj.layer === 'top_copper') return '#e53935';
@@ -721,8 +729,9 @@
 			ctx.arc(0, 0, width / 2, 0, Math.PI * 2);
 			ctx.fill();
 			// Vien vang sang chi hop ly khi dang chinh sua (de nhan via ra ngay);
-			// trong Xem 2D sach via cung bi mask phu nhu track, khong nen noi bat.
-			ctx.strokeStyle = this.app.options.cleanView ? 'rgba(255,255,255,.14)' : '#ffe08a';
+			// trong Xem 2D sach via cung bi mask phu nhu track nen cung mau xanh
+			// mask, khong phai vien trang/vang noi bat.
+			ctx.strokeStyle = this.app.options.cleanView ? '#148554' : '#ffe08a';
 			ctx.lineWidth = Math.max(1, 0.12 * this.view.scale);
 			ctx.stroke();
 		} else if (g.shape === 'rect') {
@@ -744,14 +753,12 @@
 		}
 		var drill = Number(g.drill || 0);
 		if (drill > 0) {
-			// Truoc day dung destination-out de "khoet" lo, nhung no xoa xuyen het
-			// canvas ve mau nen thuc su cua TRANG (phia sau the <canvas>) chu khong
-			// phai mau board - tinh co truoc day trung mau toi nen nhin "giong" lo
-			// khoan, nhung sai ban chat va vo tinh phu thuoc vao thu nam duoi canvas.
-			// To hang mau board that (boardFillColor) moi la lo khoan dung nghia.
+			// To hang mau toi (drillFillColor) thay vi destination-out: khong phu
+			// thuoc vao thu nam duoi the <canvas>, va van doc ra la lo thung xuyen
+			// qua board chu khong phai vet bit mau board.
 			ctx.beginPath();
 			ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2);
-			ctx.fillStyle = this.boardFillColor();
+			ctx.fillStyle = this.drillFillColor();
 			ctx.fill();
 			ctx.beginPath();
 			ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2);
