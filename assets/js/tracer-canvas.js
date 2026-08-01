@@ -529,7 +529,7 @@
 		this.pinLabelQueue = [];
 		this.drillHoleQueue = [];
 		var cleanView = this.app.options.cleanView;
-		this.app.state.objects.forEach(function (obj) {
+		this.paintOrder(this.app.state.objects).forEach(function (obj) {
 			if (!obj.visible || !this.app.layerVisible(obj.layer)) return;
 			var inactiveSideCopper = this.isInactiveSideCopper(obj);
 			// Xem 2D sach la ban xem truoc kieu Gerber cua TUNG mat - an han mat
@@ -566,6 +566,21 @@
 		// dau day, nhung bo mach that khong in so trong long pad (in lua nam ngoai
 		// than linh kien), nen ban xem sach bo han di.
 		if (!cleanView) this.drawPinLabels(ctx);
+	};
+
+	// Pad/via luon ve SAU duong mach. Tren bo mach that, pad la o ho cua lop son
+	// mask - dong tran lo ra o do - nen duong mach chay vao pad phai chim duoi
+	// pad chu khong the vat ngang qua no. Truoc day thu tu ve chinh la thu tu
+	// trong state.objects, nen duong mach nao tao SAU pad se de len pad. Giu
+	// nguyen thu tu tuong doi trong tung nhom de moi thu khac ve y nhu cu.
+	Renderer.prototype.paintOrder = function (objects) {
+		var body = [], terminals = [];
+		for (var i = 0; i < objects.length; i++) {
+			var obj = objects[i];
+			if (obj.type === 'pad' || obj.type === 'via') terminals.push(obj);
+			else body.push(obj);
+		}
+		return body.concat(terminals);
 	};
 
 	// Doi "Mat ve" (Top/Bottom) truoc gio khong doi gi tren canvas - dong top
