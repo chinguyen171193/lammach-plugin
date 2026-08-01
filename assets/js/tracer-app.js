@@ -168,6 +168,7 @@
 				self.canvas.invalidate();
 			} else if (e.target.matches('[data-active-side]')) {
 				self.activeSide = e.target.value;
+				self.canvas.invalidate();
 			} else if (e.target.matches('[data-upload-side]') && e.target.files[0]) {
 				self.uploadImage(e.target.getAttribute('data-upload-side'), e.target.files[0]);
 			} else if (e.target.matches('[data-prop]')) {

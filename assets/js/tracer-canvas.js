@@ -518,7 +518,7 @@
 			var drawColor = this.resolveObjectColor(obj, layer);
 			var isRouteDraft = this.isRouteDraftObject(obj);
 			ctx.save();
-			ctx.globalAlpha = Number(layer.opacity || 1);
+			ctx.globalAlpha = Number(layer.opacity || 1) * (this.isInactiveSideCopper(obj) ? 0.32 : 1);
 			ctx.strokeStyle = drawColor;
 			ctx.fillStyle = drawColor;
 			if (isRouteDraft) {
@@ -533,6 +533,17 @@
 			ctx.restore();
 		}, this);
 		this.drawPinLabels(ctx);
+	};
+
+	// Doi "Mat ve" (Top/Bottom) truoc gio khong doi gi tren canvas - dong top
+	// (do) va bottom (xanh) luon ve full mau chong len nhau nen khong biet dang
+	// xem/ve mat nao. Lam mo han lop dong KHONG thuoc mat dang active de mat do
+	// noi len ro rang; via giu nguyen vi no noi ca 2 mat, khong thuoc rieng mat nao.
+	Renderer.prototype.isInactiveSideCopper = function (obj) {
+		if (obj.type === 'via') return false;
+		if (obj.layer !== 'top_copper' && obj.layer !== 'bottom_copper') return false;
+		var activeLayer = this.app.activeSide === 'bottom' ? 'bottom_copper' : 'top_copper';
+		return obj.layer !== activeLayer;
 	};
 
 	// Khoang cach toi pad gan nhat, tinh mot lan cho ca khung hinh. Do la gioi han
