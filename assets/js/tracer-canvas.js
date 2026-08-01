@@ -435,6 +435,13 @@
 		ctx.restore();
 	};
 
+	// Mau nen "thuc" tai thoi diem ve - dung chung cho ca hinh chu nhat board
+	// (drawBoard) lan lo khoan pad/via (drawPadLike), de lo khoan luon trung
+	// khop mau board thay vi tuy vao nhung gi nam duoi canvas (xem drawPadLike).
+	Renderer.prototype.boardFillColor = function () {
+		return this.app.options.cleanView ? '#0e6b40' : '#10151c';
+	};
+
 	Renderer.prototype.drawBoard = function (ctx) {
 		var b = this.app.state.board;
 		var p0 = this.mmToScreen({ x: 0, y: 0 });
@@ -444,7 +451,7 @@
 			// Xem 2D sach: to dac mau solder-mask giong PCB thuc. Vien truoc day
 			// mau bac ha sang qua muc (#90e0a5, ro nhu wireframe) - PCB that khong
 			// co vien sang nhu vay, chi la mep cat mo, nen doi thanh vien toi mo.
-			ctx.fillStyle = '#0e6b40';
+			ctx.fillStyle = this.boardFillColor();
 			ctx.fillRect(p0.x, p0.y, w, h);
 			ctx.strokeStyle = 'rgba(0,0,0,.45)';
 			ctx.lineWidth = 1.5;
@@ -713,7 +720,9 @@
 		} else if (obj.type === 'via') {
 			ctx.arc(0, 0, width / 2, 0, Math.PI * 2);
 			ctx.fill();
-			ctx.strokeStyle = '#ffe08a';
+			// Vien vang sang chi hop ly khi dang chinh sua (de nhan via ra ngay);
+			// trong Xem 2D sach via cung bi mask phu nhu track, khong nen noi bat.
+			ctx.strokeStyle = this.app.options.cleanView ? 'rgba(255,255,255,.14)' : '#ffe08a';
 			ctx.lineWidth = Math.max(1, 0.12 * this.view.scale);
 			ctx.stroke();
 		} else if (g.shape === 'rect') {
@@ -735,9 +744,15 @@
 		}
 		var drill = Number(g.drill || 0);
 		if (drill > 0) {
-			ctx.globalCompositeOperation = 'destination-out';
-			ctx.beginPath(); ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2); ctx.fill();
-			ctx.globalCompositeOperation = 'source-over';
+			// Truoc day dung destination-out de "khoet" lo, nhung no xoa xuyen het
+			// canvas ve mau nen thuc su cua TRANG (phia sau the <canvas>) chu khong
+			// phai mau board - tinh co truoc day trung mau toi nen nhin "giong" lo
+			// khoan, nhung sai ban chat va vo tinh phu thuoc vao thu nam duoi canvas.
+			// To hang mau board that (boardFillColor) moi la lo khoan dung nghia.
+			ctx.beginPath();
+			ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2);
+			ctx.fillStyle = this.boardFillColor();
+			ctx.fill();
 			ctx.beginPath();
 			ctx.arc(0, 0, (drill * this.view.scale) / 2, 0, Math.PI * 2);
 			ctx.strokeStyle = '#050505';
