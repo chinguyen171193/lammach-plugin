@@ -14,6 +14,7 @@
 		this.pendingFile = null;
 		this.button = document.createElement('button');
 		this.panel = document.createElement('aside');
+		this.inputBar = document.createElement('div');
 		this.thread = document.createElement('div');
 		this.prompt = document.createElement('textarea');
 		this.fileInput = document.createElement('input');
@@ -45,6 +46,10 @@
 		hint.className = 'dat-tablet-ai-hint';
 		hint.textContent = 'Ví dụ: "vẽ mạch ổn áp 5V lm2596", "di chuyển C1 sang trái 5mm", "xoá R2", "nối U1.4 với R1.1".';
 		this.thread.appendChild(hint);
+		// Thanh nhap dan day man hinh, tach khoi panel ben phai de tran het chieu
+		// rong man hinh (panel chi con giu phan lich su chat, hep hon).
+		this.inputBar.className = 'dat-tablet-ai-inputbar';
+		this.inputBar.hidden = true;
 		this.attachment.className = 'dat-tablet-ai-attachment';
 		this.attachment.hidden = true;
 		this.fileInput.type = 'file';
@@ -71,22 +76,25 @@
 		this.panel.appendChild(resize);
 		this.panel.appendChild(header);
 		this.panel.appendChild(this.thread);
-		this.panel.appendChild(this.attachment);
-		this.panel.appendChild(inputRow);
-		this.panel.appendChild(this.fileInput);
+		this.inputBar.appendChild(this.attachment);
+		this.inputBar.appendChild(inputRow);
+		this.inputBar.appendChild(this.fileInput);
 		this.app.root.appendChild(this.button);
 		this.app.root.appendChild(this.panel);
+		this.app.root.appendChild(this.inputBar);
 	};
 
 	TabletAIPanel.prototype.bind = function () {
 		var self = this;
 		this.button.addEventListener('click', function () { self.open(); });
-		this.panel.addEventListener('click', function (e) {
+		function onClick(e) {
 			if (e.target.getAttribute('data-ai-close')) self.close();
 			if (e.target.getAttribute('data-ai-send')) self.send();
 			if (e.target.getAttribute('data-ai-attach')) self.fileInput.click();
 			if (e.target.getAttribute('data-ai-remove-attachment')) self.setPendingFile(null);
-		});
+		}
+		this.panel.addEventListener('click', onClick);
+		this.inputBar.addEventListener('click', onClick);
 		this.prompt.addEventListener('keydown', function (e) {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
@@ -123,10 +131,12 @@
 
 	TabletAIPanel.prototype.open = function () {
 		this.panel.hidden = false;
+		this.inputBar.hidden = false;
 	};
 
 	TabletAIPanel.prototype.close = function () {
 		this.panel.hidden = true;
+		this.inputBar.hidden = true;
 	};
 
 	TabletAIPanel.prototype.buildBoardContext = function () {

@@ -55,6 +55,7 @@
 .dat-tablet-fab,
 .dat-tablet-ai-button,
 .dat-tablet-ai-panel,
+.dat-tablet-ai-inputbar,
 .dat-tablet-palette,
 .dat-tablet-left-shell,
 .dat-tablet-language-switcher,
@@ -234,7 +235,7 @@
 	position: fixed;
 	top: 32px;
 	right: 0;
-	bottom: 0;
+	bottom: 80px;
 	z-index: 100005;
 	display: flex;
 	flex-direction: column;
@@ -245,6 +246,25 @@
 	box-shadow: -18px 0 48px rgba(0,0,0,.38);
 	min-width: 320px;
 	max-width: 45vw;
+}
+
+.tablet-mode .dat-tablet-ai-inputbar {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 100005;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 14px;
+	background: #151f29;
+	border-top: 1px solid #53677d;
+	box-shadow: 0 -12px 32px rgba(0,0,0,.38);
+}
+
+.tablet-mode .dat-tablet-ai-inputbar[hidden] {
+	display: none;
 }
 
 .tablet-mode .dat-tablet-ai-panel[hidden] {
@@ -2292,6 +2312,7 @@
 	.tablet-mode .dat-tablet-floating-toolbar,
 	.tablet-mode .dat-tablet-context-menu,
 	.tablet-mode .dat-tablet-ai-panel,
+	.tablet-mode .dat-tablet-ai-inputbar,
 	.tablet-mode .dat-tablet-overflow-menu {
 		z-index: 2147483001 !important;
 	}
