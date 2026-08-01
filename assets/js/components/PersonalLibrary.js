@@ -36,7 +36,7 @@
 	};
 
 	PersonalLibrary.prototype.build = function () {
-		var panel = el('section', 'dat-easy-panel dat-easy-library-panel');
+		var panel = el('section', 'dat-easy-panel dat-easy-library-panel is-collapsed');
 		panel.hidden = true;
 		panel.style.right = '18px';
 		panel.style.top = '86px';
@@ -45,9 +45,11 @@
 		var header = el('div', 'dat-easy-panel-header');
 		header.appendChild(el('span', 'dat-easy-panel-grip', '▦'));
 		header.appendChild(el('strong', '', 'Thư viện cá nhân'));
-		var collapse = el('button', 'dat-easy-icon-button', '−');
+		// Mac dinh panel dat da co class is-collapsed (xem tren) - nut phai khoi
+		// dau dung trang thai "+/Mo rong" cho khop, khong phai "-/Thu gon".
+		var collapse = el('button', 'dat-easy-icon-button', '+');
 		collapse.type = 'button';
-		collapse.title = 'Thu gọn';
+		collapse.title = 'Mở rộng';
 		collapse.setAttribute('data-library-collapse', '1');
 		var close = el('button', 'dat-easy-icon-button', '×');
 		close.type = 'button';

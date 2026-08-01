@@ -1253,6 +1253,10 @@
 		this.rightPanel.appendChild(body);
 		this.selectTab('properties');
 		this.refreshInfoPanes();
+		// Mac dinh thu gon the Thuoc tinh/Layers/History - nguoi dung tu mo bang
+		// nut thu gon hoac vuot ngang khi can, thay vi chiem san man hinh ngay
+		// tu dau khi chua chon doi tuong nao.
+		this.setRightPanelCollapsed(true);
 		this.root.addEventListener('datpcb:selectionchange', function () {
 			this.refreshInfoPanes();
 		}.bind(this));

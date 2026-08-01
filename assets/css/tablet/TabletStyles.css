@@ -244,7 +244,7 @@
 	border-left: 1px solid #53677d;
 	box-shadow: -18px 0 48px rgba(0,0,0,.38);
 	min-width: 320px;
-	max-width: 55vw;
+	max-width: 45vw;
 }
 
 .tablet-mode .dat-tablet-ai-panel[hidden] {

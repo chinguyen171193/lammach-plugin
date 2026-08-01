@@ -8,7 +8,7 @@
 	function TabletAIPanel(app) {
 		this.app = app;
 		this.executor = new global.DATPCBEditorCommandExecutor(app);
-		this.width = 35;
+		this.width = 28; // gon hon truoc (35%) - van keo rong lai duoc qua tay cam
 		this.busy = false;
 		this.messages = [];
 		this.pendingFile = null;
@@ -342,7 +342,7 @@
 		var self = this;
 		e.preventDefault();
 		function move(ev) {
-			self.width = Math.max(25, Math.min(55, ((global.innerWidth - ev.clientX) / global.innerWidth) * 100));
+			self.width = Math.max(22, Math.min(45, ((global.innerWidth - ev.clientX) / global.innerWidth) * 100));
 			self.panel.style.width = self.width + '%';
 		}
 		function up() {
