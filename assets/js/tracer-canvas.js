@@ -531,12 +531,12 @@
 		var cleanView = this.app.options.cleanView;
 		this.paintOrder(this.app.state.objects).forEach(function (obj) {
 			if (!obj.visible || !this.app.layerVisible(obj.layer)) return;
-			var inactiveSideCopper = this.isInactiveSideCopper(obj);
+			var inactiveSide = this.isInactiveSide(obj);
 			// Xem 2D sach la ban xem truoc kieu Gerber cua TUNG mat - an han mat
 			// khong active thay vi lam mo, giong duyet qua nut "Mat ve" de xem lan
 			// luot tung mat that. Che do ve binh thuong van giu ca 2 mat (mo mat
 			// khong active) de tien doi chieu khi dang chinh sua.
-			if (cleanView && inactiveSideCopper) return;
+			if (cleanView && inactiveSide) return;
 			// Lop 'mechanical' o day chi la khung THAM CHIEU EditorCommandExecutor
 			// tu ve khi footprint khong co in lua that (xem addAutoSilk) - khong
 			// phai net thuc te tren PCB, nen an trong ban xem sach.
@@ -545,7 +545,7 @@
 			var drawColor = this.resolveObjectColor(obj, layer);
 			var isRouteDraft = this.isRouteDraftObject(obj);
 			ctx.save();
-			ctx.globalAlpha = Number(layer.opacity || 1) * (!cleanView && inactiveSideCopper ? 0.32 : 1);
+			ctx.globalAlpha = Number(layer.opacity || 1) * (!cleanView && inactiveSide ? 0.32 : 1);
 			ctx.strokeStyle = drawColor;
 			ctx.fillStyle = drawColor;
 			if (isRouteDraft) {
@@ -583,15 +583,31 @@
 		return body.concat(terminals);
 	};
 
+	// Mat (top/bottom) ma doi tuong thuoc ve. Dong suy thang tu ten lop, nhung in
+	// lua va nhan ten linh kien deu nam chung lop 'annotation' cho CA HAI mat -
+	// nen phai doc geometry.side (addRealSilk/addAutoSilk va nhan footprint trong
+	// EditorCommandExecutor luon ghi truong nay) hoac suy tu linh kien chu quan.
+	// Tra ve '' khi khong xac dinh duoc: vat the dung chung cho ca hai mat (vien
+	// bo, lo khoan, ghi chu nguoi dung tu ve) - nhung thu do luon phai hien.
+	Renderer.prototype.objectSide = function (obj) {
+		if (obj.layer === 'top_copper') return 'top';
+		if (obj.layer === 'bottom_copper') return 'bottom';
+		var g = obj.geometry || {};
+		if (g.side === 'top' || g.side === 'bottom') return g.side;
+		var component = this.app.getComponentById(this.app.getComponentIdForObject(obj));
+		if (component && (component.side === 'top' || component.side === 'bottom')) return component.side;
+		return '';
+	};
+
 	// Doi "Mat ve" (Top/Bottom) truoc gio khong doi gi tren canvas - dong top
 	// (do) va bottom (xanh) luon ve full mau chong len nhau nen khong biet dang
-	// xem/ve mat nao. Lam mo han lop dong KHONG thuoc mat dang active de mat do
-	// noi len ro rang; via giu nguyen vi no noi ca 2 mat, khong thuoc rieng mat nao.
-	Renderer.prototype.isInactiveSideCopper = function (obj) {
+	// xem/ve mat nao. Lam mo han thu KHONG thuoc mat dang active de mat do noi
+	// len ro rang; via giu nguyen vi no xuyen ca 2 mat, khong thuoc rieng mat nao.
+	Renderer.prototype.isInactiveSide = function (obj) {
 		if (obj.type === 'via') return false;
-		if (obj.layer !== 'top_copper' && obj.layer !== 'bottom_copper') return false;
-		var activeLayer = this.app.activeSide === 'bottom' ? 'bottom_copper' : 'top_copper';
-		return obj.layer !== activeLayer;
+		var side = this.objectSide(obj);
+		if (!side) return false;
+		return side !== (this.app.activeSide === 'bottom' ? 'bottom' : 'top');
 	};
 
 	// Khoang cach toi pad gan nhat, tinh mot lan cho ca khung hinh. Do la gioi han
