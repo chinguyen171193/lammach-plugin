@@ -570,22 +570,24 @@
 
 	// Ve theo dung thu tu chong lop cua bo mach that, tu duoi len:
 	//   1. duong mach / vung dong - nam duoi cung, bi son mask phu kin
-	//   2. in lua - in DE len tren mask nen che duong mach ben duoi
-	//   3. pad/via - o ho cua mask, dong tran noi len tren cung; xuong san xuat
-	//      luon chua in lua ra khoi pad (khong in muc len cho can han) nen pad
-	//      phai nam tren in lua
+	//   2. via - cung bi mask phu; no chi de noi hai mat, khong phai cho han
+	//      linh kien, nen xuong KHONG chua in lua ra khoi no
+	//   3. in lua - in DE len tren mask nen che ca duong mach lan via ben duoi
+	//   4. pad han - o ho cua mask, dong tran noi len tren cung; day la cho se
+	//      han chan nen xuong luon chua in lua ra, pad phai nam tren in lua
 	// Truoc day thu tu ve chinh la thu tu trong state.objects, nen vat the nao
 	// tao sau se de len - duong mach de len pad, roi de len ca in lua.
 	// Giu nguyen thu tu tuong doi trong tung nhom de moi thu khac ve y nhu cu.
 	Renderer.prototype.paintOrder = function (objects) {
-		var body = [], silk = [], terminals = [];
+		var body = [], vias = [], silk = [], pads = [];
 		for (var i = 0; i < objects.length; i++) {
 			var obj = objects[i];
-			if (obj.type === 'pad' || obj.type === 'via') terminals.push(obj);
+			if (obj.type === 'pad') pads.push(obj);
+			else if (obj.type === 'via') vias.push(obj);
 			else if (obj.layer === 'silk_top' || obj.layer === 'silk_bottom') silk.push(obj);
 			else body.push(obj);
 		}
-		return body.concat(silk, terminals);
+		return body.concat(vias, silk, pads);
 	};
 
 	// Mat (top/bottom) ma doi tuong thuoc ve. Dong suy thang tu ten lop, nhung in
