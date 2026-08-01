@@ -8,7 +8,7 @@
 	function TabletAIPanel(app) {
 		this.app = app;
 		this.executor = new global.DATPCBEditorCommandExecutor(app);
-		this.width = 28; // gon hon truoc (35%) - van keo rong lai duoc qua tay cam
+		this.height = 34; // % chieu cao man hinh cho khung lich su chat - keo tay cam tren dinh de chinh
 		this.busy = false;
 		this.messages = [];
 		this.pendingFile = null;
@@ -29,7 +29,7 @@
 		this.button.textContent = '✨ AI';
 		this.panel.className = 'dat-tablet-ai-panel';
 		this.panel.hidden = true;
-		this.panel.style.width = this.width + '%';
+		this.panel.style.height = this.height + 'vh';
 		var resize = document.createElement('div');
 		resize.className = 'dat-tablet-ai-resize';
 		resize.setAttribute('data-ai-resize', '1');
@@ -348,12 +348,17 @@
 		return list;
 	};
 
+	// Panel dung o day man hinh, canh duoi co dinh cach day 80px (dung bang
+	// chieu cao thanh nhap ben duoi) - keo tay cam TREN DINH panel len/xuong se
+	// doi chieu cao (vh), khong doi chieu rong nua vi panel da la full-width.
 	TabletAIPanel.prototype.startResize = function (e) {
 		var self = this;
 		e.preventDefault();
 		function move(ev) {
-			self.width = Math.max(22, Math.min(45, ((global.innerWidth - ev.clientX) / global.innerWidth) * 100));
-			self.panel.style.width = self.width + '%';
+			var panelBottomY = global.innerHeight - 80;
+			var heightPx = panelBottomY - ev.clientY;
+			self.height = Math.max(20, Math.min(60, (heightPx / global.innerHeight) * 100));
+			self.panel.style.height = self.height + 'vh';
 		}
 		function up() {
 			document.removeEventListener('pointermove', move);

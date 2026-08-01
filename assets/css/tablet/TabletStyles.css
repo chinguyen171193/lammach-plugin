@@ -233,7 +233,7 @@
 
 .tablet-mode .dat-tablet-ai-panel {
 	position: fixed;
-	top: 32px;
+	left: 0;
 	right: 0;
 	bottom: 80px;
 	z-index: 100005;
@@ -242,10 +242,11 @@
 	gap: 12px;
 	padding: 14px;
 	background: #151f29;
-	border-left: 1px solid #53677d;
-	box-shadow: -18px 0 48px rgba(0,0,0,.38);
-	min-width: 320px;
-	max-width: 45vw;
+	border-top: 1px solid #53677d;
+	box-shadow: 0 -18px 48px rgba(0,0,0,.38);
+	width: 100%;
+	min-height: 160px;
+	max-height: 60vh;
 }
 
 .tablet-mode .dat-tablet-ai-inputbar {
@@ -273,11 +274,11 @@
 
 .tablet-mode .dat-tablet-ai-resize {
 	position: absolute;
-	left: -8px;
-	top: 0;
-	bottom: 0;
-	width: 16px;
-	cursor: ew-resize;
+	left: 0;
+	right: 0;
+	top: -8px;
+	height: 16px;
+	cursor: ns-resize;
 }
 
 .tablet-mode .dat-tablet-ai-header {
@@ -466,11 +467,6 @@
 
 	.tablet-mode .dat-pcb-canvas-panel {
 		min-height: 64vh;
-	}
-
-	.tablet-mode .dat-tablet-ai-panel {
-		width: 62vw !important;
-		max-width: 62vw;
 	}
 }
 
@@ -940,8 +936,7 @@
 }
 
 .tablet-mode .dat-tablet-ai-panel {
-	top: 0;
-	border-radius: 18px 0 0 18px;
+	border-radius: 18px 18px 0 0;
 	background: var(--tablet-panel);
 	transition: transform .18s ease, opacity .18s ease;
 }
