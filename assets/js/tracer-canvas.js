@@ -644,11 +644,16 @@
 	};
 
 	Renderer.prototype.resolveObjectColor = function (obj, layer) {
+		if (this.app.options.cleanView && (obj.layer === 'top_copper' || obj.layer === 'bottom_copper')) {
+			// PCB that: son mask xanh phu kin track va than via, chi lo dong that
+			// (vang-dong) o pad - noi mask co lo ho de han linh kien. Track/via chi
+			// con thay mo qua lop mask, khong sang ro nhu dong tran; lo khoan via
+			// van hien vi drawPadLike tu ve rieng vien toi quanh drill (khong phu
+			// thuoc mau nay).
+			if (obj.type === 'pad') return '#d6a94a';
+			return 'rgba(255,255,255,.08)';
+		}
 		if (obj.type === 'via') return '#d6a94a';
-		// Xem 2D sach mo phong ban render Gerber that: dong luon mau vang-dong,
-		// khong phan biet do/xanh nhu che do ve binh thuong (o do goi la de biet
-		// dang chinh sua lop nao, o day goi la de trong giong PCB thuc).
-		if (this.app.options.cleanView && (obj.layer === 'top_copper' || obj.layer === 'bottom_copper')) return '#d6a94a';
 		if (obj.layer === 'top_copper') return '#e53935';
 		if (obj.layer === 'bottom_copper') return '#1e88e5';
 		if (obj.layer === 'drill') return '#151515';
