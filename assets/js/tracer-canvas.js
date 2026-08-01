@@ -512,13 +512,20 @@
 		// So chan duoc gom lai va ve o cuoi, sau moi pad va moi duong in lua, de
 		// khong bi chinh pad ve sau do de len.
 		this.pinLabelQueue = [];
+		var cleanView = this.app.options.cleanView;
 		this.app.state.objects.forEach(function (obj) {
 			if (!obj.visible || !this.app.layerVisible(obj.layer)) return;
+			var inactiveSideCopper = this.isInactiveSideCopper(obj);
+			// Xem 2D sach la ban xem truoc kieu Gerber cua TUNG mat - an han mat
+			// khong active thay vi lam mo, giong duyet qua nut "Mat ve" de xem lan
+			// luot tung mat that. Che do ve binh thuong van giu ca 2 mat (mo mat
+			// khong active) de tien doi chieu khi dang chinh sua.
+			if (cleanView && inactiveSideCopper) return;
 			var layer = this.app.state.layers[obj.layer] || {};
 			var drawColor = this.resolveObjectColor(obj, layer);
 			var isRouteDraft = this.isRouteDraftObject(obj);
 			ctx.save();
-			ctx.globalAlpha = Number(layer.opacity || 1) * (this.isInactiveSideCopper(obj) ? 0.32 : 1);
+			ctx.globalAlpha = Number(layer.opacity || 1) * (!cleanView && inactiveSideCopper ? 0.32 : 1);
 			ctx.strokeStyle = drawColor;
 			ctx.fillStyle = drawColor;
 			if (isRouteDraft) {
@@ -631,6 +638,10 @@
 
 	Renderer.prototype.resolveObjectColor = function (obj, layer) {
 		if (obj.type === 'via') return '#d6a94a';
+		// Xem 2D sach mo phong ban render Gerber that: dong luon mau vang-dong,
+		// khong phan biet do/xanh nhu che do ve binh thuong (o do goi la de biet
+		// dang chinh sua lop nao, o day goi la de trong giong PCB thuc).
+		if (this.app.options.cleanView && (obj.layer === 'top_copper' || obj.layer === 'bottom_copper')) return '#d6a94a';
 		if (obj.layer === 'top_copper') return '#e53935';
 		if (obj.layer === 'bottom_copper') return '#1e88e5';
 		if (obj.layer === 'drill') return '#151515';
