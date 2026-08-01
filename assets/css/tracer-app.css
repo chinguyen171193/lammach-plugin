@@ -751,7 +751,31 @@
 }
 
 .dat-easy-library-panel {
-	grid-template-rows: auto auto minmax(0, 1fr);
+	grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.dat-easy-library-tabs {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 6px;
+	padding: 8px 8px 0;
+}
+
+.dat-easy-library-tabs button {
+	min-height: 30px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--eda-muted);
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.dat-easy-library-tabs button:hover,
+.dat-easy-library-tabs button.is-active {
+	border-color: rgba(247,178,61,.34);
+	background: rgba(247,178,61,.08);
+	color: var(--eda-text);
 }
 
 .dat-easy-library-actions {
@@ -760,6 +784,10 @@
 	gap: 6px;
 	padding: 8px;
 	border-bottom: 1px solid var(--eda-line);
+}
+
+.dat-easy-library-actions.is-single-action {
+	grid-template-columns: 1fr;
 }
 
 .dat-easy-library-actions button {
@@ -777,6 +805,10 @@
 	display: grid;
 	grid-template-columns: 118px minmax(0, 1fr);
 	min-height: 0;
+}
+
+.dat-easy-library-body.is-projects {
+	grid-template-columns: minmax(0, 1fr);
 }
 
 .dat-easy-library-folders {
@@ -842,6 +874,11 @@
 .dat-easy-library-item:hover {
 	border-color: rgba(247,178,61,.34);
 	background: rgba(247,178,61,.06);
+}
+
+.dat-easy-library-item.is-active {
+	border-color: rgba(247,178,61,.5);
+	background: rgba(247,178,61,.1);
 }
 
 @media (max-width: 1024px) {

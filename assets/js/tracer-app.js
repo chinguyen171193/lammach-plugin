@@ -612,14 +612,7 @@
 				var btn = el('button', item.name + ' [' + item.code + ']');
 				btn.type = 'button';
 				btn.addEventListener('click', function () {
-					self.projectId = item.id;
-					global.DATPCBTracerStorage.read(item.id).then(function (res) {
-						self.state = res.data;
-						self.normalizeState();
-						self.selected = [];
-						self.activePinId = '';
-						self.renderAll();
-						self.canvas.fit();
+					self.loadProject(item.id).then(function () {
 						qs(self.root, '[data-modal]').hidden = true;
 					});
 				});
@@ -627,6 +620,21 @@
 			});
 			self.showNode(box);
 		}).catch(function (err) { self.showMessage(err.message); });
+	};
+
+	// Tach rieng tu openChooser() de PersonalLibrary co the mo lai 1 du an da
+	// luu ma khong lap logic doc/nap state.
+	App.prototype.loadProject = function (id) {
+		var self = this;
+		this.projectId = id;
+		return global.DATPCBTracerStorage.read(id).then(function (res) {
+			self.state = res.data;
+			self.normalizeState();
+			self.selected = [];
+			self.activePinId = '';
+			self.renderAll();
+			self.canvas.fit();
+		});
 	};
 
 	App.prototype.pointerDown = function (p, event) {

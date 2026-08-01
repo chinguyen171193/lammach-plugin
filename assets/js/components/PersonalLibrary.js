@@ -13,6 +13,8 @@
 		this.key = 'datPCBPersonalLibraryV1';
 		this.data = this.load();
 		this.activeFolder = this.data.folders[0] ? this.data.folders[0].id : 'default';
+		this.activeTab = 'components'; // 'components' | 'projects'
+		this.projects = null;
 		this.executor = new global.DATPCBEditorCommandExecutor(app);
 		this.build();
 		this.bind();
@@ -57,28 +59,33 @@
 		close.setAttribute('data-library-close', '1');
 		header.appendChild(collapse);
 		header.appendChild(close);
-		var actions = el('div', 'dat-easy-library-actions');
+		var tabs = el('div', 'dat-easy-library-tabs');
 		[
-			['folder', 'Thư mục'],
-			['save-selected', 'Lưu linh kiện'],
-			['delete-folder', 'Xóa thư mục']
+			['components', 'Linh kiện'],
+			['projects', 'Dự án']
 		].forEach(function (item) {
 			var button = el('button', '', item[1]);
 			button.type = 'button';
-			button.setAttribute('data-library-action', item[0]);
-			actions.appendChild(button);
-		});
+			button.setAttribute('data-library-tab', item[0]);
+			button.classList.toggle('is-active', item[0] === this.activeTab);
+			tabs.appendChild(button);
+		}, this);
+		this.tabs = tabs;
+		this.actions = el('div', 'dat-easy-library-actions');
 		var body = el('div', 'dat-easy-library-body');
+		this.body = body;
 		this.folderList = el('div', 'dat-easy-library-folders');
 		this.itemList = el('div', 'dat-easy-library-items');
 		body.appendChild(this.folderList);
 		body.appendChild(this.itemList);
 		panel.appendChild(header);
-		panel.appendChild(actions);
+		panel.appendChild(tabs);
+		panel.appendChild(this.actions);
 		panel.appendChild(body);
 		this.panel = panel;
 		this.app.root.appendChild(panel);
 		this.bindDrag(header);
+		this.renderActionsForTab();
 	};
 
 	PersonalLibrary.prototype.bind = function () {
@@ -92,6 +99,11 @@
 			}
 			if (event.target.closest('[data-library-close]')) {
 				this.close();
+				return;
+			}
+			var tab = event.target.closest('[data-library-tab]');
+			if (tab) {
+				this.setActiveTab(tab.getAttribute('data-library-tab'));
 				return;
 			}
 			var action = event.target.closest('[data-library-action]');
@@ -113,6 +125,16 @@
 			var item = event.target.closest('[data-library-item]');
 			if (item) {
 				this.insertItem(item.getAttribute('data-library-item'));
+				return;
+			}
+			var projectRemove = event.target.closest('[data-library-project-remove]');
+			if (projectRemove) {
+				this.removeProject(projectRemove.getAttribute('data-library-project-remove'));
+				return;
+			}
+			var project = event.target.closest('[data-library-project]');
+			if (project) {
+				this.openProject(project.getAttribute('data-library-project'));
 				return;
 			}
 		}.bind(this));
@@ -159,7 +181,7 @@
 
 	PersonalLibrary.prototype.open = function () {
 		this.panel.hidden = false;
-		this.render();
+		this.refreshActiveTab();
 		this.keepInViewport();
 		global.setTimeout(this.keepInViewport.bind(this), 180);
 	};
@@ -172,6 +194,102 @@
 		if (action === 'folder') this.createFolder();
 		if (action === 'save-selected') this.saveSelectedComponent();
 		if (action === 'delete-folder') this.deleteActiveFolder();
+		if (action === 'save-project') this.saveCurrentProject();
+	};
+
+	// Tab "Linh kien" dung du lieu localStorage (folders/items) nhu cu; tab
+	// "Du an" doc/ghi qua REST du an co san (DATPCBTracerStorage) - khong dung
+	// chung kho luu voi linh kien.
+	PersonalLibrary.prototype.setActiveTab = function (tab) {
+		if (tab !== 'components' && tab !== 'projects') return;
+		this.activeTab = tab;
+		this.tabs.querySelectorAll('[data-library-tab]').forEach(function (button) {
+			button.classList.toggle('is-active', button.getAttribute('data-library-tab') === tab);
+		});
+		this.renderActionsForTab();
+		this.refreshActiveTab();
+	};
+
+	PersonalLibrary.prototype.refreshActiveTab = function () {
+		if (this.activeTab === 'projects') this.loadProjects();
+		else this.render();
+	};
+
+	PersonalLibrary.prototype.renderActionsForTab = function () {
+		this.actions.textContent = '';
+		this.actions.classList.toggle('is-single-action', this.activeTab === 'projects');
+		this.body.classList.toggle('is-projects', this.activeTab === 'projects');
+		this.folderList.hidden = this.activeTab === 'projects';
+		var buttons = this.activeTab === 'projects'
+			? [['save-project', 'Lưu dự án hiện tại']]
+			: [['folder', 'Thư mục'], ['save-selected', 'Lưu linh kiện'], ['delete-folder', 'Xóa thư mục']];
+		buttons.forEach(function (item) {
+			var button = el('button', '', item[1]);
+			button.type = 'button';
+			button.setAttribute('data-library-action', item[0]);
+			this.actions.appendChild(button);
+		}, this);
+	};
+
+	PersonalLibrary.prototype.loadProjects = function () {
+		this.itemList.textContent = '';
+		this.itemList.appendChild(el('div', 'dat-easy-empty', 'Đang tải danh sách dự án...'));
+		var self = this;
+		global.DATPCBTracerStorage.list().then(function (items) {
+			self.projects = items;
+			self.renderProjects();
+		}).catch(function (err) {
+			self.app.showMessage(err.message);
+			self.itemList.textContent = '';
+			self.itemList.appendChild(el('div', 'dat-easy-empty', 'Không tải được danh sách dự án.'));
+		});
+	};
+
+	PersonalLibrary.prototype.renderProjects = function () {
+		this.itemList.textContent = '';
+		var items = this.projects || [];
+		if (!items.length) {
+			this.itemList.appendChild(el('div', 'dat-easy-empty', 'Chưa có dự án nào trong thư viện.'));
+			return;
+		}
+		items.forEach(function (item) {
+			var row = el('div', 'dat-easy-library-item');
+			row.classList.toggle('is-active', item.id === this.app.projectId);
+			var main = el('button', '', item.name + ' · ' + String(item.modified || '').slice(0, 10));
+			main.type = 'button';
+			main.setAttribute('data-library-project', item.id);
+			var remove = el('button', 'dat-easy-icon-button', '×');
+			remove.type = 'button';
+			remove.setAttribute('data-library-project-remove', item.id);
+			row.appendChild(main);
+			row.appendChild(remove);
+			this.itemList.appendChild(row);
+		}, this);
+	};
+
+	PersonalLibrary.prototype.openProject = function (id) {
+		var self = this;
+		this.app.loadProject(Number(id)).then(function () {
+			self.close();
+		}).catch(function (err) { self.app.showMessage(err.message); });
+	};
+
+	PersonalLibrary.prototype.removeProject = function (id) {
+		id = Number(id);
+		if (!global.confirm('Xóa dự án này khỏi thư viện? Không thể hoàn tác.')) return;
+		var self = this;
+		global.DATPCBTracerStorage.remove(id).then(function () {
+			self.projects = (self.projects || []).filter(function (p) { return p.id !== id; });
+			if (self.app.projectId === id) self.app.projectId = 0;
+			self.renderProjects();
+		}).catch(function (err) { self.app.showMessage(err.message); });
+	};
+
+	PersonalLibrary.prototype.saveCurrentProject = function () {
+		var self = this;
+		this.app.save().then(function () {
+			self.loadProjects();
+		});
 	};
 
 	PersonalLibrary.prototype.createFolder = function () {
