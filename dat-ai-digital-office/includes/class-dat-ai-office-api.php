@@ -21,7 +21,7 @@ class DAT_AI_Office_API {
 	}
 	public function status() {
 		$data = DAT_AI_Office::dataset();
-		return rest_ensure_response( array( 'company' => $data['settings']['company_name'], 'online_staff' => count( array_filter( $data['agents'], static fn( $agent ) => 'human' === $agent['type'] ) ), 'online_ai' => count( array_filter( $data['agents'], static fn( $agent ) => 'ai' === $agent['type'] ) ), 'active_tasks' => $this->task_count( 'in_progress' ), 'completed_tasks' => $this->task_count( 'completed' ), 'efficiency' => 92, 'saved_minutes' => 186 ) );
+		return rest_ensure_response( array( 'plugin_version' => DAT_AI_OFFICE_VERSION, 'build' => DAT_AI_OFFICE_BUILD, 'company' => $data['settings']['company_name'], 'departments' => count( $data['departments'] ), 'online_staff' => count( array_filter( $data['agents'], static fn( $agent ) => 'human' === $agent['type'] ) ), 'online_ai' => count( array_filter( $data['agents'], static fn( $agent ) => 'ai' === $agent['type'] ) ), 'workflows' => count( $data['workflows'] ), 'active_tasks' => $this->task_count( 'in_progress' ), 'completed_tasks' => $this->task_count( 'completed' ), 'efficiency' => 92, 'saved_minutes' => 186 ) );
 	}
 	public function departments() { return rest_ensure_response( DAT_AI_Office::dataset()['departments'] ); }
 	public function agents() { return rest_ensure_response( DAT_AI_Office::dataset()['agents'] ); }
