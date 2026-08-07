@@ -29,7 +29,7 @@ Mỗi Agent cũng khai báo một anchor cố định:
 
 `anchorX` là tâm ngang và `anchorY` là baseline ở đáy vùng nhìn thấy. Mọi frame được căn vào anchor này ngay trong PNG, vì vậy khi state đổi thì card, desk và sprite area không di chuyển.
 
-Ba Agent thử nghiệm `supervisor-ai`, `sale-ai` và `pcb-engineer` dùng skeletal rig SVG để chuyển động ổn định. Mỗi rig tải thêm `portrait.png` 512×512 nền trong suốt để tạo khuôn mặt 3D life-simulation riêng, còn cơ thể và thiết bị tiếp tục chuyển động theo state. Các sprite PNG vẫn được giữ làm nguồn thay thế và để bật lại chế độ sprite sau này. Nếu rig hoặc asset không tải được, `AgentSpritePlayer` giữ nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
+`supervisor-ai` và `sale-ai` tiếp tục dùng skeletal rig SVG ổn định. Riêng `pcb-engineer` là nguyên mẫu nhân vật 3D toàn thân: đầu, thân, tay và chân là các khớp riêng, được Three.js render trực tiếp trong card. Các sprite PNG và `portrait.png` vẫn được giữ làm nguồn thay thế. Nếu WebGL không khả dụng, `AgentSpritePlayer` tự quay về skeletal rig SVG; card không bị trắng hoặc hỏng.
 
 | State | File | Frame | FPS | Loop |
 | --- | --- | ---: | ---: | --- |
@@ -54,13 +54,23 @@ Ba Agent thử nghiệm `supervisor-ai`, `sale-ai` và `pcb-engineer` dùng skel
 
 ### Chế độ skeletal rig không giật hình
 
-Ba Agent mẫu dùng `playback: "rig"`. Player dựng nhân vật 2.5D bằng SVG nhiều lớp; bàn và màn hình đứng yên, trong khi đầu, mắt, tay, chuột, bàn phím và thiết bị được chuyển động độc lập. Chế độ này không đổi ảnh, không làm mờ và không scale toàn bộ nhân vật nên không có hiện tượng co giãn giữa các frame:
+Supervisor AI và Sale AI dùng `playback: "rig"`. Player dựng nhân vật 2.5D bằng SVG nhiều lớp; bàn và màn hình đứng yên, trong khi đầu, mắt, tay, chuột, bàn phím và thiết bị được chuyển động độc lập. Chế độ này không đổi ảnh, không làm mờ và không scale toàn bộ nhân vật nên không có hiện tượng co giãn giữa các frame:
 
 ```json
 "playback": "rig"
 ```
 
-State, progress, task và Demo Agent vẫn hoạt động. `idle`, `working`, `reviewing` và `done` điều khiển các animation CSS khác nhau. Animation tự pause khi card ra ngoài màn hình hoặc tab trình duyệt bị ẩn. Khi có sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, có thể đổi `playback` thành `sprite` để dùng lại sprite sheet.
+### Nguyên mẫu nhân vật 3D toàn thân
+
+Gerber AI dùng `playback: "three"`. `public/js/agent-3d.js` tạo một nhân vật kỹ sư PCB toàn thân, ghế, bàn, màn hình, bàn phím, chuột và PCB trong một scene WebGL cố định. Mọi trạng thái chỉ thay đổi góc khớp rồi nội suy theo thời gian; canvas và camera không đổi nên hình không co, mờ hoặc nhảy frame:
+
+```json
+"playback": "three"
+```
+
+`idle` có thở và chớp mắt; `working` điều khiển hai tay, chuột, bàn phím và hướng nhìn; `reviewing` nghiêng người quan sát PCB; `done` đưa tay báo hoàn thành. Renderer tự dừng khi card ra ngoài viewport hoặc tab bị ẩn. Three.js 0.128.0 được đóng gói trong `public/js/vendor/`, không dùng CDN.
+
+State, progress, task và Demo Agent vẫn hoạt động. Animation tự pause khi card ra ngoài màn hình hoặc tab trình duyệt bị ẩn. Khi có sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, có thể đổi `playback` thành `sprite` để dùng lại sprite sheet.
 
 ## Kiểm tra alignment
 

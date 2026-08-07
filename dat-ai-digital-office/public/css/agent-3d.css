@@ -1,0 +1,61 @@
+.dat-agent-sprite__surface.is-agent-3d {
+	background: none !important;
+	contain: strict;
+}
+
+.dat-agent-sprite.has-agent-3d .dat-agent-sprite__fallback {
+	display: none;
+}
+
+.dat-agent-3d__canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	outline: 0;
+	image-rendering: auto;
+	touch-action: none;
+}
+
+.dat-agent-sprite.has-agent-3d::before {
+	content: '';
+	position: absolute;
+	inset: 7% 4% 3%;
+	pointer-events: none;
+	border-radius: 44% 44% 18% 18%;
+	background: radial-gradient(circle at 50% 72%, rgba(38, 225, 180, .1), transparent 58%);
+}
+
+.dat-agent-sprite.has-agent-3d::after {
+	content: '3D';
+	position: absolute;
+	z-index: 3;
+	right: 9px;
+	bottom: 9px;
+	padding: 2px 5px;
+	border: 1px solid rgba(81, 233, 202, .38);
+	border-radius: 5px;
+	color: #74efd5;
+	background: rgba(4, 18, 30, .7);
+	font-size: 8px;
+	font-weight: 700;
+	letter-spacing: .08em;
+}
+
+.dat-ai-office-agent-card[data-agent-state="done"] .dat-agent-sprite.has-agent-3d::after {
+	content: '✓';
+	top: auto;
+	display: grid;
+	width: 25px;
+	height: 25px;
+	padding: 0;
+	place-items: center;
+	border: 0;
+	border-radius: 50%;
+	color: #052516;
+	background: #4ce995;
+	font-size: 15px;
+}
+
+@media (max-width: 640px) {
+	.dat-agent-3d__canvas { max-width: 100%; }
+}

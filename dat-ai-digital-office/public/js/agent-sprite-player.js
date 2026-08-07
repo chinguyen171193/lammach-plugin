@@ -120,6 +120,12 @@
 
 		preloadStates() {
 			if (this.config.placeholder || !this.config.states) return Promise.resolve();
+			if (this.playbackMode(this.config.states[this.state]) === 'three') {
+				return preloadImage(this.portraitSource()).then(loaded => {
+					this.portraitLoaded = loaded;
+					return loaded;
+				});
+			}
 			if (this.playbackMode(this.config.states[this.state]) === 'rig') {
 				return preloadImage(this.portraitSource()).then(loaded => {
 					this.portraitLoaded = loaded;
@@ -171,20 +177,29 @@
 			this.frame = playback === 'stable' ? this.stableFrame(visualDefinition, frames) : 0;
 			this.elapsed = 0;
 			this.doneDelay = 0;
-			const source = this.config.placeholder || playback === 'rig' ? '' : imageUrl(this.options.assetBase, this.spriteId, visualDefinition.image, this.options.assetVersion);
+			const source = this.config.placeholder || playback === 'rig' || playback === 'three' ? '' : imageUrl(this.options.assetBase, this.spriteId, visualDefinition.image, this.options.assetVersion);
 			this.element.dataset.spriteState = this.state;
 			this.element.dataset.spritePlayback = playback;
 			this.element.style.setProperty('--agent-frame-count', frames);
 			this.element.style.setProperty('--agent-frame', String(this.frame));
-			const rigReady = playback === 'rig' ? this.ensureRig() : false;
-			if (playback !== 'rig') this.removeRig();
+			let rigReady = false;
+			let threeReady = false;
+			if (playback === 'three') {
+				threeReady = this.ensureThree();
+				if (!threeReady) rigReady = this.ensureRig();
+			} else if (playback === 'rig') {
+				rigReady = this.ensureRig();
+			}
+			if (playback !== 'rig' && !rigReady) this.removeRig();
+			if (playback !== 'three') this.removeThree();
 			this.sprite.style.backgroundImage = source ? 'url("' + source.replace(/"/g, '%22') + '")' : 'none';
 			this.element.classList.toggle('has-sprite-image', Boolean(source));
 			this.element.classList.toggle('has-agent-rig', rigReady);
+			this.element.classList.toggle('has-agent-3d', threeReady);
 			this.element.classList.toggle('is-stable-playback', playback === 'stable');
 			this.element.dataset.spriteInitialized = '1';
 			if (source) this.usePreloadedSource(source);
-			else this.element.classList.toggle('is-sprite-ready', rigReady);
+			else this.element.classList.toggle('is-sprite-ready', rigReady || threeReady);
 			this.renderFrame();
 			this.syncCard();
 			this.syncAnimationState();
@@ -200,6 +215,19 @@
 			return true;
 		}
 
+		ensureThree() {
+			if (this.threeCharacter) {
+				this.threeCharacter.setState(this.state);
+				return true;
+			}
+			if (this.spriteId !== 'pcb-engineer' || !global.DAT_Agent3D || typeof global.DAT_Agent3D.create !== 'function') return false;
+			this.removeRig();
+			this.threeCharacter = global.DAT_Agent3D.create(this.sprite, { state: this.state });
+			if (!this.threeCharacter) return false;
+			this.sprite.classList.add('is-agent-3d');
+			return true;
+		}
+
 		portraitSource() {
 			return imageUrl(this.options.assetBase, this.spriteId, 'portrait.png', this.options.assetVersion);
 		}
@@ -209,6 +237,14 @@
 			this.sprite.replaceChildren();
 			this.sprite.classList.remove('is-agent-rig');
 			this.rigMounted = false;
+		}
+
+		removeThree() {
+			if (!this.threeCharacter) return;
+			this.threeCharacter.destroy();
+			this.threeCharacter = null;
+			this.sprite.classList.remove('is-agent-3d');
+			this.element.classList.remove('has-agent-3d');
 		}
 
 		usePreloadedSource(source) {
@@ -237,7 +273,9 @@
 		play() { this.running = true; this.syncAnimationState(); startScheduler(); return this; }
 		pause() { this.running = false; this.syncAnimationState(); return this; }
 		syncAnimationState() {
-			this.element.classList.toggle('is-animation-paused', !this.running || !this.inViewport || document.hidden);
+			const paused = !this.running || !this.inViewport || document.hidden;
+			this.element.classList.toggle('is-animation-paused', paused);
+			if (this.threeCharacter) this.threeCharacter.setPaused(paused);
 		}
 		stop() {
 			this.running = false;
@@ -269,7 +307,7 @@
 
 		playbackMode(definition) {
 			const mode = String((definition && definition.playback) || this.config.playback || 'sprite').toLowerCase();
-			return mode === 'stable' || mode === 'rig' ? mode : 'sprite';
+			return mode === 'stable' || mode === 'rig' || mode === 'three' ? mode : 'sprite';
 		}
 
 		needsScheduler() {
@@ -302,7 +340,7 @@
 			const frames = Math.max(1, Number(definition.frames) || 1);
 			const elapsedMs = Math.max(0, delta * 1000);
 			const playback = this.playbackMode(definition);
-			if (playback === 'rig' || playback === 'stable') {
+			if (playback === 'rig' || playback === 'three' || playback === 'stable') {
 				if (!definition.loop && this.state === 'done') {
 					this.doneDelay += elapsedMs;
 					const holdLast = Math.max(1000, Number(definition.holdLast) || 1400);
@@ -339,7 +377,7 @@
 
 		renderFrame() {
 			const stateDefinition = this.config.states[this.state] || this.config.states.idle;
-			if (this.playbackMode(stateDefinition) === 'rig') return;
+			if (this.playbackMode(stateDefinition) === 'rig' || this.playbackMode(stateDefinition) === 'three') return;
 			const definition = this.visualDefinition(stateDefinition);
 			const frames = Math.max(1, Number(definition && definition.frames) || 1);
 			const frameWidth = Math.max(1, Number(this.config.frameWidth) || 320);
@@ -369,6 +407,7 @@
 			players.delete(this);
 			if (this.observer) this.observer.disconnect();
 			if (this.resizeObserver) this.resizeObserver.disconnect();
+			this.removeThree();
 			this.removeRig();
 			if (this.agentId && registry.has(this.agentId)) registry.get(this.agentId).delete(this);
 		}

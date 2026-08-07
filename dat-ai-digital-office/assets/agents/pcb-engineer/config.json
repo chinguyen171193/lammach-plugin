@@ -5,7 +5,7 @@
   "frameHeight": 400,
   "anchorX": 160,
   "anchorY": 345,
-  "playback": "rig",
+  "playback": "three",
   "states": {
     "idle": { "image": "idle.png", "frames": 8, "fps": 5, "loop": true, "frameDurations": [190, 180, 230, 260, 180, 220, 280, 420] },
     "working": { "image": "working.png", "frames": 12, "fps": 8, "loop": true, "frameDurations": [120, 120, 120, 130, 140, 150, 750, 120, 120, 130, 180, 420] },
