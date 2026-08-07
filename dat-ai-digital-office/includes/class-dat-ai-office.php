@@ -145,8 +145,36 @@ final class DAT_AI_Office {
 		if ( empty( $workflows ) ) {
 			$workflows = self::demo_workflows();
 		}
+		$agents = array_map(
+			static function ( $agent ) {
+				$agent['sprite'] = self::agent_sprite_id( $agent );
+				return $agent;
+			},
+			$agents
+		);
 		self::$dataset = array( 'departments' => $departments, 'agents' => $agents, 'workflows' => $workflows, 'settings' => self::public_settings() );
 		return self::$dataset;
+	}
+
+	/**
+	 * Maps an Agent record to an asset-folder identifier. Animation metadata stays
+	 * in that folder's config.json, rather than being embedded in business logic.
+	 *
+	 * @param array $agent Agent data.
+	 * @return string
+	 */
+	public static function agent_sprite_id( $agent ) {
+		if ( ! empty( $agent['sprite'] ) ) {
+			return sanitize_key( $agent['sprite'] );
+		}
+
+		$mapping = array(
+			'ai_1' => 'supervisor-ai',
+			'ai_2' => 'sale-ai',
+			'ai_3' => 'pcb-engineer',
+		);
+
+		return $mapping[ $agent['id'] ?? '' ] ?? sanitize_key( $agent['id'] ?? '_placeholder' );
 	}
 
 	public static function public_settings() {

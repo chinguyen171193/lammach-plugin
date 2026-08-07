@@ -1,0 +1,12 @@
+{
+  "id": "_placeholder",
+  "placeholder": true,
+  "frameWidth": 320,
+  "frameHeight": 400,
+  "states": {
+    "idle": { "image": "", "frames": 6, "fps": 4, "loop": true },
+    "working": { "image": "", "frames": 8, "fps": 8, "loop": true },
+    "reviewing": { "image": "", "frames": 6, "fps": 5, "loop": true },
+    "done": { "image": "", "frames": 6, "fps": 6, "loop": false }
+  }
+}
