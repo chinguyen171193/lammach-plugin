@@ -24,5 +24,11 @@ class DAT_AI_Office_Assets {
 		wp_enqueue_style( 'dat-ai-office-admin', DAT_AI_OFFICE_URL . 'admin/css/admin.css', array(), DAT_AI_OFFICE_VERSION );
 		wp_enqueue_script( 'dat-ai-office-admin', DAT_AI_OFFICE_URL . 'admin/js/admin.js', array( 'jquery' ), DAT_AI_OFFICE_VERSION, true );
 		wp_localize_script( 'dat-ai-office-admin', 'DAT_AI_OFFICE_ADMIN', array( 'nonce' => wp_create_nonce( DAT_AI_OFFICE_NONCE ), 'restUrl' => esc_url_raw( rest_url( 'dat-ai-office/v1/' ) ) ) );
+
+		// The preview contains the shortcode but is rendered after admin_head.
+		// Queue its public renderer here so both CSS and JavaScript are printed.
+		if ( 'dat-ai-office_page_dat-ai-office-preview' === $hook ) {
+			$this->public_assets();
+		}
 	}
 }
