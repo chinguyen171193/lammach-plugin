@@ -19,6 +19,15 @@ assets/agents/
 
 Mỗi PNG là một hàng ngang, nền trong suốt. Mỗi frame luôn là `320 × 400px`; chiều rộng file là số frame nhân `320px`. `config.json` là nơi duy nhất mô tả số frame, FPS, loop và nhịp riêng của từng frame. `AgentSpritePlayer` đọc config, dùng `background-position` để đổi frame và dùng một requestAnimationFrame dùng chung cho mọi Agent.
 
+Mỗi Agent cũng khai báo một anchor cố định:
+
+```json
+"anchorX": 160,
+"anchorY": 345
+```
+
+`anchorX` là tâm ngang và `anchorY` là baseline ở đáy vùng nhìn thấy. Mọi frame được căn vào anchor này ngay trong PNG, vì vậy khi state đổi thì card, desk và sprite area không di chuyển.
+
 Ba Agent thử nghiệm đã dùng sprite PNG thật: `supervisor-ai`, `sale-ai` và `pcb-engineer`. Các config của chúng đặt `"placeholder": false` để ưu tiên sprite. Nếu file không tải được, `AgentSpritePlayer` tự trả về nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
 
 | State | File | Frame | FPS | Loop |
@@ -40,11 +49,27 @@ Ba Agent thử nghiệm đã dùng sprite PNG thật: `supervisor-ai`, `sale-ai`
 }
 ```
 
+`frameOffsets` là tùy chọn chỉ dành cho asset bên thứ ba chưa được bake anchor. Đây là mảng `{ "x": 0, "y": 0 }` theo pixel gốc của một frame; giá trị dương di chuyển hình hiển thị sang phải/xuống dưới. Không cần khai báo cho ba Agent mẫu vì các PNG đã được căn sẵn.
+
+## Kiểm tra alignment
+
+Hai utility phát triển nằm trong `tools/`, không được tải bởi WordPress:
+
+```bash
+python -m pip install pillow
+python tools/check-agent-sprites.py --strict
+python tools/align-agent-sprites.py --scale 0.88 --normalize-height --write
+```
+
+`check-agent-sprites.py` kiểm tra kích thước sheet, alpha canvas, bounding box, tâm nhân vật và baseline giữa các frame. Utility báo lỗi nếu file thiếu/sai kích thước, và cảnh báo nếu tâm lệch quá 8px, tâm dọc quá 12px hoặc baseline lệch quá 6px.
+
 ## Thêm Agent mới
 
 1. Tạo `assets/agents/ten-agent/config.json`, theo mẫu `pcb-engineer/config.json`.
 2. Thêm bốn PNG sprite sheet vào cùng thư mục, đúng tên `idle.png`, `working.png`, `reviewing.png`, `done.png`. Chuẩn hiện tại là `idle: 8`, `working: 12`, `reviewing: 8`, `done: 6` frame; mỗi frame `320 × 400px`, nền PNG trong suốt.
 3. Đặt `sprite: "ten-agent"` trong dữ liệu Agent. Nếu không đặt, plugin dùng ID Agent làm tên thư mục; vì vậy Agent ID `quality-ai` tự tìm `assets/agents/quality-ai/config.json`.
+
+Khi tạo lại asset, khóa hoàn toàn camera angle, desk, chair và monitor position; chỉ thay đổi tay, mắt, đầu hoặc PCB. Để trống ít nhất 20px nền trong suốt quanh subject, không crop bàn/chân/monitor. Sau khi export, chạy utility kiểm tra trước khi thay PNG.
 
 Đặt `"placeholder": false` khi bốn PNG đã sẵn sàng. Không cần thêm code animation riêng. Các state được chuẩn hóa như sau:
 
@@ -68,7 +93,7 @@ updateAgentTask('ai_3', 'Phân tích Gerber', 65);
 
 ## Demo
 
-Vào **DAT AI Office → Nhân viên và AI Agent**, bấm **Demo Agent**. Demo chạy chuỗi: idle → working (10–80%) → reviewing → done → idle cho Gerber AI và cập nhật nhật ký ngay trên trang.
+Vào **DAT AI Office → Nhân viên và AI Agent**, bấm **Demo Agent**. Demo chạy: idle 2 giây → working 8 giây (10–80%) → reviewing 4 giây → done 2 giây → idle cho Gerber AI và cập nhật nhật ký ngay trên trang.
 
 ## Kết nối dữ liệu thật
 

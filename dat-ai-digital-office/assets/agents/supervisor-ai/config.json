@@ -3,6 +3,8 @@
   "placeholder": false,
   "frameWidth": 320,
   "frameHeight": 400,
+  "anchorX": 160,
+  "anchorY": 345,
   "states": {
     "idle": { "image": "idle.png", "frames": 8, "fps": 5, "loop": true, "frameDurations": [220, 200, 240, 360, 200, 240, 300, 480] },
     "working": { "image": "working.png", "frames": 12, "fps": 8, "loop": true, "frameDurations": [180, 180, 170, 140, 180, 260, 800, 180, 180, 160, 250, 440] },

@@ -126,12 +126,17 @@
 		}
 
 		observe() {
-			if (!('IntersectionObserver' in global)) return;
-			this.observer = new IntersectionObserver(entries => {
-				this.inViewport = entries.some(entry => entry.isIntersecting);
-				if (this.inViewport) startScheduler();
-			}, { threshold: 0.05 });
-			this.observer.observe(this.element);
+			if ('IntersectionObserver' in global) {
+				this.observer = new IntersectionObserver(entries => {
+					this.inViewport = entries.some(entry => entry.isIntersecting);
+					if (this.inViewport) startScheduler();
+				}, { threshold: 0.05 });
+				this.observer.observe(this.element);
+			}
+			if ('ResizeObserver' in global) {
+				this.resizeObserver = new ResizeObserver(() => this.renderFrame());
+				this.resizeObserver.observe(this.sprite);
+			}
 		}
 
 		register() {
@@ -151,18 +156,16 @@
 			this.elapsed = 0;
 			this.doneDelay = 0;
 			const definition = this.config.states[this.state] || this.config.states.idle || placeholderConfig.states.idle;
-			const frames = Math.max(1, Number(definition.frames) || 1);
 			const source = this.config.placeholder ? '' : imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
 			this.element.dataset.spriteState = this.state;
 			this.element.style.setProperty('--agent-frame-count', frames);
 			this.element.style.setProperty('--agent-frame', '0');
-			this.sprite.style.backgroundSize = (frames * 100) + '% 100%';
-			this.sprite.style.backgroundPosition = '0 0';
 			this.sprite.style.backgroundImage = source ? 'url("' + source.replace(/"/g, '%22') + '")' : 'none';
 			this.element.classList.toggle('has-sprite-image', Boolean(source));
 			this.element.dataset.spriteInitialized = '1';
 			if (source) this.usePreloadedSource(source);
 			else this.element.classList.remove('is-sprite-ready');
+			this.renderFrame();
 			this.syncCard();
 			startScheduler();
 		}
@@ -201,6 +204,15 @@
 			return 1000 / Math.max(1, Number(definition && definition.fps) || 1);
 		}
 
+		frameOffset(definition, frame) {
+			const offsets = definition && Array.isArray(definition.frameOffsets) ? definition.frameOffsets : [];
+			const offset = offsets[frame] || {};
+			return {
+				x: Number.isFinite(Number(offset.x)) ? Number(offset.x) : 0,
+				y: Number.isFinite(Number(offset.y)) ? Number(offset.y) : 0
+			};
+		}
+
 		tick(delta) {
 			if (this.destroyed || !this.running || !this.inViewport || document.hidden || !this.config.states) return;
 			const definition = this.config.states[this.state] || this.config.states.idle;
@@ -237,10 +249,18 @@
 		renderFrame() {
 			const definition = this.config.states[this.state] || this.config.states.idle;
 			const frames = Math.max(1, Number(definition && definition.frames) || 1);
-			const position = frames > 1 ? (this.frame / (frames - 1)) * 100 : 0;
+			const frameWidth = Math.max(1, Number(this.config.frameWidth) || 320);
+			const frameHeight = Math.max(1, Number(this.config.frameHeight) || 400);
+			const renderWidth = this.sprite.clientWidth || frameWidth;
+			const renderHeight = this.sprite.clientHeight || frameHeight;
+			const scaleX = renderWidth / frameWidth;
+			const scaleY = renderHeight / frameHeight;
+			const offset = this.frameOffset(definition, this.frame);
+			const positionX = (-this.frame * frameWidth * scaleX) + (offset.x * scaleX);
+			const positionY = offset.y * scaleY;
 			this.element.style.setProperty('--agent-frame', this.frame);
-			this.sprite.style.backgroundPosition = position + '% 0';
-			this.sprite.style.backgroundSize = (frames * 100) + '% 100%';
+			this.sprite.style.backgroundPosition = positionX + 'px ' + positionY + 'px';
+			this.sprite.style.backgroundSize = (frameWidth * frames * scaleX) + 'px ' + (frameHeight * scaleY) + 'px';
 		}
 
 		syncCard() {
@@ -255,6 +275,7 @@
 			this.destroyed = true;
 			players.delete(this);
 			if (this.observer) this.observer.disconnect();
+			if (this.resizeObserver) this.resizeObserver.disconnect();
 			if (this.agentId && registry.has(this.agentId)) registry.get(this.agentId).delete(this);
 		}
 	}

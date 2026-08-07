@@ -49,12 +49,12 @@
 		addLog('Gerber AI bắt đầu phân tích DRC.', 'new_gerber');
 		for (let progress = 10; progress <= 80; progress += 10) {
 			global.updateAgentTask(agentId, 'Phân tích Gerber và kiểm tra DRC', progress);
-			await wait(750);
+			await wait(1000);
 		}
-		await wait(750);
+		await wait(1000);
 		global.updateAgentState(agentId, 'reviewing');
 		addLog('PCB Engineer đang rà soát kết quả phân tích.', 'gerber_checked');
-		await wait(3000);
+		await wait(4000);
 		global.updateAgentState(agentId, 'done');
 		global.updateAgentTask(agentId, 'Đã hoàn thành kiểm tra Gerber', 100);
 		addLog('Gerber AI đã hoàn thành và gửi kết quả.', 'gerber_checked');
