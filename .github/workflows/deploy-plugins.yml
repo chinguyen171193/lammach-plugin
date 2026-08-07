@@ -65,7 +65,7 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./dat-pcb-image-tracer/
-          server-dir: /domains/lammach.shop/public_html/wp-content/plugins/dat-pcb-image-tracer/
+          server-dir: /public_html/wp-content/plugins/dat-pcb-image-tracer/
           dangerous-clean-slate: false
 
   deploy-cty:
@@ -85,7 +85,7 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./cty-1-nguoi/
-          server-dir: /domains/lammach.shop/public_html/wp-content/plugins/cty-1-nguoi/
+          server-dir: /public_html/wp-content/plugins/cty-1-nguoi/
           dangerous-clean-slate: false
 
   deploy-ai-office:
@@ -105,5 +105,5 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./dat-ai-digital-office/
-          server-dir: /domains/lammach.shop/public_html/wp-content/plugins/dat-ai-digital-office/
+          server-dir: /public_html/wp-content/plugins/dat-ai-digital-office/
           dangerous-clean-slate: false
