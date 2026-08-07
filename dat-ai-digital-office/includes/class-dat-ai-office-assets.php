@@ -27,7 +27,8 @@ class DAT_AI_Office_Assets {
 
 		// The preview contains the shortcode but is rendered after admin_head.
 		// Queue its public renderer here so both CSS and JavaScript are printed.
-		if ( false !== strpos( (string) $hook, 'preview' ) ) {
+		$current_page = sanitize_key( $_GET['page'] ?? '' );
+		if ( 'dat-ai-office-preview' === $current_page || false !== strpos( (string) $hook, 'preview' ) ) {
 			$this->public_assets( false );
 		}
 	}
