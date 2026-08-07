@@ -12,6 +12,7 @@
 .dat-agent-rig__status-light { transform-box: view-box; }
 .dat-agent-rig__body { transform-origin: 135px 244px; }
 .dat-agent-rig__head { transform-origin: 135px 171px; }
+.dat-agent-rig__portrait { pointer-events: none; filter: drop-shadow(0 5px 5px rgba(0, 0, 0, .22)); }
 .dat-agent-rig__eyes { transform-origin: 137px 143px; }
 .dat-agent-rig__arm--left { transform-origin: 108px 193px; }
 .dat-agent-rig__arm--right { transform-origin: 158px 191px; }

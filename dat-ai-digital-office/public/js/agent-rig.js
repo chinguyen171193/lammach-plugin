@@ -4,10 +4,14 @@
 	let instance = 0;
 
 	const profiles = {
-		'supervisor-ai': { variant: 'supervisor', shirt: '#173d68', accent: '#55dcff', skin: '#d89b72', hair: '#17202d' },
-		'sale-ai': { variant: 'sale', shirt: '#b9dced', accent: '#55dcff', skin: '#e3ad87', hair: '#20242d' },
-		'pcb-engineer': { variant: 'pcb', shirt: '#17486a', accent: '#43e0b3', skin: '#d89b72', hair: '#17202d' }
+		'supervisor-ai': { variant: 'supervisor', shirt: '#173d68', accent: '#55dcff', skin: '#d89b72', hair: '#17202d', portraitFlip: false },
+		'sale-ai': { variant: 'sale', shirt: '#b9dced', accent: '#55dcff', skin: '#e3ad87', hair: '#20242d', portraitFlip: false },
+		'pcb-engineer': { variant: 'pcb', shirt: '#17486a', accent: '#43e0b3', skin: '#d89b72', hair: '#17202d', portraitFlip: true }
 	};
+
+	function escapeAttribute(value) {
+		return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	}
 
 	function screenMarkup(variant, accent) {
 		if (variant === 'supervisor') {
@@ -36,10 +40,11 @@
 		return `<g class="dat-agent-rig__role-detail" transform="translate(219 206)"><circle r="18" fill="#0a263a" stroke="${accent}" stroke-width="2"/><path class="dat-agent-rig__screen-data" d="M-9 3l6-7 5 4 8-10" fill="none" stroke="${accent}" stroke-width="3"/></g>`;
 	}
 
-	function markup(spriteId) {
+	function markup(spriteId, portraitUrl) {
 		const profile = profiles[spriteId] || profiles['supervisor-ai'];
 		const id = `dat-agent-rig-${++instance}`;
 		const isSale = profile.variant === 'sale';
+		const portrait = portraitUrl ? `<image class="dat-agent-rig__portrait" href="${escapeAttribute(portraitUrl)}" x="73" y="65" width="124" height="124" preserveAspectRatio="xMidYMid meet"${profile.portraitFlip ? ' transform="translate(270 0) scale(-1 1)"' : ''}/>` : '';
 
 		return `<svg class="dat-agent-rig dat-agent-rig--${profile.variant}" viewBox="0 0 320 400" role="img" aria-label="Nhân vật Agent hoạt hình">
 			<defs>
@@ -53,10 +58,7 @@
 			<g class="dat-agent-rig__legs"><path d="M119 245c2 30 17 55 24 85" fill="none" stroke="#172d48" stroke-width="24" stroke-linecap="round"/><path d="M151 244c13 28 22 55 20 84" fill="none" stroke="#11243b" stroke-width="24" stroke-linecap="round"/><path d="M133 334h28M161 334h29" stroke="#241f22" stroke-width="12" stroke-linecap="round"/></g>
 			<g class="dat-agent-rig__body"><path d="M103 181c12-14 50-17 63 2l14 67H91z" fill="url(#${id}-shirt)" stroke="#43627a" stroke-width="3"/><path d="M111 205h49" stroke="${profile.accent}" stroke-opacity=".35" stroke-width="3"/></g>
 			<g class="dat-agent-rig__head">
-				<ellipse cx="135" cy="143" rx="31" ry="37" fill="${profile.skin}"/>
-				${isSale ? `<path d="M104 145c-2-35 15-52 34-52 31 0 42 27 31 65l-12-4c6-28-1-45-20-46-14 0-23 13-23 37z" fill="${profile.hair}"/><path d="M107 134c-8 25-3 55 15 67" fill="none" stroke="${profile.hair}" stroke-width="13" stroke-linecap="round"/>` : `<path d="M105 137c1-31 15-44 34-44 22 0 34 13 34 34-15-11-36-14-62-5z" fill="${profile.hair}"/>`}
-				<g class="dat-agent-rig__eyes"><ellipse cx="126" cy="143" rx="3" ry="2" fill="#14202b"/><ellipse cx="148" cy="143" rx="3" ry="2" fill="#14202b"/></g>
-				<path d="M131 158c6 4 12 4 17 0" fill="none" stroke="#985f53" stroke-width="2" stroke-linecap="round"/>
+				${portrait || `<ellipse cx="135" cy="143" rx="31" ry="37" fill="${profile.skin}"/>${isSale ? `<path d="M104 145c-2-35 15-52 34-52 31 0 42 27 31 65l-12-4c6-28-1-45-20-46-14 0-23 13-23 37z" fill="${profile.hair}"/>` : `<path d="M105 137c1-31 15-44 34-44 22 0 34 13 34 34-15-11-36-14-62-5z" fill="${profile.hair}"/>`}<g class="dat-agent-rig__eyes"><ellipse cx="126" cy="143" rx="3" ry="2" fill="#14202b"/><ellipse cx="148" cy="143" rx="3" ry="2" fill="#14202b"/></g><path d="M131 158c6 4 12 4 17 0" fill="none" stroke="#985f53" stroke-width="2" stroke-linecap="round"/>`}
 			</g>
 			${accessoryMarkup(profile.variant, profile.accent)}
 			<g class="dat-agent-rig__arm dat-agent-rig__arm--left"><path d="M108 193c-7 21 4 42 32 51" fill="none" stroke="${profile.shirt}" stroke-width="18" stroke-linecap="round"/><circle cx="142" cy="245" r="9" fill="${profile.skin}"/></g>

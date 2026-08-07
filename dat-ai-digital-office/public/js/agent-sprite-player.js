@@ -120,7 +120,12 @@
 
 		preloadStates() {
 			if (this.config.placeholder || !this.config.states) return Promise.resolve();
-			if (this.playbackMode(this.config.states[this.state]) === 'rig') return Promise.resolve();
+			if (this.playbackMode(this.config.states[this.state]) === 'rig') {
+				return preloadImage(this.portraitSource()).then(loaded => {
+					this.portraitLoaded = loaded;
+					return loaded;
+				});
+			}
 			const sources = Object.keys(this.config.states).map(key => {
 				const definition = this.config.states[key] || {};
 				return imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
@@ -189,10 +194,14 @@
 		ensureRig() {
 			if (this.rigMounted) return true;
 			if (!global.DAT_AgentRig || typeof global.DAT_AgentRig.markup !== 'function') return false;
-			this.sprite.innerHTML = global.DAT_AgentRig.markup(this.spriteId);
+			this.sprite.innerHTML = global.DAT_AgentRig.markup(this.spriteId, this.portraitLoaded ? this.portraitSource() : '');
 			this.sprite.classList.add('is-agent-rig');
 			this.rigMounted = true;
 			return true;
+		}
+
+		portraitSource() {
+			return imageUrl(this.options.assetBase, this.spriteId, 'portrait.png', this.options.assetVersion);
 		}
 
 		removeRig() {

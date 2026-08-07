@@ -11,6 +11,7 @@ assets/agents/
 │   ├── working.png
 │   ├── reviewing.png
 │   ├── done.png
+│   ├── portrait.png
 │   └── config.json
 ├── sale-ai/
 ├── supervisor-ai/
@@ -28,7 +29,7 @@ Mỗi Agent cũng khai báo một anchor cố định:
 
 `anchorX` là tâm ngang và `anchorY` là baseline ở đáy vùng nhìn thấy. Mọi frame được căn vào anchor này ngay trong PNG, vì vậy khi state đổi thì card, desk và sprite area không di chuyển.
 
-Ba Agent thử nghiệm `supervisor-ai`, `sale-ai` và `pcb-engineer` dùng skeletal rig SVG để chuyển động ổn định. Các sprite PNG vẫn được giữ làm nguồn thay thế và để bật lại chế độ sprite sau này. Nếu rig hoặc asset không tải được, `AgentSpritePlayer` giữ nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
+Ba Agent thử nghiệm `supervisor-ai`, `sale-ai` và `pcb-engineer` dùng skeletal rig SVG để chuyển động ổn định. Mỗi rig tải thêm `portrait.png` 512×512 nền trong suốt để tạo khuôn mặt 3D life-simulation riêng, còn cơ thể và thiết bị tiếp tục chuyển động theo state. Các sprite PNG vẫn được giữ làm nguồn thay thế và để bật lại chế độ sprite sau này. Nếu rig hoặc asset không tải được, `AgentSpritePlayer` giữ nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
 
 | State | File | Frame | FPS | Loop |
 | --- | --- | ---: | ---: | --- |
