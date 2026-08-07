@@ -17,17 +17,24 @@ assets/agents/
 └── _placeholder/
 ```
 
-Mỗi PNG là một hàng ngang. Ví dụ `working.png` có 8 frame, mỗi frame `320 × 400px`, thì ảnh có kích thước `2560 × 400px`. `config.json` là nơi duy nhất mô tả số frame, FPS và loop. `AgentSpritePlayer` đọc config, dùng `background-position` để đổi frame và dùng một requestAnimationFrame dùng chung cho mọi Agent.
+Mỗi PNG là một hàng ngang gồm **4 frame thật**, mỗi frame `320 × 400px`; vì vậy mỗi file có kích thước `1280 × 400px`, nền trong suốt. `config.json` là nơi duy nhất mô tả số frame, FPS và loop. `AgentSpritePlayer` đọc config, dùng `background-position` để đổi frame và dùng một requestAnimationFrame dùng chung cho mọi Agent.
 
-Ba config có sẵn đang bật `"placeholder": true`, vì chưa có PNG thật. Điều này hiển thị nhân vật CSS dự phòng, không yêu cầu ảnh tĩnh hoặc request file 404. Khi đã thêm đủ PNG, xóa `"placeholder": true` (hoặc đổi thành `false`).
+Ba Agent thử nghiệm đã dùng sprite PNG thật: `supervisor-ai`, `sale-ai` và `pcb-engineer`. Các config của chúng đặt `"placeholder": false` để ưu tiên sprite. Nếu file không tải được, `AgentSpritePlayer` tự trả về nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
+
+| State | File | Frame | FPS | Loop |
+| --- | --- | ---: | ---: | --- |
+| `idle` | `idle.png` | 4 | 4 | Có |
+| `working` | `working.png` | 4 | 8 | Có |
+| `reviewing` | `reviewing.png` | 4 | 5 | Có |
+| `done` | `done.png` | 4 | 6 | Không — giữ frame cuối 1,2 giây rồi về `idle` |
 
 ## Thêm Agent mới
 
 1. Tạo `assets/agents/ten-agent/config.json`, theo mẫu `pcb-engineer/config.json`.
-2. Thêm bốn PNG sprite sheet vào cùng thư mục.
+2. Thêm bốn PNG sprite sheet vào cùng thư mục, đúng tên `idle.png`, `working.png`, `reviewing.png`, `done.png`. Mỗi file nên là `1280 × 400px`: 4 frame ngang, mỗi frame `320 × 400px`, nền PNG trong suốt.
 3. Đặt `sprite: "ten-agent"` trong dữ liệu Agent. Nếu không đặt, plugin dùng ID Agent làm tên thư mục; vì vậy Agent ID `quality-ai` tự tìm `assets/agents/quality-ai/config.json`.
 
-Không cần thêm code animation riêng. Các state được chuẩn hóa như sau:
+Đặt `"placeholder": false` khi bốn PNG đã sẵn sàng. Không cần thêm code animation riêng. Các state được chuẩn hóa như sau:
 
 | Business status | Sprite state |
 | --- | --- |
