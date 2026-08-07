@@ -1,0 +1,2 @@
+<?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
+<div class="wrap dat-ai-office-admin"><h1>Phòng ban</h1><p>Dữ liệu demo có thể mở rộng qua REST API hoặc hook WordPress.</p><div class="dat-ai-office-grid"><?php foreach ( $data['departments'] as $department ) : ?><article style="--room:<?php echo esc_attr( $department['color'] ); ?>"><b><?php echo esc_html( $department['name'] ); ?></b><span><?php echo esc_html( $department['equipment'] ); ?></span><small><?php echo esc_html( count( $department['seats'] ) ); ?> vị trí làm việc</small></article><?php endforeach; ?></div></div>
