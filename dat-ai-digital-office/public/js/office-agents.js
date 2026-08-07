@@ -2,7 +2,7 @@
 	'use strict';
 	const humanGraphic = (agent) => {
 		const c = new PIXI.Container(), shadow = new PIXI.Graphics(), legs = new PIXI.Graphics(), body = new PIXI.Graphics(), head = new PIXI.Graphics(), paper = new PIXI.Graphics();
-		shadow.beginFill(0x000000,.24).drawEllipse(0,12,13,5).endFill(); legs.lineStyle(3,0x19314d,1).moveTo(-4,8).lineTo(-5,17).moveTo(4,8).lineTo(5,17); body.beginFill(PIXI.utils.string2hex(agent.color)).drawRoundedRect(-8,-2,16,15,5).endFill(); head.beginFill(0xf2c9a5).drawCircle(0,-10,7).endFill(); head.beginFill(0x162b45).drawArc(0,-11,7,Math.PI,Math.PI*2).endFill(); paper.beginFill(0xfff7d1).drawRect(9,-2,7,10).endFill(); paper.visible=false;
+		shadow.beginFill(0x000000,.24).drawEllipse(0,12,13,5).endFill(); legs.lineStyle(3,0x19314d,1).moveTo(-4,8).lineTo(-5,17).moveTo(4,8).lineTo(5,17); body.beginFill(PIXI.utils.string2hex(agent.color)).drawRoundedRect(-8,-2,16,15,5).endFill(); head.beginFill(0xf2c9a5).drawCircle(0,-10,7).endFill(); head.beginFill(0x162b45).arc(0,-11,7,Math.PI,Math.PI*2).endFill(); paper.beginFill(0xfff7d1).drawRect(9,-2,7,10).endFill(); paper.visible=false;
 		c.addChild(shadow,legs,body,head,paper); c.hitArea=new PIXI.Circle(0,0,18); c.interactive=true; c.buttonMode=true; c._parts={legs,body,paper}; return c;
 	};
 	const aiGraphic = (agent) => {
