@@ -2,35 +2,43 @@
 	'use strict';
 
 	/**
-	 * Animation-only state machine. It has no knowledge of WordPress, cards,
-	 * tasks, progress, or the Agent dashboard.
+	 * Animation-only state machine for clips embedded in the loaded model.
+	 * It has no knowledge of WordPress, cards, tasks, progress, or debug UI.
 	 */
 	class Agent3DStateMachine {
-		constructor(mixer, clips, options) {
+		constructor(mixer, animations, states, options) {
 			this.mixer = mixer;
-			this.clips = clips || {};
-			this.options = Object.assign({ fadeDuration: 0.32 }, options || {});
+			this.options = Object.assign({ fadeDuration: 0.28 }, options || {});
+			this.states = states || {};
+			this.clips = new Map((animations || []).map(clip => [clip.name, clip]));
 			this.actions = new Map();
 			this.currentAction = null;
 			this.currentState = '';
-			this.seated = false;
+			this.currentClip = '';
 			this.finishedHandler = null;
 			this.destroyed = false;
-			this.requireClips(['idle', 'walk', 'sitEnter', 'sitIdle', 'stand']);
+			this.validateStates();
 		}
 
-		requireClips(names) {
-			const missing = names.filter(name => !this.clips[name]);
-			if (missing.length) {
-				throw new Error('Thiếu animation 3D: ' + missing.join(', '));
-			}
+		validateStates() {
+			const missing = [];
+			Object.keys(this.states).forEach(state => {
+				const clipName = this.states[state] && this.states[state].clip;
+				if (clipName && !this.clips.has(clipName)) missing.push(state + ': ' + clipName);
+			});
+			if (missing.length) throw new Error('Thiếu animation nhúng sẵn: ' + missing.join(', '));
 		}
 
-		action(name) {
-			if (!this.actions.has(name)) {
-				this.actions.set(name, this.mixer.clipAction(this.clips[name]));
+		clipNames() {
+			return Array.from(this.clips.keys());
+		}
+
+		action(clipName) {
+			if (!this.clips.has(clipName)) throw new Error('Không tìm thấy native clip: ' + clipName);
+			if (!this.actions.has(clipName)) {
+				this.actions.set(clipName, this.mixer.clipAction(this.clips.get(clipName)));
 			}
-			return this.actions.get(name);
+			return this.actions.get(clipName);
 		}
 
 		clearFinishedHandler() {
@@ -42,90 +50,63 @@
 		onFinished(action, callback) {
 			this.clearFinishedHandler();
 			this.finishedHandler = event => {
-				if (event.action !== action || this.destroyed) return;
+				if (this.destroyed || event.action !== action) return;
 				this.clearFinishedHandler();
 				callback();
 			};
 			this.mixer.addEventListener('finished', this.finishedHandler);
 		}
 
-		prepareAction(action, loop) {
-			action.enabled = true;
-			action.paused = false;
-			action.reset();
-			action.setEffectiveTimeScale(1);
-			action.setEffectiveWeight(1);
-			action.clampWhenFinished = !loop;
-			action.setLoop(loop ? global.THREE.LoopRepeat : global.THREE.LoopOnce, loop ? Infinity : 1);
-			return action;
-		}
-
-		transition(name, loop, immediate) {
-			const next = this.prepareAction(this.action(name), loop);
+		playClip(clipName, settings) {
+			if (this.destroyed) return;
+			const options = Object.assign({ loop: true, immediate: false, afterState: '' }, settings || {});
+			const next = this.action(clipName);
+			next.enabled = true;
+			next.paused = false;
+			next.reset();
+			next.setEffectiveTimeScale(1);
+			next.setEffectiveWeight(1);
+			next.clampWhenFinished = !options.loop;
+			next.setLoop(options.loop ? global.THREE.LoopRepeat : global.THREE.LoopOnce, options.loop ? Infinity : 1);
 			next.play();
 
 			if (this.currentAction && this.currentAction !== next) {
-				if (immediate) {
-					this.currentAction.stop();
-				} else {
-					this.currentAction.crossFadeTo(next, this.options.fadeDuration, true);
-				}
+				if (options.immediate) this.currentAction.stop();
+				else this.currentAction.crossFadeTo(next, this.options.fadeDuration, true);
 			}
 
-			this.currentAction = next;
-			return next;
-		}
-
-		playLoop(name, state, immediate) {
 			this.clearFinishedHandler();
-			this.currentState = state;
-			this.transition(name, true, immediate);
-		}
-
-		playSit(immediate) {
-			this.currentState = 'sit';
-			if (this.seated) {
-				this.playLoop('sitIdle', 'sit', immediate);
-				return;
+			this.currentAction = next;
+			this.currentClip = clipName;
+			if (!options.loop && options.afterState) {
+				this.onFinished(next, () => this.setState(options.afterState, false));
 			}
-			const enter = this.transition('sitEnter', false, immediate);
-			this.onFinished(enter, () => {
-				this.seated = true;
-				if (this.currentState === 'sit') this.playLoop('sitIdle', 'sit', false);
-			});
-		}
-
-		playStand(nextState, immediate) {
-			this.currentState = 'stand';
-			const exit = this.transition('stand', false, immediate);
-			this.onFinished(exit, () => {
-				this.seated = false;
-				this.setState(nextState || 'idle', false);
-			});
 		}
 
 		setState(state, immediate) {
 			if (this.destroyed) return;
-			const next = ['idle', 'walk', 'sit', 'stand'].indexOf(state) >= 0 ? state : 'idle';
-			if (!immediate && next === this.currentState && next !== 'stand') return;
+			const definition = this.states[state] || this.states.idle;
+			if (!definition || !definition.clip) throw new Error('State 3D không hợp lệ: ' + state);
+			if (!immediate && state === this.currentState) return;
+			this.currentState = state;
+			this.playClip(definition.clip, {
+				loop: definition.loop !== false,
+				immediate: Boolean(immediate),
+				afterState: definition.afterState || ''
+			});
+		}
 
-			if ((next === 'idle' || next === 'walk') && this.seated) {
-				this.playStand(next, immediate);
-				return;
-			}
+		stop() {
+			if (this.destroyed) return;
+			this.clearFinishedHandler();
+			this.mixer.stopAllAction();
+			this.currentAction = null;
+			this.currentState = '';
+			this.currentClip = '';
+		}
 
-			if (next === 'sit') {
-				this.playSit(immediate);
-				return;
-			}
-
-			if (next === 'stand') {
-				this.playStand('idle', immediate);
-				return;
-			}
-
-			this.seated = false;
-			this.playLoop(next, next, immediate);
+		setPaused(paused) {
+			this.mixer.timeScale = paused ? 0 : 1;
 		}
 
 		update(delta) {
@@ -134,9 +115,8 @@
 
 		destroy() {
 			if (this.destroyed) return;
+			this.stop();
 			this.destroyed = true;
-			this.clearFinishedHandler();
-			this.mixer.stopAllAction();
 			this.actions.clear();
 		}
 	}

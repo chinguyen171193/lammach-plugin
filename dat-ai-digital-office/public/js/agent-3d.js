@@ -5,50 +5,6 @@
 	let animationFrame = 0;
 	let previousTime = 0;
 
-	// GLTFLoader removes punctuation from node names (for example Shoulder.L
-	// becomes ShoulderL), so this map uses the runtime names, not raw JSON names.
-	const boneMap = {
-		Root: 'root',
-		Hips: 'pelvis',
-		Abdomen: 'spine_01',
-		Torso: 'spine_02',
-		Chest: 'spine_03',
-		Neck: 'neck_01',
-		Head: 'Head',
-		ShoulderL: 'clavicle_l',
-		UpperArmL: 'upperarm_l',
-		LowerArmL: 'lowerarm_l',
-		WristL: 'hand_l',
-		ShoulderR: 'clavicle_r',
-		UpperArmR: 'upperarm_r',
-		LowerArmR: 'lowerarm_r',
-		WristR: 'hand_r',
-		UpperLegL: 'thigh_l',
-		LowerLegL: 'calf_l',
-		FootL: 'foot_l',
-		PTL: 'ball_l',
-		UpperLegR: 'thigh_r',
-		LowerLegR: 'calf_r',
-		FootR: 'foot_r',
-		PTR: 'ball_r'
-	};
-
-	['Index', 'Middle', 'Ring', 'Pinky'].forEach(finger => {
-		['L', 'R'].forEach(side => {
-			const suffix = side.toLowerCase();
-			for (let joint = 1; joint <= 4; joint++) {
-				boneMap[finger + joint + side] = finger.toLowerCase() + '_0' + joint + (joint === 4 ? '_leaf_' : '_') + suffix;
-			}
-		});
-	});
-
-	['L', 'R'].forEach(side => {
-		const suffix = side.toLowerCase();
-		for (let joint = 1; joint <= 3; joint++) {
-			boneMap['Thumb' + joint + side] = 'thumb_0' + joint + '_' + suffix;
-		}
-	});
-
 	function versionedUrl(url, version) {
 		if (!version) return url;
 		return url + (url.indexOf('?') === -1 ? '?' : '&') + 'ver=' + encodeURIComponent(version);
@@ -77,27 +33,34 @@
 	class QuaterniusAgent3D {
 		constructor(container, options) {
 			this.container = container;
+			const defaultStates = {
+				idle: { clip: 'Idle', loop: true },
+				walk: { clip: 'Walk', loop: true },
+				reviewing: { clip: 'Idle_Neutral', loop: true },
+				done: { clip: 'Wave', loop: false, afterState: 'idle' }
+			};
 			const defaults = {
 				state: 'idle',
-				stateMap: { idle: 'idle', working: 'walk', reviewing: 'sit', done: 'stand' },
-				clips: {
-					idle: 'Idle_Loop',
-					walk: 'Walk_Loop',
-					sitEnter: 'Sitting_Enter',
-					sitIdle: 'Sitting_Idle_Loop',
-					stand: 'Sitting_Exit'
-				},
+				stateMap: { idle: 'idle', working: 'walk', reviewing: 'reviewing', done: 'done' },
+				states: defaultStates,
+				startInBindPose: false,
+				debug: false,
+				cameraFill: 0.76,
 				pixelRatio: 1.5,
-				fadeDuration: 0.32,
+				fadeDuration: 0.28,
 				onError: null
 			};
 			this.options = Object.assign({}, defaults, options || {});
 			this.options.stateMap = Object.assign({}, defaults.stateMap, (options && options.stateMap) || {});
-			this.options.clips = Object.assign({}, defaults.clips, (options && options.clips) || {});
+			this.options.states = Object.assign({}, defaultStates, (options && options.states) || {});
 			this.state = this.options.state;
+			this.hasExternalStateChange = false;
 			this.paused = false;
+			this.debugPaused = false;
 			this.destroyed = false;
 			this.ready = false;
+			this.debugListeners = [];
+			this.boundsElapsed = 0;
 			this.init();
 		}
 
@@ -111,14 +74,14 @@
 		}
 
 		init() {
-			if (!global.THREE || !global.THREE.GLTFLoader || !global.THREE.SkeletonUtils || !global.DAT_Agent3DStateMachine || !this.webglAvailable()) {
-				this.fail(new Error('Three.js hoặc WebGL không khả dụng'));
+			if (!global.THREE || !global.THREE.GLTFLoader || !global.DAT_Agent3DStateMachine || !this.webglAvailable()) {
+				this.fail(new Error('Three.js, GLTFLoader hoặc WebGL không khả dụng'));
 				return;
 			}
 
 			const THREE = global.THREE;
 			this.scene = new THREE.Scene();
-			this.camera = new THREE.PerspectiveCamera(30, 0.8, 0.05, 100);
+			this.camera = new THREE.PerspectiveCamera(30, 0.8, 0.01, 100);
 			this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
 			this.renderer.setClearColor(0x000000, 0);
 			this.renderer.setPixelRatio(Math.min(global.devicePixelRatio || 1, Number(this.options.pixelRatio) || 1.5));
@@ -141,7 +104,7 @@
 			this.resizeObserver = 'ResizeObserver' in global ? new ResizeObserver(() => this.resize()) : null;
 			if (this.resizeObserver) this.resizeObserver.observe(this.container);
 			instances.add(this);
-			this.loadAssets();
+			this.loadModel();
 		}
 
 		addLights() {
@@ -160,30 +123,16 @@
 		addOfficeStage() {
 			const THREE = global.THREE;
 			const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x0a2637, roughness: 0.82, metalness: 0.1, transparent: true, opacity: 0.9 });
-			this.floor = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 0.055, 48), floorMaterial);
+			this.floor = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.04, 48), floorMaterial);
 			this.floor.receiveShadow = true;
-			this.floor.position.y = -0.035;
+			this.floor.position.y = -0.025;
 			this.scene.add(this.floor);
 
-			const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x4bddff, transparent: true, opacity: 0.42 });
-			this.ring = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.012, 8, 64), ringMaterial);
+			const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x4bddff, transparent: true, opacity: 0.4 });
+			this.ring = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.01, 8, 64), ringMaterial);
 			this.ring.rotation.x = Math.PI / 2;
 			this.ring.position.y = 0.005;
 			this.scene.add(this.ring);
-
-			const chairMaterial = new THREE.MeshStandardMaterial({ color: 0x173247, roughness: 0.72, metalness: 0.12 });
-			const metalMaterial = new THREE.MeshStandardMaterial({ color: 0x2c5266, roughness: 0.35, metalness: 0.7 });
-			this.chair = new THREE.Group();
-			const seat = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.12, 0.62), chairMaterial);
-			seat.position.set(0, 0.55, -0.18);
-			const back = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.82, 0.12), chairMaterial);
-			back.position.set(0, 0.95, -0.47);
-			back.rotation.x = -0.08;
-			const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 12), metalMaterial);
-			stem.position.set(0, 0.28, -0.18);
-			this.chair.add(seat, back, stem);
-			this.chair.visible = false;
-			this.scene.add(this.chair);
 		}
 
 		load(url) {
@@ -192,13 +141,10 @@
 			});
 		}
 
-		async loadAssets() {
+		async loadModel() {
 			try {
-				const modelUrl = versionedUrl(this.options.modelUrl, this.options.assetVersion);
-				const animationUrl = versionedUrl(this.options.animationUrl, this.options.assetVersion);
-				const loaded = await Promise.all([this.load(modelUrl), this.load(animationUrl)]);
-				if (this.destroyed) return;
-				this.installModel(loaded[0], loaded[1]);
+				const model = await this.load(versionedUrl(this.options.modelUrl, this.options.assetVersion));
+				if (!this.destroyed) this.installModel(model);
 			} catch (error) {
 				this.fail(error);
 			}
@@ -215,117 +161,262 @@
 			return preferred || first;
 		}
 
-		findClip(animations, name) {
-			const clip = animations.find(candidate => candidate.name === name);
-			if (!clip) throw new Error('Không tìm thấy animation thật: ' + name);
-			return clip;
+		isVisibleInHierarchy(object) {
+			let current = object;
+			while (current) {
+				if (!current.visible) return false;
+				current = current.parent;
+			}
+			return true;
 		}
 
-		retargetClips(targetMesh, sourceMesh, animations) {
-			const clips = {};
-			const hips = targetMesh.skeleton.bones.find(bone => bone.name === 'Hips');
-			if (!hips) throw new Error('Skeleton Suit không có bone Hips');
-			const hipsRestPosition = hips.position.clone();
-			const mappedBones = targetMesh.skeleton.bones.filter(bone => {
-				const sourceName = boneMap[bone.name];
-				return sourceName && global.THREE.SkeletonUtils.getBoneByName(sourceName, sourceMesh.skeleton);
-			});
-			if (mappedBones.length < 50) throw new Error('Skeleton không tương thích: chỉ ánh xạ được ' + mappedBones.length + ' bones');
-
-			Object.keys(this.options.clips).forEach(key => {
-				const sourceClip = this.findClip(animations, this.options.clips[key]);
-				const converted = global.THREE.SkeletonUtils.retargetClip(targetMesh, sourceMesh, sourceClip, {
-					fps: 30,
-					hip: 'pelvis',
-					names: boneMap,
-					preservePosition: true,
-					preserveHipPosition: false,
-					useFirstFramePosition: true
-				});
-				const hipTrack = converted.tracks.find(track => track.name === '.bones[Hips].position');
-				if (hipTrack) {
-					for (let index = 0; index < hipTrack.values.length; index += 3) {
-						hipTrack.values[index] = hipsRestPosition.x;
-						hipTrack.values[index + 1] += hipsRestPosition.y;
-						hipTrack.values[index + 2] = hipsRestPosition.z;
-					}
-				}
-				converted.name = sourceClip.name;
-				clips[key] = converted;
-			});
-
-			targetMesh.skeleton.pose();
-			targetMesh.updateMatrixWorld(true);
-			return clips;
-		}
-
-		installModel(modelAsset, animationAsset) {
+		computeSkinnedBounds() {
 			const THREE = global.THREE;
-			modelAsset.scene.updateMatrixWorld(true);
-			animationAsset.scene.updateMatrixWorld(true);
-			const targetMesh = this.findSkinnedMesh(modelAsset.scene, 'Suit_Feet');
-			const sourceMesh = this.findSkinnedMesh(animationAsset.scene, 'Mannequin_1');
-			if (!targetMesh || !sourceMesh) throw new Error('Không tìm thấy SkinnedMesh yêu cầu');
-			if (!targetMesh.skeleton || targetMesh.skeleton.bones.length !== 62) throw new Error('Suit.gltf không đúng skeleton 62 joints đã kiểm tra');
-			if (!sourceMesh.skeleton || sourceMesh.skeleton.bones.length !== 65) throw new Error('UAL1_Standard.glb không đúng skeleton 65 joints đã kiểm tra');
+			const box = new THREE.Box3();
+			const vertex = new THREE.Vector3();
+			let pointCount = 0;
+			this.model.updateMatrixWorld(true);
+			this.skinnedMeshes.forEach(mesh => {
+				if (!this.isVisibleInHierarchy(mesh) || !mesh.geometry.attributes.position) return;
+				mesh.skeleton.update();
+				const count = mesh.geometry.attributes.position.count;
+				for (let index = 0; index < count; index++) {
+					vertex.fromBufferAttribute(mesh.geometry.attributes.position, index);
+					mesh.boneTransform(index, vertex);
+					vertex.applyMatrix4(mesh.matrixWorld);
+					box.expandByPoint(vertex);
+					pointCount++;
+				}
+			});
+			return pointCount ? box : new THREE.Box3().setFromObject(this.model);
+		}
 
-			const clips = this.retargetClips(targetMesh, sourceMesh, animationAsset.animations);
+		resetSkeletons() {
+			this.skeletons.forEach(skeleton => skeleton.pose());
+			this.model.updateMatrixWorld(true);
+		}
+
+		centerModelOnFloor() {
+			this.model.position.set(0, 0, 0);
+			this.model.rotation.set(0, -0.12, 0);
+			this.model.scale.set(1, 1, 1);
+			this.model.updateMatrixWorld(true);
+			const box = this.computeSkinnedBounds();
+			const center = box.getCenter(new global.THREE.Vector3());
+			this.model.position.x -= center.x;
+			this.model.position.y -= box.min.y;
+			this.model.position.z -= center.z;
+			this.model.updateMatrixWorld(true);
+		}
+
+		installModel(modelAsset) {
+			const THREE = global.THREE;
 			this.model = modelAsset.scene;
+			this.animations = modelAsset.animations || [];
+			this.targetMesh = this.findSkinnedMesh(this.model, 'Suit_Feet');
+			if (!this.targetMesh || !this.targetMesh.skeleton || this.targetMesh.skeleton.bones.length !== 62) {
+				throw new Error('Suit.gltf không đúng skeleton 62 joints');
+			}
+			if (!this.animations.some(clip => clip.name === 'Idle') || !this.animations.some(clip => clip.name === 'Walk')) {
+				throw new Error('Suit.gltf thiếu native clip Idle hoặc Walk');
+			}
+
+			this.skinnedMeshes = [];
+			const skeletonSet = new Set();
 			this.model.traverse(object => {
 				if (object.name === 'Pistol') object.visible = false;
+				if (object.isSkinnedMesh) {
+					this.skinnedMeshes.push(object);
+					skeletonSet.add(object.skeleton);
+				}
 				if (object.isMesh) {
 					object.castShadow = true;
 					object.receiveShadow = true;
 				}
 			});
-			this.normalizeModel();
+			this.skeletons = Array.from(skeletonSet);
 			this.scene.add(this.model);
+			this.resetSkeletons();
+			this.centerModelOnFloor();
 
-			this.targetMesh = targetMesh;
-			this.mixer = new THREE.AnimationMixer(this.targetMesh);
-			this.stateMachine = new global.DAT_Agent3DStateMachine(this.mixer, clips, { fadeDuration: this.options.fadeDuration });
-			const initialVisualState = this.visualState(this.state);
-			this.chair.visible = initialVisualState === 'sit' || initialVisualState === 'stand';
-			this.stateMachine.setState(initialVisualState, true);
-			this.disposeObject(animationAsset.scene);
+			this.mixer = new THREE.AnimationMixer(this.model);
+			this.stateMachine = new global.DAT_Agent3DStateMachine(this.mixer, this.animations, this.options.states, { fadeDuration: this.options.fadeDuration });
+			this.createHelpers();
+			this.currentBounds = this.computeSkinnedBounds();
+			if (this.options.debug) {
+				this.printDiagnostics();
+				this.createDebugControls();
+			}
+
+			if (this.options.startInBindPose && !this.hasExternalStateChange) this.resetBindPose(false);
+			else this.playBusinessState(this.state, true);
 			this.ready = true;
 			this.container.closest('[data-agent-sprite]')?.classList.add('is-agent-3d-ready');
 			this.resize();
-			this.tick(0);
+			this.render();
 			startScheduler();
 		}
 
-		normalizeModel() {
+		createHelpers() {
 			const THREE = global.THREE;
-			const initialBox = new THREE.Box3().setFromObject(this.model);
-			const initialSize = initialBox.getSize(new THREE.Vector3());
-			const scale = 2.55 / Math.max(0.001, initialSize.y);
-			this.model.scale.setScalar(scale);
-			this.model.updateMatrixWorld(true);
+			this.skeletonHelper = new THREE.SkeletonHelper(this.model);
+			this.skeletonHelper.visible = false;
+			this.skeletonHelper.material.depthTest = false;
+			this.skeletonHelper.material.transparent = true;
+			this.skeletonHelper.material.opacity = 0.9;
+			this.skeletonHelper.material.color.set(0xffc857);
+			this.skeletonHelper.renderOrder = 8;
+			this.scene.add(this.skeletonHelper);
 
-			const box = new THREE.Box3().setFromObject(this.model);
-			const center = box.getCenter(new THREE.Vector3());
-			this.model.position.x -= center.x;
-			this.model.position.y -= box.min.y;
-			this.model.position.z -= center.z;
-			this.model.rotation.y = -0.12;
-			this.model.updateMatrixWorld(true);
+			this.boxHelper = new THREE.Box3Helper(this.computeSkinnedBounds(), 0x4ce9a0);
+			this.boxHelper.visible = false;
+			this.boxHelper.material.depthTest = false;
+			this.boxHelper.renderOrder = 9;
+			this.scene.add(this.boxHelper);
+		}
 
-			this.camera.position.set(3.35, 2.05, 6.4);
-			this.camera.lookAt(0, 1.25, 0);
+		plainVector(vector) {
+			return vector.toArray().map(value => Number(value.toFixed(5)));
+		}
+
+		printDiagnostics() {
+			const bones = this.targetMesh.skeleton.bones.map((bone, index) => ({
+				index: index,
+				name: bone.name,
+				parent: bone.parent && bone.parent.isBone ? bone.parent.name : '(armature)',
+				position: this.plainVector(bone.position).join(', '),
+				quaternion: this.plainVector(bone.quaternion).join(', ')
+			}));
+			const clips = this.animations.map((clip, index) => ({ index: index, name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
+			const box = this.computeSkinnedBounds();
+			global.console.groupCollapsed('[DAT AI Office 3D Debug] Suit.gltf bind pose');
+			global.console.log('Root bone:', bones[0]);
+			global.console.log('Model transform:', { position: this.plainVector(this.model.position), quaternion: this.plainVector(this.model.quaternion), scale: this.plainVector(this.model.scale) });
+			global.console.log('Bounding box:', { min: this.plainVector(box.min), max: this.plainVector(box.max), size: this.plainVector(box.getSize(new global.THREE.Vector3())) });
+			global.console.log('Bones (' + bones.length + '):');
+			global.console.table(bones);
+			global.console.log('Embedded animation clips (' + clips.length + '):');
+			global.console.table(clips);
+			global.console.groupEnd();
+		}
+
+		listen(element, event, callback) {
+			element.addEventListener(event, callback);
+			this.debugListeners.push(() => element.removeEventListener(event, callback));
+		}
+
+		createDebugControls() {
+			const panel = document.createElement('div');
+			panel.className = 'dat-agent-3d-debug';
+			panel.setAttribute('aria-label', 'Điều khiển debug nhân vật 3D');
+
+			const select = document.createElement('select');
+			select.className = 'dat-agent-3d-debug__select';
+			select.setAttribute('aria-label', 'Chọn animation nhúng sẵn');
+			const bindOption = document.createElement('option');
+			bindOption.value = '__bind__';
+			bindOption.textContent = 'Bind pose';
+			select.appendChild(bindOption);
+			this.animations.forEach(clip => {
+				const option = document.createElement('option');
+				option.value = clip.name;
+				option.textContent = clip.name;
+				select.appendChild(option);
+			});
+
+			const skeletonLabel = document.createElement('label');
+			const skeletonToggle = document.createElement('input');
+			skeletonToggle.type = 'checkbox';
+			skeletonLabel.append(skeletonToggle, document.createTextNode(' Xương'));
+
+			const boundsLabel = document.createElement('label');
+			const boundsToggle = document.createElement('input');
+			boundsToggle.type = 'checkbox';
+			boundsLabel.append(boundsToggle, document.createTextNode(' Bounds'));
+
+			const pauseButton = document.createElement('button');
+			pauseButton.type = 'button';
+			pauseButton.textContent = 'Pause';
+			const bindButton = document.createElement('button');
+			bindButton.type = 'button';
+			bindButton.textContent = 'Reset bind';
+			const note = document.createElement('small');
+			note.textContent = 'Suit không có Sit / Typing / Using Mouse';
+
+			panel.append(select, skeletonLabel, boundsLabel, pauseButton, bindButton, note);
+			const spriteContainer = this.container.closest('[data-agent-sprite]');
+			if (spriteContainer && spriteContainer.parentNode) spriteContainer.parentNode.insertBefore(panel, spriteContainer.nextSibling);
+			else this.container.appendChild(panel);
+			this.debugPanel = panel;
+			this.debugSelect = select;
+			this.debugPauseButton = pauseButton;
+
+			this.listen(select, 'change', () => {
+				if (select.value === '__bind__') this.resetBindPose(true);
+				else this.playNativeClip(select.value, true);
+			});
+			this.listen(skeletonToggle, 'change', () => {
+				this.skeletonHelper.visible = skeletonToggle.checked;
+				this.render();
+			});
+			this.listen(boundsToggle, 'change', () => {
+				this.boxHelper.visible = boundsToggle.checked;
+				this.refreshBounds(false);
+				this.render();
+			});
+			this.listen(pauseButton, 'click', () => {
+				this.debugPaused = !this.debugPaused;
+				this.stateMachine.setPaused(this.debugPaused);
+				pauseButton.textContent = this.debugPaused ? 'Play' : 'Pause';
+			});
+			this.listen(bindButton, 'click', () => this.resetBindPose(true));
 		}
 
 		visualState(state) {
 			return this.options.stateMap[state] || state || 'idle';
 		}
 
+		playBusinessState(state, immediate) {
+			const visual = this.visualState(state);
+			this.debugPaused = false;
+			this.stateMachine.setPaused(false);
+			this.stateMachine.setState(visual, immediate);
+			this.stateMachine.update(0);
+			if (this.debugSelect) {
+				const definition = this.options.states[visual];
+				if (definition && definition.clip) this.debugSelect.value = definition.clip;
+			}
+			if (this.debugPauseButton) this.debugPauseButton.textContent = 'Pause';
+			this.refreshBounds(true);
+		}
+
+		playNativeClip(clipName, fitCamera) {
+			this.debugPaused = false;
+			this.stateMachine.setPaused(false);
+			this.stateMachine.currentState = '';
+			this.stateMachine.playClip(clipName, { loop: true, immediate: false });
+			this.stateMachine.update(0);
+			if (this.debugSelect) this.debugSelect.value = clipName;
+			if (this.debugPauseButton) this.debugPauseButton.textContent = 'Pause';
+			this.refreshBounds(Boolean(fitCamera));
+			startScheduler();
+		}
+
+		resetBindPose(fitCamera) {
+			if (this.stateMachine) this.stateMachine.stop();
+			this.resetSkeletons();
+			this.debugPaused = false;
+			if (this.stateMachine) this.stateMachine.setPaused(false);
+			if (this.debugSelect) this.debugSelect.value = '__bind__';
+			if (this.debugPauseButton) this.debugPauseButton.textContent = 'Pause';
+			this.refreshBounds(Boolean(fitCamera));
+			this.render();
+		}
+
 		setState(state) {
 			this.state = state || 'idle';
-			if (this.stateMachine) {
-				const visual = this.visualState(this.state);
-				this.chair.visible = visual === 'sit' || visual === 'stand';
-				this.stateMachine.setState(visual, false);
-			}
+			this.hasExternalStateChange = true;
+			if (this.stateMachine) this.playBusinessState(this.state, false);
 			return this;
 		}
 
@@ -335,6 +426,33 @@
 			return this;
 		}
 
+		refreshBounds(updateCamera) {
+			if (!this.model) return;
+			this.currentBounds = this.computeSkinnedBounds();
+			if (this.boxHelper) this.boxHelper.box.copy(this.currentBounds);
+			if (updateCamera) this.fitCamera(this.currentBounds);
+		}
+
+		fitCamera(box) {
+			if (!box || box.isEmpty()) return;
+			const THREE = global.THREE;
+			const size = box.getSize(new THREE.Vector3());
+			const center = box.getCenter(new THREE.Vector3());
+			const fill = Math.min(0.82, Math.max(0.7, Number(this.options.cameraFill) || 0.76));
+			const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+			const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(0.1, this.camera.aspect));
+			const heightDistance = size.y / (2 * Math.tan(verticalFov / 2) * fill);
+			const widthDistance = size.x / (2 * Math.tan(horizontalFov / 2) * 0.9);
+			const distance = Math.max(heightDistance, widthDistance, 0.5) * 1.08;
+			const direction = new THREE.Vector3(0.32, 0.08, 1).normalize();
+			this.camera.position.copy(center).addScaledVector(direction, distance);
+			this.camera.near = Math.max(0.01, distance - size.length() * 1.5);
+			this.camera.far = distance + size.length() * 3;
+			this.camera.lookAt(center);
+			this.camera.updateProjectionMatrix();
+			this.camera.updateMatrixWorld(true);
+		}
+
 		resize() {
 			if (!this.renderer || !this.camera) return;
 			const width = Math.max(1, this.container.clientWidth || 240);
@@ -342,12 +460,25 @@
 			this.camera.aspect = width / height;
 			this.camera.updateProjectionMatrix();
 			this.renderer.setSize(width, height, false);
+			if (this.currentBounds) this.fitCamera(this.currentBounds);
+			this.render();
+		}
+
+		render() {
+			if (this.renderer && this.scene && this.camera) this.renderer.render(this.scene, this.camera);
 		}
 
 		tick(delta) {
 			if (!this.ready || this.destroyed) return;
-			this.stateMachine.update(delta);
-			this.renderer.render(this.scene, this.camera);
+			if (!this.debugPaused) this.stateMachine.update(delta);
+			if (this.boxHelper && this.boxHelper.visible) {
+				this.boundsElapsed += delta;
+				if (this.boundsElapsed >= 0.2) {
+					this.boundsElapsed = 0;
+					this.refreshBounds(false);
+				}
+			}
+			this.render();
 		}
 
 		disposeObject(root) {
@@ -376,18 +507,22 @@
 			if (this.destroyed) return;
 			this.destroyed = true;
 			instances.delete(this);
+			this.debugListeners.forEach(remove => remove());
+			this.debugListeners = [];
 			if (this.resizeObserver) this.resizeObserver.disconnect();
 			if (this.stateMachine) this.stateMachine.destroy();
-			if (this.mixer && this.targetMesh) this.mixer.uncacheRoot(this.targetMesh);
+			if (this.mixer && this.model) this.mixer.uncacheRoot(this.model);
 			this.disposeObject(this.model);
 			this.disposeObject(this.floor);
 			this.disposeObject(this.ring);
-			this.disposeObject(this.chair);
+			this.disposeObject(this.skeletonHelper);
+			this.disposeObject(this.boxHelper);
 			if (this.renderer) {
 				this.renderer.dispose();
 				this.renderer.forceContextLoss();
 				this.renderer.domElement.remove();
 			}
+			if (this.debugPanel) this.debugPanel.remove();
 		}
 	}
 

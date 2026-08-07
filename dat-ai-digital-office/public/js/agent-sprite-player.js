@@ -221,14 +221,16 @@
 				return true;
 			}
 			const definition = this.config.three || {};
-			if (this.threeFailed || !definition.model || !definition.animations || !global.DAT_Agent3D || typeof global.DAT_Agent3D.create !== 'function') return false;
+			if (this.threeFailed || !definition.model || !global.DAT_Agent3D || typeof global.DAT_Agent3D.create !== 'function') return false;
 			this.removeRig();
 			this.threeCharacter = global.DAT_Agent3D.create(this.sprite, {
 				state: this.state,
 				stateMap: definition.stateMap,
-				clips: definition.clips,
+				states: definition.states,
+				startInBindPose: definition.startInBindPose === true && Boolean(global.DAT_AI_OFFICE_ADMIN),
+				debug: definition.debug === true && Boolean(global.DAT_AI_OFFICE_ADMIN),
+				cameraFill: definition.cameraFill,
 				modelUrl: imageUrl(this.options.assetBase, this.spriteId, definition.model, ''),
-				animationUrl: imageUrl(this.options.assetBase, this.spriteId, definition.animations, ''),
 				assetVersion: this.options.assetVersion,
 				onError: error => this.fallbackFromThree(error)
 			});

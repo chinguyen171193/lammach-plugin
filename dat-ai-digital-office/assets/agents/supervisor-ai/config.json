@@ -8,19 +8,20 @@
   "playback": "three",
   "three": {
     "model": "3d/Suit.gltf",
-    "animations": "3d/UAL1_Standard.glb",
+    "startInBindPose": true,
+    "debug": true,
+    "cameraFill": 0.76,
     "stateMap": {
       "idle": "idle",
       "working": "walk",
-      "reviewing": "sit",
-      "done": "stand"
+      "reviewing": "reviewing",
+      "done": "done"
     },
-    "clips": {
-      "idle": "Idle_Loop",
-      "walk": "Walk_Loop",
-      "sitEnter": "Sitting_Enter",
-      "sitIdle": "Sitting_Idle_Loop",
-      "stand": "Sitting_Exit"
+    "states": {
+      "idle": { "clip": "Idle", "loop": true },
+      "walk": { "clip": "Walk", "loop": true },
+      "reviewing": { "clip": "Idle_Neutral", "loop": true },
+      "done": { "clip": "Wave", "loop": false, "afterState": "idle" }
     }
   },
   "states": {

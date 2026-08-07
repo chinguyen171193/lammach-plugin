@@ -29,7 +29,7 @@ Mỗi Agent cũng khai báo một anchor cố định:
 
 `anchorX` là tâm ngang và `anchorY` là baseline ở đáy vùng nhìn thấy. Mọi frame được căn vào anchor này ngay trong PNG, vì vậy khi state đổi thì card, desk và sprite area không di chuyển.
 
-`supervisor-ai` là prototype 3D đầu tiên. Agent này dùng model toàn thân `Suit.gltf` từ Quaternius Ultimate Modular Men và animation `UAL1_Standard.glb` từ Universal Animation Library. `sale-ai` và `pcb-engineer` vẫn dùng skeletal rig SVG hiện có để không thay đổi các phần chưa nằm trong prototype. Các sprite sheet cũ và `portrait.png` vẫn được giữ làm fallback nếu WebGL hoặc asset 3D không tải được.
+`supervisor-ai` là prototype 3D đầu tiên. Agent này chỉ dùng model toàn thân và animation nhúng sẵn trong `Suit.gltf` từ Quaternius Ultimate Modular Men. Không retarget animation từ skeleton khác. `sale-ai` và `pcb-engineer` vẫn dùng skeletal rig SVG hiện có để không thay đổi các phần chưa nằm trong prototype. Các sprite sheet cũ và `portrait.png` vẫn được giữ làm fallback nếu WebGL hoặc asset 3D không tải được.
 
 | State | File | Frame | FPS | Loop |
 | --- | --- | ---: | ---: | --- |
@@ -54,7 +54,7 @@ Mỗi Agent cũng khai báo một anchor cố định:
 
 ### Chế độ skeletal rig không giật hình
 
-Supervisor AI và Sale AI dùng `playback: "rig"`. Player dựng nhân vật 2.5D bằng SVG nhiều lớp; bàn và màn hình đứng yên, trong khi đầu, mắt, tay, chuột, bàn phím và thiết bị được chuyển động độc lập. Chế độ này không đổi ảnh, không làm mờ và không scale toàn bộ nhân vật nên không có hiện tượng co giãn giữa các frame:
+Sale AI và PCB Engineer dùng `playback: "rig"`. Player dựng nhân vật 2.5D bằng SVG nhiều lớp; bàn và màn hình đứng yên, trong khi đầu, mắt, tay, chuột, bàn phím và thiết bị được chuyển động độc lập. Chế độ này không đổi ảnh, không làm mờ và không scale toàn bộ nhân vật nên không có hiện tượng co giãn giữa các frame:
 
 ```json
 "playback": "rig"
@@ -68,13 +68,16 @@ DAT Supervisor AI dùng `playback: "three"`. Model và animation được đóng
 "playback": "three",
 "three": {
   "model": "3d/Suit.gltf",
-  "animations": "3d/UAL1_Standard.glb"
+  "startInBindPose": true,
+  "debug": true
 }
 ```
 
-Mapping prototype hiện tại dùng đúng tên clip đã kiểm tra trong file: `idle → Idle_Loop`, `working → Walk_Loop`, `reviewing → Sitting_Enter` rồi `Sitting_Idle_Loop`, và `done → Sitting_Exit`. `typing` và `using_mouse` không tồn tại trong nguồn Universal Animation Library đang dùng, vì vậy phiên bản này không tự giả hai animation đó. Muốn bổ sung cần tạo animation tương thích trong Blender hoặc lấy từ nguồn có giấy phép rõ ràng.
+Mapping prototype hiện tại chỉ dùng clip nhúng cùng skeleton: `idle → Idle`, `working → Walk`, `reviewing → Idle_Neutral`, `done → Wave`. Model Suit không có `Sit`, `typing` hoặc `using_mouse`, vì vậy phiên bản này không tự giả các animation đó. Muốn bổ sung phải dùng model có clip cùng skeleton hoặc tạo animation tương thích trong Blender.
 
-Model `Suit.gltf` có 5 node gắn skin (Three.js tách thành 13 `SkinnedMesh` theo primitive), một skeleton 62 joints; file UAL có một node gắn skin (2 primitive `SkinnedMesh`), skeleton 65 joints. `public/js/agent-3d.js` retarget clip bằng mapping xương tường minh, ẩn phụ kiện súng của model Suit, render toàn thân và tự dừng khi card ra ngoài viewport hoặc tab bị ẩn. Thông tin nguồn và giấy phép nằm trong `assets/licenses/`.
+Model `Suit.gltf` có 5 node gắn skin (Three.js tách thành 13 `SkinnedMesh` theo primitive), một skeleton 62 joints và 24 clip nhúng sẵn. `public/js/agent-3d.js` ẩn phụ kiện súng, tính bounding box trực tiếp từ các vertex sau skinning và tự căn camera để nhân vật chiếm khoảng 70–80% chiều cao. Trong trang Admin, bảng debug cho phép hiện skeleton, bounding box, chọn native clip, pause và reset bind pose. Console cũng in đủ bones, clips, root transform và bounding box.
+
+`UAL1_Standard.glb` vẫn được lưu cùng thông tin giấy phép để nghiên cứu, nhưng không được enqueue hoặc tải bởi frontend. SkeletonUtils cũng không được enqueue. Điều này loại trừ hoàn toàn lỗi retarget trong prototype hiện tại.
 
 State, progress, task và Demo Agent vẫn hoạt động. Animation tự pause khi card ra ngoài màn hình hoặc tab trình duyệt bị ẩn. Khi có sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, có thể đổi `playback` thành `sprite` để dùng lại sprite sheet.
 
