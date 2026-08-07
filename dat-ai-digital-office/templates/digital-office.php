@@ -1,4 +1,9 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
+<style>
+/* Render after enqueued styles so the task panel is hidden until its button is pressed. */
+#<?php echo esc_attr( $config['id'] ); ?> .dat-ai-office__task-modal[hidden],
+#<?php echo esc_attr( $config['id'] ); ?> .dat-ai-office__agent-card[hidden] { display: none !important; }
+</style>
 <section id="<?php echo esc_attr( $config['id'] ); ?>" class="dat-ai-office dat-ai-office--<?php echo esc_attr( $config['theme'] ); ?>" style="--dat-ai-office-height:<?php echo esc_attr( $config['height'] ); ?>px" data-office-config="<?php echo esc_attr( wp_json_encode( $config ) ); ?>">
 	<div class="dat-ai-office__stage" aria-label="Mô phỏng văn phòng số AI"></div>
 	<?php if ( $config['showDashboard'] ) : ?><aside class="dat-ai-office__dashboard" data-office-dashboard><button type="button" class="dat-ai-office__collapse" data-office-toggle="dashboard" aria-label="Ẩn dashboard">×</button><span class="dat-ai-office__eyebrow">LIVE OPERATIONS</span><h2><?php echo esc_html( $config['data']['settings']['model_name'] ); ?></h2><div class="dat-ai-office__metrics" data-office-metrics></div></aside><?php endif; ?>
