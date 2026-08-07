@@ -1,0 +1,76 @@
+name: Deploy WordPress plugins
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Chọn plugin cần deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - dat-pcb-image-tracer
+          - cty-1-nguoi
+          - dat-ai-digital-office
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-pcb:
+    if: inputs.plugin == 'all' || inputs.plugin == 'dat-pcb-image-tracer'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy source code
+        uses: actions/checkout@v6
+
+      - name: Upload DAT PCB Image Tracer
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          local-dir: ./dat-pcb-image-tracer/
+          server-dir: /wp-content/plugins/dat-pcb-image-tracer/
+          dangerous-clean-slate: false
+
+  deploy-cty:
+    if: inputs.plugin == 'all' || inputs.plugin == 'cty-1-nguoi'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy source code
+        uses: actions/checkout@v6
+
+      - name: Upload CTY 1 Người
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          local-dir: ./cty-1-nguoi/
+          server-dir: /wp-content/plugins/cty-1-nguoi/
+          dangerous-clean-slate: false
+
+  deploy-ai-office:
+    if: inputs.plugin == 'all' || inputs.plugin == 'dat-ai-digital-office'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy source code
+        uses: actions/checkout@v6
+
+      - name: Upload LM AI Digital Office
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          local-dir: ./dat-ai-digital-office/
+          server-dir: /wp-content/plugins/dat-ai-digital-office/
+          dangerous-clean-slate: false
