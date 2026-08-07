@@ -58,10 +58,10 @@ Hai utility phát triển nằm trong `tools/`, không được tải bởi Word
 ```bash
 python -m pip install pillow
 python tools/check-agent-sprites.py --strict
-python tools/align-agent-sprites.py --scale 0.88 --normalize-height --write
+python tools/align-agent-sprites.py --scale 0.88 --normalize-height --normalize-width --write
 ```
 
-`check-agent-sprites.py` kiểm tra kích thước sheet, alpha canvas, bounding box, tâm nhân vật và baseline giữa các frame. Utility báo lỗi nếu file thiếu/sai kích thước, và cảnh báo nếu tâm lệch quá 8px, tâm dọc quá 12px hoặc baseline lệch quá 6px.
+`check-agent-sprites.py` kiểm tra kích thước sheet, alpha canvas, bounding box, tâm nhân vật, baseline và kích thước object giữa các frame. Utility báo lỗi nếu file thiếu/sai kích thước, và cảnh báo nếu tâm lệch quá 8px, tâm dọc quá 12px, baseline lệch quá 6px hoặc object thay đổi quá 10px chiều rộng/12px chiều cao.
 
 ## Thêm Agent mới
 

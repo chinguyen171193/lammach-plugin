@@ -25,6 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--agent', action='append', dest='agents', help='Agent folder name; repeat to target several agents.')
     parser.add_argument('--scale', type=float, default=0.88, help='Uniform pre-alignment scale; default: 0.88.')
     parser.add_argument('--normalize-height', action='store_true', help='Normalize each frame alpha height to the median height of its state.')
+    parser.add_argument('--normalize-width', action='store_true', help='Normalize each frame alpha width to the median width of its state.')
     parser.add_argument('--write', action='store_true', help='Write the corrected PNG files. Without this flag, only validate.')
     return parser.parse_args()
 
@@ -36,10 +37,22 @@ def alpha_height(frame: Image.Image) -> int:
     return bbox[3] - bbox[1]
 
 
-def aligned_frame(frame: Image.Image, frame_width: int, frame_height: int, anchor_x: int, anchor_y: int, scale: float) -> Image.Image:
-    scaled = frame.convert('RGBA').resize((round(frame_width * scale), round(frame_height * scale)), Image.Resampling.LANCZOS)
+def alpha_width(frame: Image.Image) -> int:
+    bbox = frame.getchannel('A').getbbox()
+    if not bbox:
+        raise ValueError('empty alpha frame')
+    return bbox[2] - bbox[0]
+
+
+def aligned_frame(frame: Image.Image, frame_width: int, frame_height: int, anchor_x: int, anchor_y: int, scale_x: float, scale_y: float) -> Image.Image:
+    scaled = frame.convert('RGBA').resize((round(frame_width * scale_x), round(frame_height * scale_y)), Image.Resampling.LANCZOS)
     padded = Image.new('RGBA', (frame_width, frame_height), (0, 0, 0, 0))
-    padded.alpha_composite(scaled, ((frame_width - scaled.width) // 2, (frame_height - scaled.height) // 2))
+    origin_x = (frame_width - scaled.width) // 2
+    origin_y = (frame_height - scaled.height) // 2
+    source_bbox = scaled.getchannel('A').getbbox()
+    if source_bbox and (source_bbox[0] + origin_x < 0 or source_bbox[2] + origin_x > frame_width or source_bbox[1] + origin_y < 0 or source_bbox[3] + origin_y > frame_height):
+        raise ValueError('normalization would crop visible pixels; lower --scale or use a wider source canvas')
+    padded.alpha_composite(scaled, (origin_x, origin_y))
     bbox = padded.getchannel('A').getbbox()
     if not bbox:
         raise ValueError('empty alpha frame')
@@ -68,12 +81,16 @@ def process_agent(folder: Path, args: argparse.Namespace) -> None:
             raise ValueError(f'{path}: unexpected sprite sheet dimensions')
         source_frames = [sheet.crop((index * frame_width, 0, (index + 1) * frame_width, frame_height)) for index in range(frames)]
         target_height = median(alpha_height(frame) for frame in source_frames)
+        target_width = median(alpha_width(frame) for frame in source_frames)
         output = Image.new('RGBA', sheet.size, (0, 0, 0, 0))
         for index, frame in enumerate(source_frames):
-            scale = args.scale
+            scale_x = args.scale
+            scale_y = args.scale
             if args.normalize_height:
-                scale *= target_height / alpha_height(frame)
-            output.alpha_composite(aligned_frame(frame, frame_width, frame_height, anchor_x, anchor_y, scale), (index * frame_width, 0))
+                scale_y *= target_height / alpha_height(frame)
+            if args.normalize_width:
+                scale_x *= target_width / alpha_width(frame)
+            output.alpha_composite(aligned_frame(frame, frame_width, frame_height, anchor_x, anchor_y, scale_x, scale_y), (index * frame_width, 0))
         print(f'{folder.name}/{state}: anchor ({anchor_x}, {anchor_y}), scale {args.scale:.2f}')
         if args.write:
             temporary = path.with_suffix('.aligned.png')

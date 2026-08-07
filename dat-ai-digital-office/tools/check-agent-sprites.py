@@ -133,9 +133,10 @@ def main() -> int:
                 alignment = state['alignment']
                 message = (
                     f"  {state['state']}: center Δx {alignment['centerXSpread']:.1f}px, "
-                    f"Δy {alignment['centerYSpread']:.1f}px, bottom Δ {alignment['bottomSpread']:.1f}px"
+                    f"Δy {alignment['centerYSpread']:.1f}px, bottom Δ {alignment['bottomSpread']:.1f}px, "
+                    f"size Δw {alignment['widthSpread']:.1f}px, Δh {alignment['heightSpread']:.1f}px"
                 )
-                is_misaligned = alignment['centerXSpread'] > 8 or alignment['centerYSpread'] > 12 or alignment['bottomSpread'] > 6
+                is_misaligned = alignment['centerXSpread'] > 8 or alignment['centerYSpread'] > 12 or alignment['bottomSpread'] > 6 or alignment['widthSpread'] > 10 or alignment['heightSpread'] > 12
                 print(message + ('  WARNING: alignment drift' if is_misaligned else '  OK'))
                 warnings += int(is_misaligned)
 
