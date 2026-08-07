@@ -1,0 +1,51 @@
+Animation inventory: UAL1_Standard.glb
+======================================
+
+01. A_TPose
+02. Crouch_Fwd_Loop
+03. Crouch_Idle_Loop
+04. Dance_Loop
+05. Death01
+06. Driving_Loop
+07. Fixing_Kneeling
+08. Hit_Chest
+09. Hit_Head
+10. Idle_Loop
+11. Idle_Talking_Loop
+12. Idle_Torch_Loop
+13. Interact
+14. Jog_Fwd_Loop
+15. Jump_Land
+16. Jump_Loop
+17. Jump_Start
+18. PickUp_Table
+19. Pistol_Aim_Down
+20. Pistol_Aim_Neutral
+21. Pistol_Aim_Up
+22. Pistol_Idle_Loop
+23. Pistol_Reload
+24. Pistol_Shoot
+25. Punch_Cross
+26. Punch_Jab
+27. Push_Loop
+28. Roll
+29. Sitting_Enter
+30. Sitting_Exit
+31. Sitting_Idle_Loop
+32. Sitting_Talking_Loop
+33. Spell_Simple_Enter
+34. Spell_Simple_Exit
+35. Spell_Simple_Idle_Loop
+36. Spell_Simple_Shoot
+37. Sprint_Loop
+38. Swim_Fwd_Loop
+39. Swim_Idle_Loop
+40. Sword_Attack
+41. Sword_Idle
+42. Walk_Formal_Loop
+43. Walk_Loop
+
+Prototype clips: Idle_Loop, Walk_Loop, Sitting_Enter,
+Sitting_Idle_Loop, Sitting_Exit.
+
+There is no clip named typing or using_mouse in this source file.

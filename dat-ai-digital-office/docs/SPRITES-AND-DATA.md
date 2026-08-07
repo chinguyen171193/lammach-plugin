@@ -29,7 +29,7 @@ Mỗi Agent cũng khai báo một anchor cố định:
 
 `anchorX` là tâm ngang và `anchorY` là baseline ở đáy vùng nhìn thấy. Mọi frame được căn vào anchor này ngay trong PNG, vì vậy khi state đổi thì card, desk và sprite area không di chuyển.
 
-`supervisor-ai` và `sale-ai` tiếp tục dùng skeletal rig SVG ổn định. Riêng `pcb-engineer` là nguyên mẫu nhân vật 3D toàn thân: đầu, thân, tay và chân là các khớp riêng, được Three.js render trực tiếp trong card. Các sprite PNG và `portrait.png` vẫn được giữ làm nguồn thay thế. Nếu WebGL không khả dụng, `AgentSpritePlayer` tự quay về skeletal rig SVG; card không bị trắng hoặc hỏng.
+`supervisor-ai` là prototype 3D đầu tiên. Agent này dùng model toàn thân `Suit.gltf` từ Quaternius Ultimate Modular Men và animation `UAL1_Standard.glb` từ Universal Animation Library. `sale-ai` và `pcb-engineer` vẫn dùng skeletal rig SVG hiện có để không thay đổi các phần chưa nằm trong prototype. Các sprite sheet cũ và `portrait.png` vẫn được giữ làm fallback nếu WebGL hoặc asset 3D không tải được.
 
 | State | File | Frame | FPS | Loop |
 | --- | --- | ---: | ---: | --- |
@@ -60,15 +60,21 @@ Supervisor AI và Sale AI dùng `playback: "rig"`. Player dựng nhân vật 2.5
 "playback": "rig"
 ```
 
-### Nguyên mẫu nhân vật 3D toàn thân
+### Prototype 3D Quaternius toàn thân
 
-Gerber AI dùng `playback: "three"`. `public/js/agent-3d.js` tạo một nhân vật kỹ sư PCB toàn thân, ghế, bàn, màn hình, bàn phím, chuột và PCB trong một scene WebGL cố định. Mọi trạng thái chỉ thay đổi góc khớp rồi nội suy theo thời gian; canvas và camera không đổi nên hình không co, mờ hoặc nhảy frame:
+DAT Supervisor AI dùng `playback: "three"`. Model và animation được đóng gói trong plugin, không dùng CDN. Renderer dùng Three.js `AnimationMixer`; state machine nằm riêng trong `public/js/agent-3d-state-machine.js` và cross-fade giữa các clip để không gắn logic chuyển động vào giao diện:
 
 ```json
-"playback": "three"
+"playback": "three",
+"three": {
+  "model": "3d/Suit.gltf",
+  "animations": "3d/UAL1_Standard.glb"
+}
 ```
 
-`idle` có thở và chớp mắt; `working` điều khiển hai tay, chuột, bàn phím và hướng nhìn; `reviewing` nghiêng người quan sát PCB; `done` đưa tay báo hoàn thành. Renderer tự dừng khi card ra ngoài viewport hoặc tab bị ẩn. Three.js 0.128.0 được đóng gói trong `public/js/vendor/`, không dùng CDN.
+Mapping prototype hiện tại dùng đúng tên clip đã kiểm tra trong file: `idle → Idle_Loop`, `working → Walk_Loop`, `reviewing → Sitting_Enter` rồi `Sitting_Idle_Loop`, và `done → Sitting_Exit`. `typing` và `using_mouse` không tồn tại trong nguồn Universal Animation Library đang dùng, vì vậy phiên bản này không tự giả hai animation đó. Muốn bổ sung cần tạo animation tương thích trong Blender hoặc lấy từ nguồn có giấy phép rõ ràng.
+
+Model `Suit.gltf` có 5 node gắn skin (Three.js tách thành 13 `SkinnedMesh` theo primitive), một skeleton 62 joints; file UAL có một node gắn skin (2 primitive `SkinnedMesh`), skeleton 65 joints. `public/js/agent-3d.js` retarget clip bằng mapping xương tường minh, ẩn phụ kiện súng của model Suit, render toàn thân và tự dừng khi card ra ngoài viewport hoặc tab bị ẩn. Thông tin nguồn và giấy phép nằm trong `assets/licenses/`.
 
 State, progress, task và Demo Agent vẫn hoạt động. Animation tự pause khi card ra ngoài màn hình hoặc tab trình duyệt bị ẩn. Khi có sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, có thể đổi `playback` thành `sprite` để dùng lại sprite sheet.
 
@@ -106,15 +112,15 @@ Khi tạo lại asset, khóa hoàn toàn camera angle, desk, chair và monitor p
 Khi Agent card đã được render, gọi từ JavaScript:
 
 ```js
-updateAgentState('ai_3', 'reviewing');
-updateAgentTask('ai_3', 'Phân tích Gerber', 65);
+updateAgentState('ai_1', 'reviewing');
+updateAgentTask('ai_1', 'Rà soát dashboard', 65);
 ```
 
 `AgentSpritePlayer` cũng cung cấp `loadState()`, `setState()`, `play()`, `pause()`, `stop()` và `destroy()`. Khi state `done` kết thúc, player tự quay lại `idle`.
 
 ## Demo
 
-Vào **DAT AI Office → Nhân viên và AI Agent**, bấm **Demo Agent**. Demo chạy: idle 2 giây → working 8 giây (10–80%) → reviewing 4 giây → done 2 giây → idle cho Gerber AI và cập nhật nhật ký ngay trên trang.
+Vào **DAT AI Office → Nhân viên và AI Agent**, bấm **Demo Agent**. Demo chạy: idle 2 giây → working 8 giây (10–80%) → reviewing 4 giây → done 2 giây → idle cho DAT Supervisor AI và cập nhật nhật ký ngay trên trang.
 
 ## Kết nối dữ liệu thật
 

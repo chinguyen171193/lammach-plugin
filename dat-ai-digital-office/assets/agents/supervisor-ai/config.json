@@ -5,7 +5,24 @@
   "frameHeight": 400,
   "anchorX": 160,
   "anchorY": 345,
-  "playback": "rig",
+  "playback": "three",
+  "three": {
+    "model": "3d/Suit.gltf",
+    "animations": "3d/UAL1_Standard.glb",
+    "stateMap": {
+      "idle": "idle",
+      "working": "walk",
+      "reviewing": "sit",
+      "done": "stand"
+    },
+    "clips": {
+      "idle": "Idle_Loop",
+      "walk": "Walk_Loop",
+      "sitEnter": "Sitting_Enter",
+      "sitIdle": "Sitting_Idle_Loop",
+      "stand": "Sitting_Exit"
+    }
+  },
   "states": {
     "idle": { "image": "idle.png", "frames": 8, "fps": 5, "loop": true, "frameDurations": [220, 200, 240, 360, 200, 240, 300, 480] },
     "working": { "image": "working.png", "frames": 12, "fps": 8, "loop": true, "frameDurations": [180, 180, 170, 140, 180, 260, 800, 180, 180, 160, 250, 440] },

@@ -40,28 +40,28 @@
 		if (button.dataset.running) return;
 		button.dataset.running = '1';
 		button.disabled = true;
-		const agentId = 'ai_3';
+		const agentId = 'ai_1';
 		global.updateAgentState(agentId, 'idle');
-		global.updateAgentTask(agentId, 'Đang chờ file Gerber', 0);
-		addLog('PCB Engineer đang ở trạng thái ' + stateLabel('idle') + '.', 'new_gerber');
+		global.updateAgentTask(agentId, 'Đang theo dõi hoạt động công ty', 0);
+		addLog('DAT Supervisor AI đang ở trạng thái ' + stateLabel('idle') + '.', 'new_customer');
 		await wait(2000);
 		global.updateAgentState(agentId, 'working');
-		addLog('Gerber AI bắt đầu phân tích DRC.', 'new_gerber');
+		addLog('DAT Supervisor AI bắt đầu điều phối hoạt động.', 'production_started');
 		for (let progress = 10; progress <= 80; progress += 10) {
-			global.updateAgentTask(agentId, 'Phân tích Gerber và kiểm tra DRC', progress);
+			global.updateAgentTask(agentId, 'Điều phối các phòng ban', progress);
 			await wait(1000);
 		}
 		await wait(1000);
 		global.updateAgentState(agentId, 'reviewing');
-		addLog('PCB Engineer đang rà soát kết quả phân tích.', 'gerber_checked');
+		addLog('DAT Supervisor AI đang rà soát dashboard.', 'production_completed');
 		await wait(4000);
 		global.updateAgentState(agentId, 'done');
-		global.updateAgentTask(agentId, 'Đã hoàn thành kiểm tra Gerber', 100);
-		addLog('Gerber AI đã hoàn thành và gửi kết quả.', 'gerber_checked');
+		global.updateAgentTask(agentId, 'Đã hoàn thành phiên điều phối', 100);
+		addLog('DAT Supervisor AI đã hoàn thành phiên điều phối.', 'production_completed');
 		await wait(2000);
 		global.updateAgentState(agentId, 'idle');
 		global.updateAgentTask(agentId, 'Đang chờ nhiệm vụ tiếp theo', 0);
-		addLog('Demo hoàn tất. PCB Engineer quay lại trạng thái chờ.', 'gerber_checked');
+		addLog('Demo hoàn tất. DAT Supervisor AI quay lại trạng thái chờ.', 'production_completed');
 		button.disabled = false;
 		delete button.dataset.running;
 	}

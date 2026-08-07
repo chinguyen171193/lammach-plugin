@@ -3,7 +3,7 @@ Contributors: dat
 Tags: ai, office, simulation, pixijs, workflow
 Requires at least: 6.4
 Requires PHP: 8.0
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 
 Mô phỏng trực quan văn phòng số với nhân viên, AI Agent, workflow, dashboard và log thời gian thực.

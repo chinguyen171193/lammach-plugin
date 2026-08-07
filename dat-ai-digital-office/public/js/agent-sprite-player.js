@@ -220,12 +220,42 @@
 				this.threeCharacter.setState(this.state);
 				return true;
 			}
-			if (this.spriteId !== 'pcb-engineer' || !global.DAT_Agent3D || typeof global.DAT_Agent3D.create !== 'function') return false;
+			const definition = this.config.three || {};
+			if (this.threeFailed || !definition.model || !definition.animations || !global.DAT_Agent3D || typeof global.DAT_Agent3D.create !== 'function') return false;
 			this.removeRig();
-			this.threeCharacter = global.DAT_Agent3D.create(this.sprite, { state: this.state });
+			this.threeCharacter = global.DAT_Agent3D.create(this.sprite, {
+				state: this.state,
+				stateMap: definition.stateMap,
+				clips: definition.clips,
+				modelUrl: imageUrl(this.options.assetBase, this.spriteId, definition.model, ''),
+				animationUrl: imageUrl(this.options.assetBase, this.spriteId, definition.animations, ''),
+				assetVersion: this.options.assetVersion,
+				onError: error => this.fallbackFromThree(error)
+			});
+			if (this.threeFailed && this.threeCharacter) {
+				this.threeCharacter.destroy();
+				this.threeCharacter = null;
+			}
 			if (!this.threeCharacter) return false;
 			this.sprite.classList.add('is-agent-3d');
 			return true;
+		}
+
+		fallbackFromThree(error) {
+			if (this.destroyed || this.threeFailed) return;
+			this.threeFailed = true;
+			const failedCharacter = this.threeCharacter;
+			this.threeCharacter = null;
+			if (failedCharacter) failedCharacter.destroy();
+			this.sprite.replaceChildren();
+			this.sprite.classList.remove('is-agent-3d');
+			this.element.classList.remove('has-agent-3d', 'is-agent-3d-ready');
+			const rigReady = this.ensureRig();
+			this.element.classList.toggle('has-agent-rig', rigReady);
+			this.element.classList.toggle('is-sprite-ready', rigReady);
+			if (global.console && typeof global.console.warn === 'function') {
+				global.console.warn('DAT AI Office: không tải được nhân vật 3D, đã dùng fallback.', error);
+			}
 		}
 
 		portraitSource() {
@@ -240,11 +270,10 @@
 		}
 
 		removeThree() {
-			if (!this.threeCharacter) return;
-			this.threeCharacter.destroy();
+			if (this.threeCharacter) this.threeCharacter.destroy();
 			this.threeCharacter = null;
 			this.sprite.classList.remove('is-agent-3d');
-			this.element.classList.remove('has-agent-3d');
+			this.element.classList.remove('has-agent-3d', 'is-agent-3d-ready');
 		}
 
 		usePreloadedSource(source) {
