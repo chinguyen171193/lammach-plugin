@@ -3,25 +3,23 @@
 ## Asset
 
 - Local file: `assets/agents/supervisor-ai/3d/ready-player-me-face-prototype.glb`
-- Original filename: `avatars/brunette-t.glb`
-- Source repository: <https://github.com/met4citizen/TalkingHead>
-- Direct source: <https://github.com/met4citizen/TalkingHead/blob/main/avatars/brunette-t.glb>
-- Creator platform: Ready Player Me
-- SHA-256: `3ca13a1e3ad8f57e50266294b823641680dd3f3f174eb4be908ddca7afc0c82a`
+- Original filename: `public/male.glb`
+- Source repository: <https://github.com/readyplayerme/visage/tree/github-pages>
+- Direct source: <https://github.com/readyplayerme/visage/blob/github-pages/public/male.glb>
+- Publisher: Ready Player Me
+- SHA-256: `4af6d89e85c129e2252aa3d13ce25322fa31c1a170a25dde6e3496d1301589f4`
 
-The TalkingHead project identifies its example `brunette.glb` Ready Player Me avatar as available to developers for non-commercial use under **CC BY-NC 4.0**. The T-pose variant used here is kept only as an administrator-facing technical prototype. Attribution: “Example avatar created with Ready Player Me; distributed by the TalkingHead example project.”
+The source branch is published by Ready Player Me with the repository's MIT License. A copy is stored in `READY-PLAYER-ME-VISAGE-MIT-LICENSE.txt`. Ready Player Me platform terms may additionally apply to avatars created or downloaded through its services: <https://readyplayer.me/terms>.
 
-License deed: <https://creativecommons.org/licenses/by-nc/4.0/>
-
-For commercial production, do not assume that this example asset is covered. Create/download an avatar through the project owner's registered Ready Player Me developer account and comply with the current Ready Player Me terms: <https://readyplayer.me/terms>.
+The asset remains administrator-facing and is not loaded on the public Agent card. For a production identity, replace this example with an avatar created under the project owner's own Ready Player Me developer account.
 
 ## Verified technical limits
 
-- File size: 2,875,236 bytes
-- Triangles: 13,317
-- Maximum embedded texture: 1024 × 1024 px
+- File size: 10,512,568 bytes
+- Triangles: 18,391
+- Maximum embedded texture: 2048 × 2048 px
 - Skeleton: one skin, 67 joints
-- Facial controls: `Head`, `LeftEye`, `RightEye` bones and 67 morph targets
+- Facial controls: `Head`, `LeftEye`, `RightEye` bones and 72 morph targets
 - Embedded body animation clips: none
 
 The plugin therefore loads this asset only after an administrator clicks **Face Preview**. It is not used for the public Agent card and no animation from another skeleton is attached to it.

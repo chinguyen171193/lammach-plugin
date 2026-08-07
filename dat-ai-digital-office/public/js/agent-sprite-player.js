@@ -231,6 +231,7 @@
 				debug: definition.debug === true && Boolean(global.DAT_AI_OFFICE_ADMIN),
 				facePreview: definition.facePreview && definition.facePreview.model ? {
 					modelUrl: imageUrl(this.options.assetBase, this.spriteId, definition.facePreview.model, ''),
+					textureUrl: definition.facePreview.texture ? imageUrl(this.options.assetBase, this.spriteId, definition.facePreview.texture, '') : '',
 					cameraFill: definition.facePreview.cameraFill
 				} : null,
 				cameraFill: definition.cameraFill,

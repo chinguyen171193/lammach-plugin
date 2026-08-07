@@ -34,8 +34,12 @@ Tất cả file được đóng gói cục bộ trong plugin; frontend không t�
 ## Ready Player Me Face Preview
 
 - Model kỹ thuật: `assets/agents/supervisor-ai/3d/ready-player-me-face-prototype.glb`
-- Nguồn: TalkingHead example `avatars/brunette-t.glb`, được tạo bằng Ready Player Me
+- Nguồn: Ready Player Me Visage official example `public/male.glb`
 - Mục đích: chỉ dùng cho Face Preview trong trang quản trị; không thay Suit hoặc animation cơ thể
 - Giấy phép và giới hạn sử dụng: xem `READY-PLAYER-ME-FACE-PROTOTYPE-LICENSE.md`
 
-Model đã được kiểm tra trực tiếp: 13.317 triangles, texture tối đa 1024 px, 67 joints, 67 morph targets và không có clip animation cơ thể nhúng sẵn. Vì vậy plugin không retarget animation Suit/UAL vào model này.
+Model nam đã được kiểm tra trực tiếp: 18.391 triangles, texture tối đa 2048 px, 67 joints, 72 morph targets và không có clip animation cơ thể nhúng sẵn. Vì vậy plugin không retarget animation Suit/UAL vào model này. Facewear và headwear của sample được ẩn trong Face Preview để không che khuôn mặt.
+
+- Texture khuôn mặt DAT Supervisor: `assets/agents/supervisor-ai/3d/textures/supervisor-face-v1.png`
+- Nguồn: texture gốc của model Ready Player Me Visage, được vẽ lại bằng AI cho prototype DAT Supervisor.
+- Mục đích: chỉ thay material `Wolf3D_Head` trong Face Preview; GLB gốc không bị sửa.

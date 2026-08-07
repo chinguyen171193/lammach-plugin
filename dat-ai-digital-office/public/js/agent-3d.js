@@ -166,7 +166,7 @@
 						this.disposeObject(asset.scene);
 						return;
 					}
-					this.installFaceModel(asset);
+					await this.installFaceModel(asset);
 				} catch (error) {
 					global.console.error('[DAT AI Office Face Preview]', error);
 					if (this.faceController) this.faceController.destroy();
@@ -201,7 +201,7 @@
 			startScheduler();
 		}
 
-		installFaceModel(modelAsset) {
+		async installFaceModel(modelAsset) {
 			const THREE = global.THREE;
 			this.faceModel = modelAsset.scene;
 			this.faceAnimations = modelAsset.animations || [];
@@ -209,12 +209,22 @@
 			this.faceModel.position.set(0, 0, 0);
 			this.faceModel.scale.set(1, 1, 1);
 			this.faceModel.traverse(object => {
+				// The official Visage sample is male but ships with carnival facewear
+				// and a helmet. Hide only those verified accessory nodes so the
+				// administrator can inspect the actual face and morph targets.
+				if (object.name === 'Wolf3D_Facewear' || object.name === 'Wolf3D_Headwear') object.visible = false;
 				if (object.isMesh) {
 					object.castShadow = true;
 					object.receiveShadow = true;
 				}
 			});
 			this.scene.add(this.faceModel);
+			try {
+				await this.applyFaceTexture();
+			} catch (error) {
+				// A custom texture is optional. Keep the original GLB texture as a safe fallback.
+				global.console.warn('[DAT AI Office Face Preview] Không tải được texture tự vẽ, dùng texture gốc.', error);
+			}
 			this.faceModel.updateMatrixWorld(true);
 			let box = new THREE.Box3().setFromObject(this.faceModel);
 			const center = box.getCenter(new THREE.Vector3());
@@ -224,6 +234,37 @@
 			this.faceBounds = box;
 			this.faceController = new global.DAT_AgentFaceController(this.faceModel);
 			this.printFaceDiagnostics();
+		}
+
+		loadTexture(url) {
+			return new Promise((resolve, reject) => {
+				new global.THREE.TextureLoader().load(url, resolve, undefined, reject);
+			});
+		}
+
+		async applyFaceTexture() {
+			const url = this.options.facePreview?.textureUrl;
+			if (!url) return false;
+			const texture = await this.loadTexture(versionedUrl(url, this.options.assetVersion));
+			texture.encoding = global.THREE.sRGBEncoding;
+			texture.flipY = false;
+			let applied = false;
+			this.faceModel.traverse(object => {
+				if (!object.isMesh || object.name !== 'Wolf3D_Head') return;
+				const original = Array.isArray(object.material) ? object.material[0] : object.material;
+				if (!original) return;
+				const material = original.clone();
+				material.map = texture;
+				material.needsUpdate = true;
+				object.material = material;
+				applied = true;
+			});
+			if (!applied) {
+				texture.dispose();
+				throw new Error('Không tìm thấy mesh Wolf3D_Head để áp texture');
+			}
+			this.faceTexture = texture;
+			return true;
 		}
 
 		showBodyPreview() {
