@@ -51,7 +51,8 @@
 	}
 
 	function startScheduler() {
-		if (!animationFrame && !document.hidden && players.size) {
+		const hasActivePlayer = Array.from(players).some(player => player.needsScheduler());
+		if (!animationFrame && !document.hidden && hasActivePlayer) {
 			animationFrame = global.requestAnimationFrame(tick);
 		}
 	}
@@ -66,6 +67,7 @@
 
 	document.addEventListener('visibilitychange', () => {
 		previousTime = 0;
+		players.forEach(player => player.syncAnimationState());
 		if (!document.hidden) startScheduler();
 	});
 
@@ -118,6 +120,7 @@
 
 		preloadStates() {
 			if (this.config.placeholder || !this.config.states) return Promise.resolve();
+			if (this.playbackMode(this.config.states[this.state]) === 'rig') return Promise.resolve();
 			const sources = Object.keys(this.config.states).map(key => {
 				const definition = this.config.states[key] || {};
 				return imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
@@ -132,6 +135,7 @@
 			if ('IntersectionObserver' in global) {
 				this.observer = new IntersectionObserver(entries => {
 					this.inViewport = entries.some(entry => entry.isIntersecting);
+					this.syncAnimationState();
 					if (this.inViewport) startScheduler();
 				}, { threshold: 0.05 });
 				this.observer.observe(this.element);
@@ -162,20 +166,40 @@
 			this.frame = playback === 'stable' ? this.stableFrame(visualDefinition, frames) : 0;
 			this.elapsed = 0;
 			this.doneDelay = 0;
-			const source = this.config.placeholder ? '' : imageUrl(this.options.assetBase, this.spriteId, visualDefinition.image, this.options.assetVersion);
+			const source = this.config.placeholder || playback === 'rig' ? '' : imageUrl(this.options.assetBase, this.spriteId, visualDefinition.image, this.options.assetVersion);
 			this.element.dataset.spriteState = this.state;
 			this.element.dataset.spritePlayback = playback;
 			this.element.style.setProperty('--agent-frame-count', frames);
 			this.element.style.setProperty('--agent-frame', String(this.frame));
+			const rigReady = playback === 'rig' ? this.ensureRig() : false;
+			if (playback !== 'rig') this.removeRig();
 			this.sprite.style.backgroundImage = source ? 'url("' + source.replace(/"/g, '%22') + '")' : 'none';
 			this.element.classList.toggle('has-sprite-image', Boolean(source));
+			this.element.classList.toggle('has-agent-rig', rigReady);
 			this.element.classList.toggle('is-stable-playback', playback === 'stable');
 			this.element.dataset.spriteInitialized = '1';
 			if (source) this.usePreloadedSource(source);
-			else this.element.classList.remove('is-sprite-ready');
+			else this.element.classList.toggle('is-sprite-ready', rigReady);
 			this.renderFrame();
 			this.syncCard();
+			this.syncAnimationState();
 			startScheduler();
+		}
+
+		ensureRig() {
+			if (this.rigMounted) return true;
+			if (!global.DAT_AgentRig || typeof global.DAT_AgentRig.markup !== 'function') return false;
+			this.sprite.innerHTML = global.DAT_AgentRig.markup(this.spriteId);
+			this.sprite.classList.add('is-agent-rig');
+			this.rigMounted = true;
+			return true;
+		}
+
+		removeRig() {
+			if (!this.rigMounted) return;
+			this.sprite.replaceChildren();
+			this.sprite.classList.remove('is-agent-rig');
+			this.rigMounted = false;
 		}
 
 		usePreloadedSource(source) {
@@ -201,9 +225,22 @@
 			return this;
 		}
 
-		play() { this.running = true; startScheduler(); return this; }
-		pause() { this.running = false; return this; }
-		stop() { this.running = false; this.frame = 0; this.renderFrame(); return this; }
+		play() { this.running = true; this.syncAnimationState(); startScheduler(); return this; }
+		pause() { this.running = false; this.syncAnimationState(); return this; }
+		syncAnimationState() {
+			this.element.classList.toggle('is-animation-paused', !this.running || !this.inViewport || document.hidden);
+		}
+		stop() {
+			this.running = false;
+			const definition = this.config.states[this.state] || this.config.states.idle;
+			const visualDefinition = this.visualDefinition(definition);
+			const frames = Math.max(1, Number(visualDefinition && visualDefinition.frames) || 1);
+			const playback = this.playbackMode(definition);
+			this.frame = playback === 'stable' ? this.stableFrame(visualDefinition, frames) : 0;
+			this.renderFrame();
+			this.syncAnimationState();
+			return this;
+		}
 
 		frameDuration(definition, frame) {
 			const durations = definition && Array.isArray(definition.frameDurations) ? definition.frameDurations : [];
@@ -223,7 +260,14 @@
 
 		playbackMode(definition) {
 			const mode = String((definition && definition.playback) || this.config.playback || 'sprite').toLowerCase();
-			return mode === 'stable' ? 'stable' : 'sprite';
+			return mode === 'stable' || mode === 'rig' ? mode : 'sprite';
+		}
+
+		needsScheduler() {
+			if (this.destroyed || !this.running || !this.inViewport || document.hidden || !this.config.states) return false;
+			const definition = this.config.states[this.state] || this.config.states.idle;
+			const playback = this.playbackMode(definition);
+			return playback === 'sprite' || this.state === 'done';
 		}
 
 		visualDefinition(definition) {
@@ -248,7 +292,8 @@
 			if (!definition) return;
 			const frames = Math.max(1, Number(definition.frames) || 1);
 			const elapsedMs = Math.max(0, delta * 1000);
-			if (this.playbackMode(definition) === 'stable') {
+			const playback = this.playbackMode(definition);
+			if (playback === 'rig' || playback === 'stable') {
 				if (!definition.loop && this.state === 'done') {
 					this.doneDelay += elapsedMs;
 					const holdLast = Math.max(1000, Number(definition.holdLast) || 1400);
@@ -285,6 +330,7 @@
 
 		renderFrame() {
 			const stateDefinition = this.config.states[this.state] || this.config.states.idle;
+			if (this.playbackMode(stateDefinition) === 'rig') return;
 			const definition = this.visualDefinition(stateDefinition);
 			const frames = Math.max(1, Number(definition && definition.frames) || 1);
 			const frameWidth = Math.max(1, Number(this.config.frameWidth) || 320);
@@ -314,6 +360,7 @@
 			players.delete(this);
 			if (this.observer) this.observer.disconnect();
 			if (this.resizeObserver) this.resizeObserver.disconnect();
+			this.removeRig();
 			if (this.agentId && registry.has(this.agentId)) registry.get(this.agentId).delete(this);
 		}
 	}

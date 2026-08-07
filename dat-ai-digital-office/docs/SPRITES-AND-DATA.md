@@ -28,7 +28,7 @@ Mỗi Agent cũng khai báo một anchor cố định:
 
 `anchorX` là tâm ngang và `anchorY` là baseline ở đáy vùng nhìn thấy. Mọi frame được căn vào anchor này ngay trong PNG, vì vậy khi state đổi thì card, desk và sprite area không di chuyển.
 
-Ba Agent thử nghiệm đã dùng sprite PNG thật: `supervisor-ai`, `sale-ai` và `pcb-engineer`. Các config của chúng đặt `"placeholder": false` để ưu tiên sprite. Nếu file không tải được, `AgentSpritePlayer` tự trả về nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
+Ba Agent thử nghiệm `supervisor-ai`, `sale-ai` và `pcb-engineer` dùng skeletal rig SVG để chuyển động ổn định. Các sprite PNG vẫn được giữ làm nguồn thay thế và để bật lại chế độ sprite sau này. Nếu rig hoặc asset không tải được, `AgentSpritePlayer` giữ nhân vật CSS dự phòng; card không bị trắng hoặc hỏng.
 
 | State | File | Frame | FPS | Loop |
 | --- | --- | ---: | ---: | --- |
@@ -51,16 +51,15 @@ Ba Agent thử nghiệm đã dùng sprite PNG thật: `supervisor-ai`, `sale-ai`
 
 `frameOffsets` là tùy chọn chỉ dành cho asset bên thứ ba chưa được bake anchor. Đây là mảng `{ "x": 0, "y": 0 }` theo pixel gốc của một frame; giá trị dương di chuyển hình hiển thị sang phải/xuống dưới. Không cần khai báo cho ba Agent mẫu vì các PNG đã được căn sẵn.
 
-### Chế độ hiển thị ổn định
+### Chế độ skeletal rig không giật hình
 
-Ba sprite mẫu hiện là các khung hình minh họa độc lập, nên chi tiết người, bàn và màn hình không hoàn toàn đồng nhất giữa các frame. Config dùng chế độ `stable` để giữ một poster frame cố định, tránh toàn bộ hiện tượng co giãn hoặc biến dạng trong card:
+Ba Agent mẫu dùng `playback: "rig"`. Player dựng nhân vật 2.5D bằng SVG nhiều lớp; bàn và màn hình đứng yên, trong khi đầu, mắt, tay, chuột, bàn phím và thiết bị được chuyển động độc lập. Chế độ này không đổi ảnh, không làm mờ và không scale toàn bộ nhân vật nên không có hiện tượng co giãn giữa các frame:
 
 ```json
-"playback": "stable",
-"stableDisplay": { "image": "working.png", "frames": 12, "frame": 0 }
+"playback": "rig"
 ```
 
-State, progress, task và Demo Agent vẫn hoạt động; trạng thái được thể hiện bằng glow, viền và dấu hoàn thành. Khi thay bằng sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, đổi `playback` thành `sprite` để bật lại animation từng frame.
+State, progress, task và Demo Agent vẫn hoạt động. `idle`, `working`, `reviewing` và `done` điều khiển các animation CSS khác nhau. Animation tự pause khi card ra ngoài màn hình hoặc tab trình duyệt bị ẩn. Khi có sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, có thể đổi `playback` thành `sprite` để dùng lại sprite sheet.
 
 ## Kiểm tra alignment
 
