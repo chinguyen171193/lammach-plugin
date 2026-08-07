@@ -30,3 +30,12 @@ Các clip đã được kiểm tra trực tiếp trong GLB: `Idle_Loop`, `Walk_L
 - Giấy phép: MIT, xem `public/js/vendor/three.LICENSE.txt`
 
 Tất cả file được đóng gói cục bộ trong plugin; frontend không tải asset từ CDN.
+
+## Ready Player Me Face Preview
+
+- Model kỹ thuật: `assets/agents/supervisor-ai/3d/ready-player-me-face-prototype.glb`
+- Nguồn: TalkingHead example `avatars/brunette-t.glb`, được tạo bằng Ready Player Me
+- Mục đích: chỉ dùng cho Face Preview trong trang quản trị; không thay Suit hoặc animation cơ thể
+- Giấy phép và giới hạn sử dụng: xem `READY-PLAYER-ME-FACE-PROTOTYPE-LICENSE.md`
+
+Model đã được kiểm tra trực tiếp: 13.317 triangles, texture tối đa 1024 px, 67 joints, 67 morph targets và không có clip animation cơ thể nhúng sẵn. Vì vậy plugin không retarget animation Suit/UAL vào model này.

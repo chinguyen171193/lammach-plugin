@@ -89,6 +89,33 @@
 	font-size: 8px;
 }
 
+.dat-agent-3d-debug__face-status {
+	color: #83eaff !important;
+}
+
+.dat-agent-face-debug {
+	display: flex;
+	flex: 1 1 100%;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding-top: 5px;
+	border-top: 1px solid rgba(91, 219, 255, .18);
+}
+
+.dat-agent-face-debug[hidden] {
+	display: none !important;
+}
+
+.dat-agent-3d-debug.is-face-preview {
+	border-color: rgba(115, 235, 255, .58);
+	box-shadow: 0 0 20px rgba(58, 218, 255, .12);
+}
+
+.dat-agent-3d-debug.is-face-preview .dat-agent-3d-debug__face-button {
+	color: #031d29;
+	background: #63e5ff;
+}
+
 .dat-agent-sprite.has-agent-3d:not(.is-agent-3d-ready)::before {
 	content: 'Đang tải nhân vật 3D…';
 	position: absolute;

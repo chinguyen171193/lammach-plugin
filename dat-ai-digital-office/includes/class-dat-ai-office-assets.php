@@ -52,6 +52,7 @@ class DAT_AI_Office_Assets {
 		wp_enqueue_script( 'dat-ai-office-three', DAT_AI_OFFICE_URL . 'public/js/vendor/three.min.js', array(), '0.128.0', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-gltf-loader', DAT_AI_OFFICE_URL . 'public/js/vendor/GLTFLoader.js', array( 'dat-ai-office-three' ), '0.128.0', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-agent-3d-state-machine', DAT_AI_OFFICE_URL . 'public/js/agent-3d-state-machine.js', array( 'dat-ai-office-three' ), DAT_AI_OFFICE_VERSION, $in_footer );
-		wp_enqueue_script( 'dat-ai-office-agent-3d', DAT_AI_OFFICE_URL . 'public/js/agent-3d.js', array( 'dat-ai-office-gltf-loader', 'dat-ai-office-agent-3d-state-machine' ), DAT_AI_OFFICE_VERSION, $in_footer );
+		wp_enqueue_script( 'dat-ai-office-agent-face-controller', DAT_AI_OFFICE_URL . 'public/js/agent-face-controller.js', array( 'dat-ai-office-three' ), DAT_AI_OFFICE_VERSION, $in_footer );
+		wp_enqueue_script( 'dat-ai-office-agent-3d', DAT_AI_OFFICE_URL . 'public/js/agent-3d.js', array( 'dat-ai-office-gltf-loader', 'dat-ai-office-agent-3d-state-machine', 'dat-ai-office-agent-face-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
 	}
 }

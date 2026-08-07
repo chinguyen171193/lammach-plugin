@@ -11,6 +11,10 @@
     "startInBindPose": true,
     "debug": true,
     "cameraFill": 0.76,
+    "facePreview": {
+      "model": "3d/ready-player-me-face-prototype.glb",
+      "cameraFill": 0.84
+    },
     "stateMap": {
       "idle": "idle",
       "working": "walk",

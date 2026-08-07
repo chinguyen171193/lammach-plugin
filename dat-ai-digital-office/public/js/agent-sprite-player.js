@@ -229,6 +229,10 @@
 				states: definition.states,
 				startInBindPose: definition.startInBindPose === true && Boolean(global.DAT_AI_OFFICE_ADMIN),
 				debug: definition.debug === true && Boolean(global.DAT_AI_OFFICE_ADMIN),
+				facePreview: definition.facePreview && definition.facePreview.model ? {
+					modelUrl: imageUrl(this.options.assetBase, this.spriteId, definition.facePreview.model, ''),
+					cameraFill: definition.facePreview.cameraFill
+				} : null,
 				cameraFill: definition.cameraFill,
 				modelUrl: imageUrl(this.options.assetBase, this.spriteId, definition.model, ''),
 				assetVersion: this.options.assetVersion,

@@ -45,6 +45,7 @@
 				states: defaultStates,
 				startInBindPose: false,
 				debug: false,
+				facePreview: null,
 				cameraFill: 0.76,
 				pixelRatio: 1.5,
 				fadeDuration: 0.28,
@@ -57,6 +58,8 @@
 			this.hasExternalStateChange = false;
 			this.paused = false;
 			this.debugPaused = false;
+			this.viewMode = 'body';
+			this.faceLoading = false;
 			this.destroyed = false;
 			this.ready = false;
 			this.debugListeners = [];
@@ -148,6 +151,129 @@
 			} catch (error) {
 				this.fail(error);
 			}
+		}
+
+		async showFacePreview() {
+			const definition = this.options.facePreview || {};
+			if (!definition.modelUrl || !global.DAT_AgentFaceController || this.faceLoading || this.destroyed) return;
+
+			if (!this.faceModel) {
+				this.faceLoading = true;
+				this.setFaceStatus('Đang tải mẫu khuôn mặt…');
+				try {
+					const asset = await this.load(versionedUrl(definition.modelUrl, this.options.assetVersion));
+					if (this.destroyed) {
+						this.disposeObject(asset.scene);
+						return;
+					}
+					this.installFaceModel(asset);
+				} catch (error) {
+					global.console.error('[DAT AI Office Face Preview]', error);
+					if (this.faceController) this.faceController.destroy();
+					if (this.faceModel) {
+						this.scene.remove(this.faceModel);
+						this.disposeObject(this.faceModel);
+					}
+					this.faceController = null;
+					this.faceModel = null;
+					this.setFaceStatus('Không tải được mẫu khuôn mặt; Suit vẫn được giữ nguyên.');
+					return;
+				} finally {
+					this.faceLoading = false;
+				}
+			}
+
+			this.viewMode = 'face';
+			this.debugPaused = false;
+			this.model.visible = false;
+			this.faceModel.visible = true;
+			if (this.floor) this.floor.visible = false;
+			if (this.ring) this.ring.visible = false;
+			if (this.skeletonHelper) this.skeletonHelper.visible = false;
+			if (this.boxHelper) this.boxHelper.visible = false;
+			if (this.debugPanel) this.debugPanel.classList.add('is-face-preview');
+			if (this.faceControls) this.faceControls.hidden = false;
+			if (this.debugPauseButton) this.debugPauseButton.textContent = 'Pause face';
+			this.faceController.reset();
+			this.fitFaceCamera();
+			this.setFaceStatus('Face Preview: Ready Player Me · ' + this.faceController.bindings.size + ' morph targets · không phát animation cơ thể');
+			this.render();
+			startScheduler();
+		}
+
+		installFaceModel(modelAsset) {
+			const THREE = global.THREE;
+			this.faceModel = modelAsset.scene;
+			this.faceAnimations = modelAsset.animations || [];
+			this.faceModel.rotation.set(0, 0, 0);
+			this.faceModel.position.set(0, 0, 0);
+			this.faceModel.scale.set(1, 1, 1);
+			this.faceModel.traverse(object => {
+				if (object.isMesh) {
+					object.castShadow = true;
+					object.receiveShadow = true;
+				}
+			});
+			this.scene.add(this.faceModel);
+			this.faceModel.updateMatrixWorld(true);
+			let box = new THREE.Box3().setFromObject(this.faceModel);
+			const center = box.getCenter(new THREE.Vector3());
+			this.faceModel.position.set(-center.x, -box.min.y, -center.z);
+			this.faceModel.updateMatrixWorld(true);
+			box = new THREE.Box3().setFromObject(this.faceModel);
+			this.faceBounds = box;
+			this.faceController = new global.DAT_AgentFaceController(this.faceModel);
+			this.printFaceDiagnostics();
+		}
+
+		showBodyPreview() {
+			if (!this.faceModel) return;
+			this.viewMode = 'body';
+			this.debugPaused = false;
+			this.stateMachine.setPaused(false);
+			this.faceController.reset();
+			this.faceModel.visible = false;
+			this.model.visible = true;
+			if (this.floor) this.floor.visible = true;
+			if (this.ring) this.ring.visible = true;
+			if (this.debugPanel) this.debugPanel.classList.remove('is-face-preview');
+			if (this.faceControls) this.faceControls.hidden = true;
+			if (this.debugPauseButton) this.debugPauseButton.textContent = 'Pause';
+			this.setFaceStatus('Suit toàn thân: animation cơ thể giữ nguyên');
+			this.refreshBounds(true);
+			this.render();
+			startScheduler();
+		}
+
+		setFaceStatus(message) {
+			if (this.faceStatus) this.faceStatus.textContent = message;
+		}
+
+		printFaceDiagnostics() {
+			const THREE = global.THREE;
+			const bones = [];
+			const morphs = new Set();
+			const meshes = [];
+			this.faceModel.traverse(object => {
+				if (object.isBone) bones.push(object.name || '(unnamed)');
+				if (object.isMesh) {
+					const names = Object.keys(object.morphTargetDictionary || {});
+					names.forEach(name => morphs.add(name));
+					meshes.push({ name: object.name || '(unnamed)', morphTargets: names.length });
+				}
+			});
+			const box = this.faceBounds;
+			global.console.groupCollapsed('[DAT AI Office 3D Debug] Ready Player Me Face Preview');
+			global.console.log('Bounding box:', {
+				min: this.plainVector(box.min),
+				max: this.plainVector(box.max),
+				size: this.plainVector(box.getSize(new THREE.Vector3()))
+			});
+			global.console.log('Bones (' + bones.length + '):', bones);
+			global.console.log('Embedded animation clips (' + this.faceAnimations.length + '):', this.faceAnimations.map(clip => clip.name));
+			global.console.table(meshes);
+			global.console.log('Morph targets (' + morphs.size + '):', Array.from(morphs));
+			global.console.groupEnd();
 		}
 
 		findSkinnedMesh(root, preferredName) {
@@ -340,36 +466,83 @@
 			const bindButton = document.createElement('button');
 			bindButton.type = 'button';
 			bindButton.textContent = 'Reset bind';
+			const faceButton = document.createElement('button');
+			faceButton.type = 'button';
+			faceButton.className = 'dat-agent-3d-debug__face-button';
+			faceButton.textContent = 'Face Preview';
+			faceButton.hidden = !(this.options.facePreview && this.options.facePreview.modelUrl && global.DAT_AgentFaceController);
 			const note = document.createElement('small');
 			note.textContent = 'Suit không có Sit / Typing / Using Mouse';
+			const faceStatus = document.createElement('small');
+			faceStatus.className = 'dat-agent-3d-debug__face-status';
+			faceStatus.textContent = 'Mẫu khuôn mặt chỉ tải khi bấm Face Preview';
 
-			panel.append(select, skeletonLabel, boundsLabel, pauseButton, bindButton, note);
+			const faceControls = document.createElement('div');
+			faceControls.className = 'dat-agent-face-debug';
+			faceControls.hidden = true;
+			const faceActions = [
+				['Blink', () => this.faceController?.blink()],
+				['Look ←', () => this.faceController?.setLook(-0.72, 0)],
+				['Look •', () => this.faceController?.setLook(0, 0)],
+				['Look →', () => this.faceController?.setLook(0.72, 0)],
+				['Neutral', () => this.faceController?.setExpression('neutral')],
+				['Focused', () => this.faceController?.setExpression('focused')],
+				['Thinking', () => this.faceController?.setExpression('thinking')],
+				['Happy', () => this.faceController?.setExpression('happy')],
+				['Talking', () => this.faceController?.setExpression('talking')],
+				['Toàn thân', () => this.showBodyPreview()]
+			];
+			faceActions.forEach(([label, action]) => {
+				const button = document.createElement('button');
+				button.type = 'button';
+				button.textContent = label;
+				this.listen(button, 'click', () => {
+					action();
+					if (label !== 'Toàn thân') {
+						this.setFaceStatus('Face Preview · ' + label);
+						startScheduler();
+					}
+				});
+				faceControls.appendChild(button);
+			});
+
+			panel.append(select, skeletonLabel, boundsLabel, pauseButton, bindButton, faceButton, note, faceStatus, faceControls);
 			const spriteContainer = this.container.closest('[data-agent-sprite]');
 			if (spriteContainer && spriteContainer.parentNode) spriteContainer.parentNode.insertBefore(panel, spriteContainer.nextSibling);
 			else this.container.appendChild(panel);
 			this.debugPanel = panel;
 			this.debugSelect = select;
 			this.debugPauseButton = pauseButton;
+			this.faceControls = faceControls;
+			this.faceStatus = faceStatus;
 
 			this.listen(select, 'change', () => {
+				if (this.viewMode === 'face') this.showBodyPreview();
 				if (select.value === '__bind__') this.resetBindPose(true);
 				else this.playNativeClip(select.value, true);
 			});
 			this.listen(skeletonToggle, 'change', () => {
+				if (this.viewMode === 'face') this.showBodyPreview();
 				this.skeletonHelper.visible = skeletonToggle.checked;
 				this.render();
 			});
 			this.listen(boundsToggle, 'change', () => {
+				if (this.viewMode === 'face') this.showBodyPreview();
 				this.boxHelper.visible = boundsToggle.checked;
 				this.refreshBounds(false);
 				this.render();
 			});
 			this.listen(pauseButton, 'click', () => {
 				this.debugPaused = !this.debugPaused;
-				this.stateMachine.setPaused(this.debugPaused);
-				pauseButton.textContent = this.debugPaused ? 'Play' : 'Pause';
+				if (this.viewMode === 'body') this.stateMachine.setPaused(this.debugPaused);
+				pauseButton.textContent = this.debugPaused ? 'Play' : (this.viewMode === 'face' ? 'Pause face' : 'Pause');
+				if (!this.debugPaused) startScheduler();
 			});
-			this.listen(bindButton, 'click', () => this.resetBindPose(true));
+			this.listen(bindButton, 'click', () => {
+				if (this.viewMode === 'face') this.showBodyPreview();
+				this.resetBindPose(true);
+			});
+			this.listen(faceButton, 'click', () => this.showFacePreview());
 		}
 
 		visualState(state) {
@@ -453,6 +626,26 @@
 			this.camera.updateMatrixWorld(true);
 		}
 
+		fitFaceCamera() {
+			if (!this.faceBounds || this.faceBounds.isEmpty()) return;
+			const THREE = global.THREE;
+			const size = this.faceBounds.getSize(new THREE.Vector3());
+			const center = this.faceBounds.getCenter(new THREE.Vector3());
+			const head = this.faceModel.getObjectByName('Head');
+			const target = head ? head.getWorldPosition(new THREE.Vector3()) : center.clone();
+			target.y -= size.y * 0.07;
+			const previewHeight = Math.max(0.25, size.y * 0.4);
+			const fill = Math.min(0.9, Math.max(0.72, Number(this.options.facePreview?.cameraFill) || 0.84));
+			const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+			const distance = previewHeight / (2 * Math.tan(verticalFov / 2) * fill);
+			this.camera.position.copy(target).add(new THREE.Vector3(0, 0.01, Math.max(0.42, distance)));
+			this.camera.near = Math.max(0.01, distance * 0.2);
+			this.camera.far = Math.max(10, distance + size.length() * 2);
+			this.camera.lookAt(target);
+			this.camera.updateProjectionMatrix();
+			this.camera.updateMatrixWorld(true);
+		}
+
 		resize() {
 			if (!this.renderer || !this.camera) return;
 			const width = Math.max(1, this.container.clientWidth || 240);
@@ -460,7 +653,8 @@
 			this.camera.aspect = width / height;
 			this.camera.updateProjectionMatrix();
 			this.renderer.setSize(width, height, false);
-			if (this.currentBounds) this.fitCamera(this.currentBounds);
+			if (this.viewMode === 'face' && this.faceBounds) this.fitFaceCamera();
+			else if (this.currentBounds) this.fitCamera(this.currentBounds);
 			this.render();
 		}
 
@@ -470,8 +664,9 @@
 
 		tick(delta) {
 			if (!this.ready || this.destroyed) return;
-			if (!this.debugPaused) this.stateMachine.update(delta);
-			if (this.boxHelper && this.boxHelper.visible) {
+			if (!this.debugPaused && this.viewMode === 'body') this.stateMachine.update(delta);
+			if (!this.debugPaused && this.viewMode === 'face' && this.faceController) this.faceController.update(delta);
+			if (this.viewMode === 'body' && this.boxHelper && this.boxHelper.visible) {
 				this.boundsElapsed += delta;
 				if (this.boundsElapsed >= 0.2) {
 					this.boundsElapsed = 0;
@@ -511,8 +706,10 @@
 			this.debugListeners = [];
 			if (this.resizeObserver) this.resizeObserver.disconnect();
 			if (this.stateMachine) this.stateMachine.destroy();
+			if (this.faceController) this.faceController.destroy();
 			if (this.mixer && this.model) this.mixer.uncacheRoot(this.model);
 			this.disposeObject(this.model);
+			this.disposeObject(this.faceModel);
 			this.disposeObject(this.floor);
 			this.disposeObject(this.ring);
 			this.disposeObject(this.skeletonHelper);

@@ -79,6 +79,12 @@ Model `Suit.gltf` có 5 node gắn skin (Three.js tách thành 13 `SkinnedMesh` 
 
 `UAL1_Standard.glb` vẫn được lưu cùng thông tin giấy phép để nghiên cứu, nhưng không được enqueue hoặc tải bởi frontend. SkeletonUtils cũng không được enqueue. Điều này loại trừ hoàn toàn lỗi retarget trong prototype hiện tại.
 
+### Face Preview tách biệt
+
+Trang quản trị có nút `Face Preview` trong bảng debug của DAT Supervisor AI. Nút này tải lười `3d/ready-player-me-face-prototype.glb`, ẩn tạm Suit và tự căn camera từ vai trở lên. `AgentFaceController` điều khiển Blink, Look Left/Center/Right và các biểu cảm Neutral, Focused, Thinking, Happy, Talking bằng morph target thật. Bấm `Toàn thân` để trở lại Suit; state engine và các clip cơ thể không bị thay đổi.
+
+Model khuôn mặt không có animation cơ thể nhúng sẵn nên plugin tuyệt đối không gắn clip Suit hoặc UAL vào skeleton Ready Player Me. Thông tin nguồn, giới hạn thương mại và số liệu kiểm tra nằm tại `assets/licenses/READY-PLAYER-ME-FACE-PROTOTYPE-LICENSE.md`.
+
 State, progress, task và Demo Agent vẫn hoạt động. Animation tự pause khi card ra ngoài màn hình hoặc tab trình duyệt bị ẩn. Khi có sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, có thể đổi `playback` thành `sprite` để dùng lại sprite sheet.
 
 ## Kiểm tra alignment
