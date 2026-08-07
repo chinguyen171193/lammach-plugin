@@ -130,7 +130,22 @@ final class DAT_AI_Office {
 		$departments = array_map( static fn( $row ) => json_decode( $row['data'], true ), $wpdb->get_results( "SELECT data FROM {$tables['departments']} WHERE enabled = 1 ORDER BY sort_order ASC", ARRAY_A ) );
 		$agents = array_map( static fn( $row ) => json_decode( $row['data'], true ), $wpdb->get_results( "SELECT data FROM {$tables['agents']} WHERE enabled = 1", ARRAY_A ) );
 		$workflows = array_map( static fn( $row ) => json_decode( $row['data'], true ), $wpdb->get_results( "SELECT data FROM {$tables['workflows']} WHERE enabled = 1", ARRAY_A ) );
-		self::$dataset = array( 'departments' => array_values( array_filter( $departments ) ), 'agents' => array_values( array_filter( $agents ) ), 'workflows' => array_values( array_filter( $workflows ) ), 'settings' => self::public_settings() );
+
+		// A plugin update does not trigger activation. Keep the public demo usable
+		// while an administrator restores or seeds its database records.
+		$departments = array_values( array_filter( $departments ) );
+		$agents = array_values( array_filter( $agents ) );
+		$workflows = array_values( array_filter( $workflows ) );
+		if ( empty( $departments ) ) {
+			$departments = self::demo_departments();
+		}
+		if ( empty( $agents ) ) {
+			$agents = self::demo_agents();
+		}
+		if ( empty( $workflows ) ) {
+			$workflows = self::demo_workflows();
+		}
+		self::$dataset = array( 'departments' => $departments, 'agents' => $agents, 'workflows' => $workflows, 'settings' => self::public_settings() );
 		return self::$dataset;
 	}
 
@@ -143,7 +158,8 @@ final class DAT_AI_Office {
 	public static function recent_logs( $limit = 40 ) {
 		global $wpdb;
 		$tables = self::tables();
-		return $wpdb->get_results( $wpdb->prepare( "SELECT id, actor, department, level, message, created_at FROM {$tables['logs']} ORDER BY id DESC LIMIT %d", min( 100, max( 1, absint( $limit ) ) ) ), ARRAY_A );
+		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT id, actor, department, level, message, created_at FROM {$tables['logs']} ORDER BY id DESC LIMIT %d", min( 100, max( 1, absint( $limit ) ) ) ), ARRAY_A );
+		return empty( $logs ) ? self::demo_logs() : $logs;
 	}
 
 	public static function demo_departments() {
