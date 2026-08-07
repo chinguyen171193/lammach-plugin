@@ -51,6 +51,17 @@ Ba Agent thử nghiệm đã dùng sprite PNG thật: `supervisor-ai`, `sale-ai`
 
 `frameOffsets` là tùy chọn chỉ dành cho asset bên thứ ba chưa được bake anchor. Đây là mảng `{ "x": 0, "y": 0 }` theo pixel gốc của một frame; giá trị dương di chuyển hình hiển thị sang phải/xuống dưới. Không cần khai báo cho ba Agent mẫu vì các PNG đã được căn sẵn.
 
+### Chế độ hiển thị ổn định
+
+Ba sprite mẫu hiện là các khung hình minh họa độc lập, nên chi tiết người, bàn và màn hình không hoàn toàn đồng nhất giữa các frame. Config dùng chế độ `stable` để giữ một poster frame cố định, tránh toàn bộ hiện tượng co giãn hoặc biến dạng trong card:
+
+```json
+"playback": "stable",
+"stableDisplay": { "image": "working.png", "frames": 12, "frame": 0 }
+```
+
+State, progress, task và Demo Agent vẫn hoạt động; trạng thái được thể hiện bằng glow, viền và dấu hoàn thành. Khi thay bằng sprite sheet được dựng từ cùng một model/camera và có hình học đồng nhất, đổi `playback` thành `sprite` để bật lại animation từng frame.
+
 ## Kiểm tra alignment
 
 Hai utility phát triển nằm trong `tools/`, không được tải bởi WordPress:

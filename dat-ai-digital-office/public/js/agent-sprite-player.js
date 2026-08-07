@@ -122,7 +122,10 @@
 				const definition = this.config.states[key] || {};
 				return imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
 			}).filter(Boolean);
-			return Promise.all(sources.map(preloadImage));
+			const stable = this.config.stableDisplay || {};
+			const stableSource = imageUrl(this.options.assetBase, this.spriteId, stable.image, this.options.assetVersion);
+			if (stableSource) sources.push(stableSource);
+			return Promise.all(Array.from(new Set(sources)).map(preloadImage));
 		}
 
 		observe() {
@@ -152,16 +155,21 @@
 			const nextState = normalizedState(state);
 			if (!force && nextState === this.state && this.element.dataset.spriteInitialized === '1') return;
 			this.state = nextState;
-			this.frame = 0;
+			const definition = this.config.states[this.state] || this.config.states.idle || placeholderConfig.states.idle;
+			const visualDefinition = this.visualDefinition(definition);
+			const frames = Math.max(1, Number(visualDefinition.frames) || 1);
+			const playback = this.playbackMode(definition);
+			this.frame = playback === 'stable' ? this.stableFrame(visualDefinition, frames) : 0;
 			this.elapsed = 0;
 			this.doneDelay = 0;
-			const definition = this.config.states[this.state] || this.config.states.idle || placeholderConfig.states.idle;
-			const source = this.config.placeholder ? '' : imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
+			const source = this.config.placeholder ? '' : imageUrl(this.options.assetBase, this.spriteId, visualDefinition.image, this.options.assetVersion);
 			this.element.dataset.spriteState = this.state;
+			this.element.dataset.spritePlayback = playback;
 			this.element.style.setProperty('--agent-frame-count', frames);
-			this.element.style.setProperty('--agent-frame', '0');
+			this.element.style.setProperty('--agent-frame', String(this.frame));
 			this.sprite.style.backgroundImage = source ? 'url("' + source.replace(/"/g, '%22') + '")' : 'none';
 			this.element.classList.toggle('has-sprite-image', Boolean(source));
+			this.element.classList.toggle('is-stable-playback', playback === 'stable');
 			this.element.dataset.spriteInitialized = '1';
 			if (source) this.usePreloadedSource(source);
 			else this.element.classList.remove('is-sprite-ready');
@@ -213,12 +221,41 @@
 			};
 		}
 
+		playbackMode(definition) {
+			const mode = String((definition && definition.playback) || this.config.playback || 'sprite').toLowerCase();
+			return mode === 'stable' ? 'stable' : 'sprite';
+		}
+
+		visualDefinition(definition) {
+			const stable = this.config.stableDisplay || {};
+			if (this.playbackMode(definition) !== 'stable' || !stable.image) return definition;
+			return Object.assign({}, definition, {
+				image: stable.image,
+				frames: Math.max(1, Number(stable.frames) || 1),
+				stableFrame: Math.max(0, Number(stable.frame) || 0)
+			});
+		}
+
+		stableFrame(definition, frames) {
+			const configured = Number(definition && definition.stableFrame);
+			const frame = Number.isFinite(configured) ? Math.round(configured) : 0;
+			return Math.max(0, Math.min(frames - 1, frame));
+		}
+
 		tick(delta) {
 			if (this.destroyed || !this.running || !this.inViewport || document.hidden || !this.config.states) return;
 			const definition = this.config.states[this.state] || this.config.states.idle;
 			if (!definition) return;
 			const frames = Math.max(1, Number(definition.frames) || 1);
 			const elapsedMs = Math.max(0, delta * 1000);
+			if (this.playbackMode(definition) === 'stable') {
+				if (!definition.loop && this.state === 'done') {
+					this.doneDelay += elapsedMs;
+					const holdLast = Math.max(1000, Number(definition.holdLast) || 1400);
+					if (this.doneDelay >= holdLast) this.setState('idle');
+				}
+				return;
+			}
 
 			if (!definition.loop && this.frame === frames - 1) {
 				this.doneDelay += elapsedMs;
@@ -247,7 +284,8 @@
 		}
 
 		renderFrame() {
-			const definition = this.config.states[this.state] || this.config.states.idle;
+			const stateDefinition = this.config.states[this.state] || this.config.states.idle;
+			const definition = this.visualDefinition(stateDefinition);
 			const frames = Math.max(1, Number(definition && definition.frames) || 1);
 			const frameWidth = Math.max(1, Number(this.config.frameWidth) || 320);
 			const frameHeight = Math.max(1, Number(this.config.frameHeight) || 400);
