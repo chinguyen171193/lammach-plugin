@@ -1,6 +1,13 @@
 name: Deploy WordPress plugins
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dat-pcb-image-tracer/**'
+      - 'cty-1-nguoi/**'
+      - 'dat-ai-digital-office/**'
   workflow_dispatch:
     inputs:
       plugin:
@@ -18,8 +25,32 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Kiểm tra plugin thay đổi
+    runs-on: ubuntu-latest
+    outputs:
+      pcb: ${{ steps.filter.outputs.pcb }}
+      cty: ${{ steps.filter.outputs.cty }}
+      ai_office: ${{ steps.filter.outputs.ai_office }}
+    steps:
+      - name: Lấy source code
+        uses: actions/checkout@v6
+
+      - name: Xác định thư mục đã thay đổi
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            pcb:
+              - 'dat-pcb-image-tracer/**'
+            cty:
+              - 'cty-1-nguoi/**'
+            ai_office:
+              - 'dat-ai-digital-office/**'
+
   deploy-pcb:
-    if: inputs.plugin == 'all' || inputs.plugin == 'dat-pcb-image-tracer'
+    needs: changes
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'dat-pcb-image-tracer')) || (github.event_name == 'push' && needs.changes.outputs.pcb == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Lấy source code
@@ -38,7 +69,8 @@ jobs:
           dangerous-clean-slate: false
 
   deploy-cty:
-    if: inputs.plugin == 'all' || inputs.plugin == 'cty-1-nguoi'
+    needs: changes
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'cty-1-nguoi')) || (github.event_name == 'push' && needs.changes.outputs.cty == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Lấy source code
@@ -57,7 +89,8 @@ jobs:
           dangerous-clean-slate: false
 
   deploy-ai-office:
-    if: inputs.plugin == 'all' || inputs.plugin == 'dat-ai-digital-office'
+    needs: changes
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'dat-ai-digital-office')) || (github.event_name == 'push' && needs.changes.outputs.ai_office == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Lấy source code
