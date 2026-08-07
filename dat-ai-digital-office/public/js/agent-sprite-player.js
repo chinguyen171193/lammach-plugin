@@ -8,6 +8,7 @@
 		done: 'done', completed: 'done'
 	};
 	const configCache = new Map();
+	const imageCache = new Map();
 	const players = new Set();
 	const registry = new Map();
 	let animationFrame = 0;
@@ -27,8 +28,26 @@
 		return stateMap[String(state || 'idle').toLowerCase()] || 'idle';
 	}
 
-	function imageUrl(baseUrl, spriteId, image) {
-		return image ? baseUrl.replace(/\/$/, '') + '/' + spriteId + '/' + image : '';
+	function versionedUrl(url, version) {
+		if (!version) return url;
+		return url + (url.indexOf('?') === -1 ? '?' : '&') + 'ver=' + encodeURIComponent(version);
+	}
+
+	function imageUrl(baseUrl, spriteId, image, version) {
+		return image ? versionedUrl(baseUrl.replace(/\/$/, '') + '/' + spriteId + '/' + image, version) : '';
+	}
+
+	function preloadImage(source) {
+		if (!source) return Promise.resolve(false);
+		if (!imageCache.has(source)) {
+			imageCache.set(source, new Promise(resolve => {
+				const image = new Image();
+				image.onload = () => resolve(true);
+				image.onerror = () => resolve(false);
+				image.src = source;
+			}));
+		}
+		return imageCache.get(source);
 	}
 
 	function startScheduler() {
@@ -53,7 +72,7 @@
 	class AgentSpritePlayer {
 		constructor(element, options) {
 			this.element = element;
-			this.options = Object.assign({ state: 'idle', scale: 1, assetBase: '', agentId: '', spriteId: '_placeholder' }, options || {});
+			this.options = Object.assign({ state: 'idle', scale: 1, assetBase: '', assetVersion: '', agentId: '', spriteId: '_placeholder' }, options || {});
 			this.agentId = this.options.agentId;
 			this.spriteId = this.options.spriteId || '_placeholder';
 			this.state = normalizedState(this.options.state);
@@ -72,10 +91,10 @@
 			this.loadConfig();
 		}
 
-		static getConfig(spriteId, assetBase) {
-			const key = assetBase + ':' + spriteId;
+		static getConfig(spriteId, assetBase, assetVersion) {
+			const key = assetBase + ':' + spriteId + ':' + (assetVersion || '');
 			if (!configCache.has(key)) {
-				const url = assetBase.replace(/\/$/, '') + '/' + spriteId + '/config.json';
+				const url = versionedUrl(assetBase.replace(/\/$/, '') + '/' + spriteId + '/config.json', assetVersion);
 				configCache.set(key, fetch(url, { credentials: 'same-origin' })
 					.then(response => response.ok ? response.json() : Promise.reject(new Error('Không tìm thấy config sprite')))
 					.catch(() => placeholderConfig));
@@ -88,11 +107,22 @@
 		}
 
 		async loadConfig() {
-			this.config = await AgentSpritePlayer.getConfig(this.spriteId, this.options.assetBase);
+			this.config = await AgentSpritePlayer.getConfig(this.spriteId, this.options.assetBase, this.options.assetVersion);
 			if (this.destroyed) return;
 			this.element.style.setProperty('--agent-frame-ratio', (this.config.frameWidth || 320) + ' / ' + (this.config.frameHeight || 400));
+			await this.preloadStates();
+			if (this.destroyed) return;
 			this.element.classList.remove('is-loading');
-			this.applyState(this.state);
+			this.applyState(this.state, true);
+		}
+
+		preloadStates() {
+			if (this.config.placeholder || !this.config.states) return Promise.resolve();
+			const sources = Object.keys(this.config.states).map(key => {
+				const definition = this.config.states[key] || {};
+				return imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
+			}).filter(Boolean);
+			return Promise.all(sources.map(preloadImage));
 		}
 
 		observe() {
@@ -113,14 +143,16 @@
 			startScheduler();
 		}
 
-		applyState(state) {
-			this.state = normalizedState(state);
+		applyState(state, force) {
+			const nextState = normalizedState(state);
+			if (!force && nextState === this.state && this.element.dataset.spriteInitialized === '1') return;
+			this.state = nextState;
 			this.frame = 0;
 			this.elapsed = 0;
 			this.doneDelay = 0;
 			const definition = this.config.states[this.state] || this.config.states.idle || placeholderConfig.states.idle;
 			const frames = Math.max(1, Number(definition.frames) || 1);
-			const source = this.config.placeholder ? '' : imageUrl(this.options.assetBase, this.spriteId, definition.image);
+			const source = this.config.placeholder ? '' : imageUrl(this.options.assetBase, this.spriteId, definition.image, this.options.assetVersion);
 			this.element.dataset.spriteState = this.state;
 			this.element.style.setProperty('--agent-frame-count', frames);
 			this.element.style.setProperty('--agent-frame', '0');
@@ -128,16 +160,24 @@
 			this.sprite.style.backgroundPosition = '0 0';
 			this.sprite.style.backgroundImage = source ? 'url("' + source.replace(/"/g, '%22') + '")' : 'none';
 			this.element.classList.toggle('has-sprite-image', Boolean(source));
-			if (source) this.preload(source);
+			this.element.dataset.spriteInitialized = '1';
+			if (source) this.usePreloadedSource(source);
+			else this.element.classList.remove('is-sprite-ready');
 			this.syncCard();
 			startScheduler();
 		}
 
-		preload(source) {
-			const image = new Image();
-			image.onload = () => { if (!this.destroyed) this.element.classList.add('is-sprite-ready'); };
-			image.onerror = () => { if (!this.destroyed) { this.element.classList.remove('has-sprite-image', 'is-sprite-ready'); this.sprite.style.backgroundImage = 'none'; } };
-			image.src = source;
+		usePreloadedSource(source) {
+			this.activeSource = source;
+			preloadImage(source).then(loaded => {
+				if (this.destroyed || this.activeSource !== source) return;
+				if (loaded) {
+					this.element.classList.add('is-sprite-ready');
+					return;
+				}
+				this.element.classList.remove('has-sprite-image', 'is-sprite-ready');
+				this.sprite.style.backgroundImage = 'none';
+			});
 		}
 
 		loadState(state) {
@@ -154,24 +194,44 @@
 		pause() { this.running = false; return this; }
 		stop() { this.running = false; this.frame = 0; this.renderFrame(); return this; }
 
+		frameDuration(definition, frame) {
+			const durations = definition && Array.isArray(definition.frameDurations) ? definition.frameDurations : [];
+			const configured = Number(durations[frame]);
+			if (Number.isFinite(configured) && configured > 0) return configured;
+			return 1000 / Math.max(1, Number(definition && definition.fps) || 1);
+		}
+
 		tick(delta) {
 			if (this.destroyed || !this.running || !this.inViewport || document.hidden || !this.config.states) return;
 			const definition = this.config.states[this.state] || this.config.states.idle;
 			if (!definition) return;
 			const frames = Math.max(1, Number(definition.frames) || 1);
-			const fps = Math.max(1, Number(definition.fps) || 1);
-			this.elapsed += delta;
-			if (this.elapsed < 1 / fps) return;
-			this.elapsed = 0;
-			if (this.frame < frames - 1) {
-				this.frame++;
-			} else if (definition.loop) {
-				this.frame = 0;
-			} else if (this.state === 'done') {
-				this.doneDelay += 1 / fps;
-				if (this.doneDelay >= 1.2) this.setState('idle');
+			const elapsedMs = Math.max(0, delta * 1000);
+
+			if (!definition.loop && this.frame === frames - 1) {
+				this.doneDelay += elapsedMs;
+				const holdLast = Math.max(1000, Number(definition.holdLast) || 1400);
+				if (this.state === 'done' && this.doneDelay >= holdLast) this.setState('idle');
+				return;
 			}
-			this.renderFrame();
+
+			this.elapsed += elapsedMs;
+			let changed = false;
+			let safety = 0;
+			while (safety < frames && this.elapsed >= this.frameDuration(definition, this.frame)) {
+				this.elapsed -= this.frameDuration(definition, this.frame);
+				if (this.frame < frames - 1) {
+					this.frame++;
+				} else if (definition.loop) {
+					this.frame = 0;
+				} else {
+					this.elapsed = 0;
+					break;
+				}
+				changed = true;
+				safety++;
+			}
+			if (changed) this.renderFrame();
 		}
 
 		renderFrame() {

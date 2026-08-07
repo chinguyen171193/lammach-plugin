@@ -4,9 +4,9 @@
   "frameWidth": 320,
   "frameHeight": 400,
   "states": {
-    "idle": { "image": "idle.png", "frames": 4, "fps": 4, "loop": true },
-    "working": { "image": "working.png", "frames": 4, "fps": 8, "loop": true },
-    "reviewing": { "image": "reviewing.png", "frames": 4, "fps": 5, "loop": true },
-    "done": { "image": "done.png", "frames": 4, "fps": 6, "loop": false }
+    "idle": { "image": "idle.png", "frames": 8, "fps": 5, "loop": true, "frameDurations": [220, 200, 240, 360, 200, 240, 300, 480] },
+    "working": { "image": "working.png", "frames": 12, "fps": 8, "loop": true, "frameDurations": [180, 180, 170, 140, 180, 260, 800, 180, 180, 160, 250, 440] },
+    "reviewing": { "image": "reviewing.png", "frames": 8, "fps": 6, "loop": true, "frameDurations": [180, 180, 220, 340, 180, 240, 400, 580] },
+    "done": { "image": "done.png", "frames": 6, "fps": 6, "loop": false, "frameDurations": [160, 160, 180, 220, 260, 1600], "holdLast": 1600 }
   }
 }
