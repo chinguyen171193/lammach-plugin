@@ -25,8 +25,8 @@
 		constructor(camera, element) {
 			this.camera = camera;
 			this.element = element;
-			this.target = new global.THREE.Vector3(0, 0.85, 0);
-			this.radius = 6.4;
+			this.target = new global.THREE.Vector3(0, 0.65, 0);
+			this.radius = 7.2;
 			this.theta = 0.7;
 			this.phi = 1.08;
 			this.pointer = null;
@@ -233,7 +233,8 @@
 			let box = new THREE.Box3().setFromObject(this.model);
 			const height = box.getSize(new THREE.Vector3()).y;
 			if (!height) throw new Error('Không thể xác định chiều cao employee_001.');
-			const scale = 1.8 / height;
+			// Keep the full figure comfortably inside the test scene at its default zoom.
+			const scale = 1.3 / height;
 			this.model.scale.setScalar(scale);
 			this.model.updateMatrixWorld(true);
 			box = new THREE.Box3().setFromObject(this.model);
