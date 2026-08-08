@@ -44,6 +44,7 @@
 
 	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton) {
 		const THREE = global.THREE;
+		const bindPoseBones = new Set([ 'FootL', 'FootR' ]);
 		const targetsByName = new Map();
 		skeleton.bones.forEach(bone => {
 			if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone);
@@ -55,9 +56,11 @@
 				// The animation-only FBX has different local bone positions from the
 				// character model. Applying those tracks collapses the hips and legs
 				// below the floor. The rotation tracks are compatible and animate the
-				// rig without changing its authored bind pose.
+				// rig without changing its authored bind pose. FootL/FootR also use
+				// an opposite local axis in the animation export, so keep their bind
+				// rotations to prevent both feet from turning backwards.
 				const match = track.name.match(/^(.+)\.(quaternion)$/);
-				if (!match || match[1] === 'CharacterArmature') { skippedTracks += 1; return; }
+				if (!match || match[1] === 'CharacterArmature' || bindPoseBones.has(match[1])) { skippedTracks += 1; return; }
 				const target = targetsByName.get(match[1]);
 				if (!target) { skippedTracks += 1; return; }
 				const retargetedTrack = track.clone();
