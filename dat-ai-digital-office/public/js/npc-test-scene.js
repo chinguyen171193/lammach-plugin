@@ -52,7 +52,11 @@
 		const retargetedClips = clips.map(clip => {
 			const tracks = [];
 			clip.tracks.forEach(track => {
-				const match = track.name.match(/^(.+)\.(position|quaternion|scale)$/);
+				// The animation-only FBX has different local bone positions from the
+				// character model. Applying those tracks collapses the hips and legs
+				// below the floor. The rotation tracks are compatible and animate the
+				// rig without changing its authored bind pose.
+				const match = track.name.match(/^(.+)\.(quaternion)$/);
 				if (!match || match[1] === 'CharacterArmature') { skippedTracks += 1; return; }
 				const target = targetsByName.get(match[1]);
 				if (!target) { skippedTracks += 1; return; }
