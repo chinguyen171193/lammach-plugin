@@ -21,46 +21,62 @@
 		});
 	}
 
-	function collectSkeletonBoneTargets(model) {
-		const targetsByName = new Map();
-		const seenSkeletons = new Set();
-		let skeletonCount = 0;
-		model.traverse(object => {
-			if (!object.isSkinnedMesh || !object.skeleton || seenSkeletons.has(object.skeleton)) return;
-			seenSkeletons.add(object.skeleton);
-			skeletonCount += 1;
-			object.skeleton.bones.forEach(bone => {
-				if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, []);
-				const targets = targetsByName.get(bone.name);
-				if (!targets.some(target => target.uuid === bone.uuid)) targets.push(bone);
-			});
-		});
-		return { targetsByName, skeletonCount };
+	function skeletonReach(root) {
+		let count = 0;
+		if (root && root.traverse) root.traverse(() => { count += 1; });
+		return count;
 	}
 
-	function retargetAnimationClipsToModelSkeletons(clips, model) {
+	function findPrimarySkinnedMesh(model) {
+		const meshes = [];
+		model.traverse(object => {
+			if (object.isSkinnedMesh && object.skeleton && object.skeleton.bones.length) meshes.push(object);
+		});
+		if (!meshes.length) return null;
+		const preferred = meshes.find(mesh => mesh.name === 'Suit_Legs');
+		if (preferred) return preferred;
+		return meshes.reduce((best, mesh) => {
+			const bestReach = skeletonReach(best.skeleton.bones[0]);
+			const meshReach = skeletonReach(mesh.skeleton.bones[0]);
+			return meshReach > bestReach ? mesh : best;
+		});
+	}
+
+	function useSingleSourceSkeleton(model) {
+		const primaryMesh = findPrimarySkinnedMesh(model);
+		if (!primaryMesh) throw new Error('employee_001.fbx không có skinned mesh/skeleton hợp lệ.');
+		const meshes = [];
+		model.traverse(object => { if (object.isSkinnedMesh && object.skeleton) meshes.push(object); });
+		meshes.forEach(mesh => {
+			if (mesh === primaryMesh) return;
+			mesh.bind(primaryMesh.skeleton, mesh.bindMatrix);
+		});
+		return { primaryMesh, meshCount: meshes.length };
+	}
+
+	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton) {
 		const THREE = global.THREE;
-		const skeletonTargets = collectSkeletonBoneTargets(model);
+		const targetsByName = new Map();
+		skeleton.bones.forEach(bone => {
+			if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone);
+		});
 		let skippedTracks = 0;
 		const retargetedClips = clips.map(clip => {
 			const tracks = [];
 			clip.tracks.forEach(track => {
 				const match = track.name.match(/^(.+)\.(position|quaternion|scale)$/);
 				if (!match || match[1] === 'CharacterArmature') { skippedTracks += 1; return; }
-				const targets = skeletonTargets.targetsByName.get(match[1]);
-				if (!targets || !targets.length) { skippedTracks += 1; return; }
-				targets.forEach(target => {
-					const retargetedTrack = track.clone();
-					retargetedTrack.name = target.uuid + '.' + match[2];
-					tracks.push(retargetedTrack);
-				});
+				const target = targetsByName.get(match[1]);
+				if (!target) { skippedTracks += 1; return; }
+				const retargetedTrack = track.clone();
+				retargetedTrack.name = target.uuid + '.' + match[2];
+				tracks.push(retargetedTrack);
 			});
 			return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 		});
 		return {
 			clips: retargetedClips,
-			skeletonCount: skeletonTargets.skeletonCount,
-			targetBoneNames: skeletonTargets.targetsByName.size,
+			targetBoneNames: targetsByName.size,
 			skippedTracks
 		};
 	}
@@ -239,12 +255,13 @@
 		installCharacter(model, clips) {
 			const THREE = global.THREE;
 			if (!clips.length) throw new Error('animations.fbx không có animation clip nào.');
-			const retargeted = retargetAnimationClipsToModelSkeletons(clips, model);
+			const skeletonSource = useSingleSourceSkeleton(model);
+			const retargeted = retargetAnimationClipsToPrimarySkeleton(clips, skeletonSource.primaryMesh.skeleton);
 			const retargetedClips = retargeted.clips;
 			const clipTable = retargetedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
 			global.console.groupCollapsed('[DAT AI Office NPC] animations.fbx clips (' + clips.length + ')');
 			global.console.table(clipTable);
-			global.console.info('[DAT AI Office NPC] Retarget animation vào ' + retargeted.skeletonCount + ' skeleton / ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
+			global.console.info('[DAT AI Office NPC] Rebind ' + skeletonSource.meshCount + ' mesh vào skeleton nguồn ' + skeletonSource.primaryMesh.name + '; retarget ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
 			global.console.groupEnd();
 			this.setClipList(clipTable);
 			const animationMap = animationMapFrom(retargetedClips);
