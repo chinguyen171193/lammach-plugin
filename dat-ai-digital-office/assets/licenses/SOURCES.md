@@ -29,7 +29,7 @@ Các clip đã được kiểm tra trực tiếp trong GLB: `Idle_Loop`, `Walk_L
 - Runtime files: `public/assets/characters/employee_001/employee_001.fbx` và `animations.fbx`
 - Nguồn: asset gốc `employee_001_quaternius_min.zip`
 - Giấy phép: CC0 1.0 Universal; bản gốc được lưu tại `docs/assets/employee_001/License.txt`
-- Cấu hình animation đã kiểm tra trực tiếp: `CharacterArmature|Idle` và `CharacterArmature|Walk`
+- Cấu hình animation đã kiểm tra trực tiếp: `CharacterArmature|Idle_Neutral` và `CharacterArmature|Walk`
 
 ## Three.js
 

@@ -5,7 +5,7 @@
 	// Keep this explicit so a changed source file fails visibly instead of silently
 	// selecting a similarly named action such as Idle_Gun_Shoot.
 	const ANIMATION_MAP = Object.freeze({
-		IDLE: 'CharacterArmature|Idle',
+		IDLE: 'CharacterArmature|Idle_Neutral',
 		WALKING: 'CharacterArmature|Walk'
 	});
 

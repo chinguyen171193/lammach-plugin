@@ -16,6 +16,6 @@ Shortcode `[dat_ai_office_npc_test]` tạo scene kiểm thử độc lập cho
 đang hoạt động. Có thể đặt chiều cao bằng `[dat_ai_office_npc_test height="620"]`.
 
 Scene in danh sách clip của `animations.fbx` ra Console và panel debug, dùng map
-đã kiểm tra trực tiếp `CharacterArmature|Idle` / `CharacterArmature|Walk`,
+đã kiểm tra trực tiếp `CharacterArmature|Idle_Neutral` / `CharacterArmature|Walk`,
 cross-fade 0.32 giây, đồng thời cho phép đi tới Marker A/B/C. Asset runtime đặt tại `public/assets/characters/employee_001/`;
 license và hướng dẫn gốc được lưu trong `docs/assets/employee_001/`.
