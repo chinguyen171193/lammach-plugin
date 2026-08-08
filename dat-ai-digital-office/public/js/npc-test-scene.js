@@ -25,8 +25,8 @@
 		constructor(camera, element) {
 			this.camera = camera;
 			this.element = element;
-			this.target = new global.THREE.Vector3(0, 0.65, 0);
-			this.radius = 7.2;
+			this.target = new global.THREE.Vector3(0, 0.45, 0);
+			this.radius = 9.4;
 			this.theta = 0.7;
 			this.phi = 1.08;
 			this.pointer = null;
@@ -53,7 +53,7 @@
 				this.update();
 			};
 			this.onPointerUp = event => { if (this.pointer && this.pointer.id === event.pointerId) this.pointer = null; };
-			this.onWheel = event => { event.preventDefault(); this.radius = Math.max(2.5, Math.min(14, this.radius + event.deltaY * 0.008)); this.update(); };
+			this.onWheel = event => { event.preventDefault(); this.radius = Math.max(3.5, Math.min(16, this.radius + event.deltaY * 0.008)); this.update(); };
 			this.onContextMenu = event => event.preventDefault();
 			this.element.addEventListener('pointerdown', this.onPointerDown);
 			this.element.addEventListener('pointermove', this.onPointerMove);
@@ -233,8 +233,8 @@
 			let box = new THREE.Box3().setFromObject(this.model);
 			const height = box.getSize(new THREE.Vector3()).y;
 			if (!height) throw new Error('Không thể xác định chiều cao employee_001.');
-			// Keep the full figure comfortably inside the test scene at its default zoom.
-			const scale = 1.3 / height;
+			// The test scene needs a full-body NPC with ample space around the markers.
+			const scale = 0.85 / height;
 			this.model.scale.setScalar(scale);
 			this.model.updateMatrixWorld(true);
 			box = new THREE.Box3().setFromObject(this.model);
