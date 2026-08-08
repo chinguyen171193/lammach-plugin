@@ -21,46 +21,50 @@
 		});
 	}
 
-	function collectSkeletonBoneTargets(model) {
-		const targetsByName = new Map();
-		const seenSkeletons = new Set();
-		let skeletonCount = 0;
+	function findPrimarySkinnedMesh(model) {
+		const meshes = [];
 		model.traverse(object => {
-			if (!object.isSkinnedMesh || !object.skeleton || seenSkeletons.has(object.skeleton)) return;
-			seenSkeletons.add(object.skeleton);
-			skeletonCount += 1;
-			object.skeleton.bones.forEach(bone => {
-				if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, []);
-				const targets = targetsByName.get(bone.name);
-				if (!targets.some(target => target.uuid === bone.uuid)) targets.push(bone);
-			});
+			if (object.isSkinnedMesh && object.skeleton && object.skeleton.bones.length) meshes.push(object);
 		});
-		return { targetsByName, skeletonCount };
+		if (!meshes.length) return null;
+		return meshes.find(mesh => mesh.name === 'Suit_Legs') || meshes[0];
 	}
 
-	function retargetAnimationClipsToModelSkeletons(clips, model) {
+	function bindMeshesToPrimarySkeleton(model) {
+		const primaryMesh = findPrimarySkinnedMesh(model);
+		if (!primaryMesh) throw new Error('employee_001.fbx không có skinned mesh/skeleton hợp lệ.');
+		let meshCount = 0;
+		model.traverse(mesh => {
+			if (!mesh.isSkinnedMesh || !mesh.skeleton) return;
+			meshCount += 1;
+			if (mesh !== primaryMesh) mesh.bind(primaryMesh.skeleton, mesh.bindMatrix);
+		});
+		return { primaryMesh, meshCount };
+	}
+
+	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton) {
 		const THREE = global.THREE;
-		const skeletonTargets = collectSkeletonBoneTargets(model);
+		const targetsByName = new Map();
+		skeleton.bones.forEach(bone => {
+			if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone);
+		});
 		let skippedTracks = 0;
 		const retargetedClips = clips.map(clip => {
 			const tracks = [];
 			clip.tracks.forEach(track => {
 				const match = track.name.match(/^(.+)\.(position|quaternion|scale)$/);
 				if (!match || match[1] === 'CharacterArmature') { skippedTracks += 1; return; }
-				const targets = skeletonTargets.targetsByName.get(match[1]);
-				if (!targets || !targets.length) { skippedTracks += 1; return; }
-				targets.forEach(target => {
-					const retargetedTrack = track.clone();
-					retargetedTrack.name = target.uuid + '.' + match[2];
-					tracks.push(retargetedTrack);
-				});
+				const target = targetsByName.get(match[1]);
+				if (!target) { skippedTracks += 1; return; }
+				const retargetedTrack = track.clone();
+				retargetedTrack.name = target.uuid + '.' + match[2];
+				tracks.push(retargetedTrack);
 			});
 			return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 		});
 		return {
 			clips: retargetedClips,
-			skeletonCount: skeletonTargets.skeletonCount,
-			targetBoneNames: skeletonTargets.targetsByName.size,
+			targetBoneNames: targetsByName.size,
 			skippedTracks
 		};
 	}
@@ -239,15 +243,16 @@
 		installCharacter(model, clips) {
 			const THREE = global.THREE;
 			if (!clips.length) throw new Error('animations.fbx không có animation clip nào.');
-			// Each Suit_* mesh carries a distinct bind pose.  Do not rebind them to
-			// one skeleton: that offsets the head and limbs.  Retarget each matching
-			// bone so every mesh keeps its authored placement while staying in sync.
-			const retargeted = retargetAnimationClipsToModelSkeletons(clips, model);
+			// FBXLoader exposes duplicate, chained skeletons for the Suit_* meshes.
+			// Driving all of them compounds bone transforms, most visibly in the legs.
+			// Bind every mesh to the valid Suit_Legs skeleton and animate it once.
+			const skeletonSource = bindMeshesToPrimarySkeleton(model);
+			const retargeted = retargetAnimationClipsToPrimarySkeleton(clips, skeletonSource.primaryMesh.skeleton);
 			const retargetedClips = retargeted.clips;
 			const clipTable = retargetedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
 			global.console.groupCollapsed('[DAT AI Office NPC] animations.fbx clips (' + clips.length + ')');
 			global.console.table(clipTable);
-			global.console.info('[DAT AI Office NPC] Retarget animation vào ' + retargeted.skeletonCount + ' skeleton / ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
+			global.console.info('[DAT AI Office NPC] Bind ' + skeletonSource.meshCount + ' mesh vào skeleton ' + skeletonSource.primaryMesh.name + '; retarget ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
 			global.console.groupEnd();
 			this.setClipList(clipTable);
 			const animationMap = animationMapFrom(retargetedClips);
@@ -259,8 +264,8 @@
 			// Keep the character clear of the debug panel on the left.
 			this.character.position.set(0.75, 0, 0);
 			this.model = model;
-			// Quaternius FBX is +Z-forward; the controller uses Three.js lookAt (-Z-forward).
-			this.model.rotation.y = Math.PI;
+			// The Quaternius model faces +Z, which matches Object3D.lookAt().
+			// Rotating it 180° makes the walking animation move backwards.
 			this.model.traverse(object => {
 				if (!object.isMesh) return;
 				object.castShadow = true;
