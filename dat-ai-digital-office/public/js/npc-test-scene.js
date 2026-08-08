@@ -21,15 +21,48 @@
 		});
 	}
 
-	function removeImportedScaleTracks(clips) {
-		return clips.map(clip => {
-			const tracks = clip.tracks.filter(track => !track.name.endsWith('.scale'));
-			if (tracks.length === clip.tracks.length) return clip;
-			// The standalone animation FBX overwrites the scale of the root and
-			// Suit_* meshes. The model FBX needs those original scale values (100),
-			// while animation only needs position/quaternion tracks for its bones.
-			return new global.THREE.AnimationClip(clip.name, clip.duration, tracks);
+	function collectSkeletonBoneTargets(model) {
+		const targetsByName = new Map();
+		const seenSkeletons = new Set();
+		let skeletonCount = 0;
+		model.traverse(object => {
+			if (!object.isSkinnedMesh || !object.skeleton || seenSkeletons.has(object.skeleton)) return;
+			seenSkeletons.add(object.skeleton);
+			skeletonCount += 1;
+			object.skeleton.bones.forEach(bone => {
+				if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, []);
+				const targets = targetsByName.get(bone.name);
+				if (!targets.some(target => target.uuid === bone.uuid)) targets.push(bone);
+			});
 		});
+		return { targetsByName, skeletonCount };
+	}
+
+	function retargetAnimationClipsToModelSkeletons(clips, model) {
+		const THREE = global.THREE;
+		const skeletonTargets = collectSkeletonBoneTargets(model);
+		let skippedTracks = 0;
+		const retargetedClips = clips.map(clip => {
+			const tracks = [];
+			clip.tracks.forEach(track => {
+				const match = track.name.match(/^(.+)\.(position|quaternion|scale)$/);
+				if (!match || match[1] === 'CharacterArmature') { skippedTracks += 1; return; }
+				const targets = skeletonTargets.targetsByName.get(match[1]);
+				if (!targets || !targets.length) { skippedTracks += 1; return; }
+				targets.forEach(target => {
+					const retargetedTrack = track.clone();
+					retargetedTrack.name = target.uuid + '.' + match[2];
+					tracks.push(retargetedTrack);
+				});
+			});
+			return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+		});
+		return {
+			clips: retargetedClips,
+			skeletonCount: skeletonTargets.skeletonCount,
+			targetBoneNames: skeletonTargets.targetsByName.size,
+			skippedTracks
+		};
 	}
 
 	class NPCOrbitCamera {
@@ -206,14 +239,15 @@
 		installCharacter(model, clips) {
 			const THREE = global.THREE;
 			if (!clips.length) throw new Error('animations.fbx không có animation clip nào.');
-			const sanitizedClips = removeImportedScaleTracks(clips);
-			const clipTable = sanitizedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
+			const retargeted = retargetAnimationClipsToModelSkeletons(clips, model);
+			const retargetedClips = retargeted.clips;
+			const clipTable = retargetedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
 			global.console.groupCollapsed('[DAT AI Office NPC] animations.fbx clips (' + clips.length + ')');
 			global.console.table(clipTable);
-			global.console.info('[DAT AI Office NPC] Đã bỏ scale tracks của FBX animation để giữ đúng kích thước model.');
+			global.console.info('[DAT AI Office NPC] Retarget animation vào ' + retargeted.skeletonCount + ' skeleton / ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
 			global.console.groupEnd();
 			this.setClipList(clipTable);
-			const animationMap = animationMapFrom(sanitizedClips);
+			const animationMap = animationMapFrom(retargetedClips);
 			global.console.log('[DAT AI Office NPC] ANIMATION_MAP', animationMap);
 			if (!animationMap.IDLE || !animationMap.WALKING) throw new Error('Không tự map được Idle/Walk. Clips đã được liệt kê trong Console và panel debug.');
 
@@ -235,7 +269,7 @@
 			this.scene.add(this.character);
 			this.placeModelOnFloor();
 			this.mixer = new THREE.AnimationMixer(this.model);
-			this.animationController = new global.DAT_NPCAnimationController(this.mixer, sanitizedClips, animationMap, { fadeDuration: 0.32 });
+			this.animationController = new global.DAT_NPCAnimationController(this.mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
 			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06 });
 			this.animationController.setState(global.DAT_NPC_STATES.IDLE);
 			this.status = 'Sẵn sàng';
