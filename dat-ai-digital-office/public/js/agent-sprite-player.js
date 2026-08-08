@@ -235,6 +235,7 @@
 					cameraFill: definition.facePreview.cameraFill
 				} : null,
 				cameraFill: definition.cameraFill,
+				appearance: this.spriteId === 'supervisor-ai' ? ((global.DAT_AI_OFFICE_ADMIN && global.DAT_AI_OFFICE_ADMIN.supervisorAppearance) || (global.DAT_AI_OFFICE && global.DAT_AI_OFFICE.supervisorAppearance) || null) : null,
 				modelUrl: imageUrl(this.options.assetBase, this.spriteId, definition.model, ''),
 				assetVersion: this.options.assetVersion,
 				onError: error => this.fallbackFromThree(error)

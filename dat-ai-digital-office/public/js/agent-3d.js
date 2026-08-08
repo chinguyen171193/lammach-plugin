@@ -46,6 +46,7 @@
 				startInBindPose: false,
 				debug: false,
 				facePreview: null,
+				appearance: null,
 				cameraFill: 0.76,
 				pixelRatio: 1.5,
 				fadeDuration: 0.28,
@@ -402,6 +403,7 @@
 				}
 			});
 			this.skeletons = Array.from(skeletonSet);
+			this.applyAppearance();
 			this.scene.add(this.model);
 			this.resetSkeletons();
 			this.centerModelOnFloor();
@@ -422,6 +424,29 @@
 			this.resize();
 			this.render();
 			startScheduler();
+		}
+
+		applyAppearance() {
+			const appearance = this.options.appearance;
+			if (!appearance) return;
+			const colors = {
+				Skin: appearance.skin_color,
+				Hair: appearance.hair_color,
+				Eyebrows: appearance.hair_color,
+				Suit: appearance.suit_color,
+				Tie: appearance.tie_color
+			};
+			this.model.traverse(object => {
+				if (!object.isMesh) return;
+				const materials = Array.isArray(object.material) ? object.material : [object.material];
+				materials.forEach(material => {
+					if (!material || !colors[material.name]) return;
+					try {
+						material.color.set(colors[material.name]);
+						material.needsUpdate = true;
+					} catch (error) { /* Invalid optional user colour: retain the model default. */ }
+				});
+			});
 		}
 
 		createHelpers() {

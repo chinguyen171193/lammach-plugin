@@ -8,14 +8,9 @@
   "playback": "three",
   "three": {
     "model": "3d/Suit.gltf",
-    "startInBindPose": true,
+    "startInBindPose": false,
     "debug": true,
     "cameraFill": 0.76,
-    "facePreview": {
-      "model": "3d/ready-player-me-face-prototype.glb",
-      "texture": "3d/textures/supervisor-face-v1.png",
-      "cameraFill": 0.84
-    },
     "stateMap": {
       "idle": "idle",
       "working": "walk",

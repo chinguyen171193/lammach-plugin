@@ -17,7 +17,7 @@ $showcase_ids = array( 'supervisor-ai', 'sale-ai', 'pcb-engineer' );
 
 	<section class="dat-ai-office-agent-visualization" aria-label="Agent Sprite Demo">
 		<div class="dat-ai-office-agent-visualization__head">
-			<div><h2>Agent visualization</h2><p>DAT Supervisor AI vẫn chạy Suit.gltf và animation cơ thể hiện tại. Quản trị viên có thể bấm “Face Preview” trong bảng debug để thử mẫu khuôn mặt riêng; hai Agent 2D còn lại được giữ nguyên.</p></div>
+		<div><h2>Agent visualization</h2><p>DAT Supervisor AI chạy model Suit.gltf với animation cơ thể gốc. Bạn có thể đổi trực tiếp màu da, tóc, vest và cà vạt tại <a href="<?php echo esc_url( admin_url( 'admin.php?page=dat-ai-office-supervisor-studio' ) ); ?>">Tạo Supervisor</a>; hai Agent 2D còn lại được giữ nguyên.</p></div>
 			<button type="button" class="button button-primary" data-dat-ai-demo-agents>Demo Agent</button>
 		</div>
 		<div class="dat-ai-office-agent-grid">

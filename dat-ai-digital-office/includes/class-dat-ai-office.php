@@ -84,7 +84,32 @@ final class DAT_AI_Office {
 			'delete_on_uninstall'=> false,
 			'connection_mode'    => 'demo',
 			'custom_endpoint'    => '',
+			'supervisor_appearance' => self::default_supervisor_appearance(),
 		);
+	}
+
+	/**
+	 * Appearance values are deliberately limited to materials that are present in
+	 * Suit.gltf.  This avoids presenting a "hair style" or clothing selector
+	 * that cannot actually change the 3D character yet.
+	 *
+	 * @return array
+	 */
+	public static function default_supervisor_appearance() {
+		return array(
+			'skin_color' => '#bd8c6d',
+			'hair_color' => '#3d281d',
+			'suit_color' => '#152a46',
+			'tie_color'  => '#1d6f9b',
+		);
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function supervisor_appearance() {
+		$settings = self::settings();
+		return wp_parse_args( is_array( $settings['supervisor_appearance'] ?? null ) ? $settings['supervisor_appearance'] : array(), self::default_supervisor_appearance() );
 	}
 
 	public static function settings() {
