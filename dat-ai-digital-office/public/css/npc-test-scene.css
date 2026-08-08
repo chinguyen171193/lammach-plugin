@@ -51,6 +51,7 @@
 .dat-npc-test__clips { margin-top: 12px; border-top: 1px solid rgba(157, 222, 244, .18); padding-top: 8px; }
 .dat-npc-test__clips summary { cursor: pointer; color: #9eeaff; }
 .dat-npc-test__clips ul { max-height: 110px; margin: 6px 0 0; padding-left: 18px; overflow: auto; color: #cbe9f2; font-size: 11px; }
+.dat-npc-test__missing { margin: 8px 0 0; color: #ffd080; font-size: 11px; line-height: 1.4; }
 .dat-npc-test__hint { margin: 10px 0 0; color: #96bac7; font-size: 11px; }
 .dat-npc-test__error { position: absolute; z-index: 3; right: 16px; bottom: 16px; left: 16px; margin: 0; padding: 10px 12px; border: 1px solid rgba(255, 152, 99, .65); border-radius: 8px; color: #ffe4d5; background: rgba(91, 28, 10, .92); font: 13px/1.4 system-ui, sans-serif; }
 .dat-npc-test__error[hidden] { display: none; }

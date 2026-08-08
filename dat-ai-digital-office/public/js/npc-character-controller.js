@@ -8,14 +8,24 @@
 			this.animationController = animationController;
 			this.speed = Number((options || {}).speed) || 1.6;
 			this.arrivalThreshold = Number((options || {}).arrivalThreshold) || 0.055;
+			this.typingAvailable = Boolean((options || {}).typingAvailable);
 			this.target = null;
+			this.targetObject = null;
+			this.currentInteraction = null;
+			this.onArrive = null;
+			this.faceMovement = true;
+			this.alignment = null;
 			this._direction = new global.THREE.Vector3();
 		}
 
-		moveTo(target) {
+		moveTo(target, options) {
+			const settings = options || {};
 			this.target = target.clone();
-			this.faceTarget(this.target);
-			this.animationController.setState(global.DAT_NPC_STATES.WALKING);
+			this.onArrive = settings.onArrive || null;
+			this.faceMovement = settings.faceMovement !== false;
+			this.moveSpeed = Number(settings.speed) || this.speed;
+			if (this.faceMovement) this.faceTarget(this.target);
+			this.animationController.setState(settings.state || global.DAT_NPC_STATES.WALKING);
 		}
 
 		faceTarget(target) {
@@ -25,10 +35,81 @@
 
 		stop() {
 			this.target = null;
+			this.onArrive = null;
+			this.moveSpeed = this.speed;
+			this.alignment = null;
 			this.animationController.setState(global.DAT_NPC_STATES.IDLE);
 		}
 
+		alignTo(rotation, onComplete) {
+			this.target = null;
+			this.alignment = { rotation, onComplete: onComplete || null };
+			this.animationController.setState(global.DAT_NPC_STATES.ALIGNING_TO_CHAIR);
+		}
+
+		goToWorkstation(workstation) {
+			if (!workstation || !workstation.chair) throw new Error('Workstation không có chair interaction metadata.');
+			this.currentInteraction = workstation.id;
+			this.targetObject = workstation.id;
+			this.moveTo(workstation.chair.approachPoint, {
+				onArrive: () => this.alignTo(workstation.chair.sitRotation, () => this.sit(workstation))
+			});
+		}
+
+		sit(workstation) {
+			if (!workstation || !workstation.chair) return;
+			this.currentInteraction = workstation.id;
+			this.targetObject = workstation.chair.id;
+			this.character.rotation.y = workstation.chair.sitRotation;
+			this.moveTo(workstation.chair.sitPoint, {
+				state: global.DAT_NPC_STATES.SITTING_DOWN,
+				speed: 0.72,
+				faceMovement: false,
+				onArrive: () => this.animationController.setState(global.DAT_NPC_STATES.SITTING_IDLE)
+			});
+		}
+
+		work() {
+			if (!this.currentInteraction) return false;
+			this.targetObject = 'computer_01';
+			this.animationController.setState(global.DAT_NPC_STATES.WORKING);
+			return this.typingAvailable;
+		}
+
+		stopWork() {
+			if (!this.currentInteraction) return;
+			this.targetObject = 'chair_01';
+			this.animationController.setState(global.DAT_NPC_STATES.SITTING_IDLE);
+		}
+
+		standUp(workstation) {
+			if (!workstation || !workstation.chair) return;
+			this.targetObject = workstation.chair.id;
+			this.animationController.setState(global.DAT_NPC_STATES.STANDING_UP);
+			this.moveTo(workstation.chair.approachPoint, {
+				state: global.DAT_NPC_STATES.STANDING_UP,
+				speed: 0.72,
+				faceMovement: false,
+				onArrive: () => {
+					this.currentInteraction = null;
+					this.targetObject = null;
+					this.animationController.setState(global.DAT_NPC_STATES.IDLE);
+				}
+			});
+		}
+
 		update(delta) {
+			if (this.alignment) {
+				const difference = global.THREE.MathUtils.euclideanModulo(this.alignment.rotation - this.character.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
+				const step = Math.sign(difference) * Math.min(Math.abs(difference), delta * 7);
+				this.character.rotation.y += step;
+				if (Math.abs(difference) <= 0.02) {
+					const callback = this.alignment.onComplete;
+					this.character.rotation.y = this.alignment.rotation;
+					this.alignment = null;
+					if (callback) callback();
+				}
+			}
 			if (!this.target) return;
 			this._direction.subVectors(this.target, this.character.position);
 			this._direction.y = 0;
@@ -36,12 +117,15 @@
 			if (distance <= this.arrivalThreshold) {
 				this.character.position.x = this.target.x;
 				this.character.position.z = this.target.z;
-				this.stop();
+				const callback = this.onArrive;
+				this.target = null;
+				this.onArrive = null;
+				if (callback) callback(); else this.stop();
 				return;
 			}
 			this._direction.multiplyScalar(1 / distance);
-			this.faceTarget(this.target);
-			const distanceThisFrame = Math.min(this.speed * delta, distance);
+			if (this.faceMovement) this.faceTarget(this.target);
+			const distanceThisFrame = Math.min(this.moveSpeed * delta, distance);
 			this.character.position.addScaledVector(this._direction, distanceThisFrame);
 		}
 

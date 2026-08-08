@@ -8,16 +8,26 @@
 		IDLE: 'CharacterArmature|Idle_Neutral',
 		WALKING: 'CharacterArmature|Walk'
 	});
+	const WORKSTATION_KEYWORDS = Object.freeze([ 'sit', 'sitting', 'sit down', 'stand up', 'typing', 'computer', 'desk', 'mouse', 'writing', 'talking', 'thinking' ]);
 
 	function versionedUrl(url, version) {
 		return version ? url + (url.indexOf('?') === -1 ? '?' : '&') + 'ver=' + encodeURIComponent(version) : url;
 	}
 
-	function animationMapFrom(clips) {
+	function workstationAnimationScan(clips) {
+		return clips.filter(clip => WORKSTATION_KEYWORDS.some(keyword => clip.name.toLowerCase().includes(keyword)));
+	}
+
+	function animationMapFrom(clips, workstationAnimations) {
 		const availableNames = new Set(clips.map(clip => clip.name));
 		return Object.freeze({
 			IDLE: availableNames.has(ANIMATION_MAP.IDLE) ? ANIMATION_MAP.IDLE : '',
-			WALKING: availableNames.has(ANIMATION_MAP.WALKING) ? ANIMATION_MAP.WALKING : ''
+			WALKING: availableNames.has(ANIMATION_MAP.WALKING) ? ANIMATION_MAP.WALKING : '',
+			ALIGNING_TO_CHAIR: availableNames.has(ANIMATION_MAP.IDLE) ? ANIMATION_MAP.IDLE : '',
+			SITTING_DOWN: workstationAnimations.sitDown || workstationAnimations.sitIdle || '__procedural_sit__',
+			SITTING_IDLE: workstationAnimations.sitIdle || '__procedural_sit__',
+			WORKING: workstationAnimations.typing || workstationAnimations.sitIdle || '__procedural_sit__',
+			STANDING_UP: workstationAnimations.standUp || ANIMATION_MAP.IDLE
 		});
 	}
 
@@ -74,6 +84,24 @@
 			targetBoneNames: targetsByName.size,
 			skippedTracks
 		};
+	}
+
+	function proceduralSittingClip(skeleton) {
+		const THREE = global.THREE;
+		const tracks = [];
+		const sitOffsets = {
+			UpperLegL: [ 0, 0, 1.28 ],
+			UpperLegR: [ 0, 0, 1.28 ],
+			LowerLegL: [ 1.32, 0, 0 ],
+			LowerLegR: [ 1.32, 0, 0 ]
+		};
+		skeleton.bones.forEach(bone => {
+			const quaternion = bone.quaternion.clone();
+			const offset = sitOffsets[bone.name];
+			if (offset) quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(offset[0], offset[1], offset[2])));
+			tracks.push(new THREE.QuaternionKeyframeTrack(bone.uuid + '.quaternion', [ 0, 1 ], quaternion.toArray().concat(quaternion.toArray())));
+		});
+		return new THREE.AnimationClip('__procedural_sit__', 1, tracks);
 	}
 
 	class NPCOrbitCamera {
@@ -205,11 +233,14 @@
 				C: new THREE.Vector3(0.8, 0, 2.35)
 			};
 			Object.keys(this.markers).forEach(name => this.addMarker(name, this.markers[name]));
+			this.workstations = new Map();
+			this.addWorkstation();
 		}
 
-		addMarker(name, position) {
+		addMarker(name, position, color) {
 			const THREE = global.THREE;
-			const marker = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.05, 32), new THREE.MeshStandardMaterial({ color: 0x45d9ff, emissive: 0x0b5d78, emissiveIntensity: 0.65 }));
+			const markerColor = color || 0x45d9ff;
+			const marker = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.04, 24), new THREE.MeshStandardMaterial({ color: markerColor, emissive: markerColor, emissiveIntensity: 0.28 }));
 			marker.position.copy(position);
 			marker.position.y = 0.03;
 			marker.receiveShadow = true;
@@ -219,14 +250,86 @@
 			labelCanvas.height = 64;
 			const context = labelCanvas.getContext('2d');
 			context.fillStyle = '#dffaff';
-			context.font = 'bold 34px sans-serif';
+			context.font = 'bold 22px sans-serif';
 			context.textAlign = 'center';
 			context.fillText('Marker ' + name, 64, 42);
 			const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(labelCanvas), depthTest: false }));
 			label.position.copy(position);
 			label.position.y = 0.52;
-			label.scale.set(1.12, 0.56, 1);
+			label.scale.set(1.2, 0.6, 1);
 			this.scene.add(label);
+		}
+
+		addWorkstation() {
+			const THREE = global.THREE;
+			const deskPosition = new THREE.Vector3(1.6, 0, 0.8);
+			const group = new THREE.Group();
+			group.name = 'desk_01';
+			group.userData = { id: 'desk_01', type: 'workstation', actions: [ 'SIT', 'WORK' ] };
+			group.position.copy(deskPosition);
+			const wood = new THREE.MeshStandardMaterial({ color: 0x5f3d28, roughness: 0.72 });
+			const metal = new THREE.MeshStandardMaterial({ color: 0x243847, roughness: 0.48, metalness: 0.55 });
+			const screen = new THREE.MeshStandardMaterial({ color: 0x0a1c28, emissive: 0x1a83a1, emissiveIntensity: 0.35 });
+			const top = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.92), wood);
+			top.position.y = 0.82;
+			group.add(top);
+			[ -0.92, 0.92 ].forEach(x => [ -0.32, 0.32 ].forEach(z => {
+				const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), metal);
+				leg.position.set(x, 0.4, z);
+				group.add(leg);
+			}));
+			const monitor = new THREE.Group();
+			monitor.name = 'computer_01';
+			monitor.userData = { id: 'computer_01', type: 'computer', actions: [ 'READ_EMAIL', 'WRITE_EMAIL', 'MAKE_QUOTE', 'WORK' ] };
+			const monitorScreen = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.5, 0.06), screen);
+			monitorScreen.position.y = 1.22;
+			monitor.add(monitorScreen);
+			const monitorStem = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.34, 0.08), metal);
+			monitorStem.position.y = 0.99;
+			monitor.add(monitorStem);
+			const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.25), metal);
+			keyboard.position.set(0, 0.9, 0.18);
+			monitor.add(keyboard);
+			const mouse = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 10), metal);
+			mouse.scale.set(1, 0.45, 1.25);
+			mouse.position.set(0.52, 0.91, 0.18);
+			monitor.add(mouse);
+			group.add(monitor);
+			const chair = new THREE.Group();
+			chair.name = 'chair_01';
+			chair.userData = { id: 'chair_01', type: 'chair', actions: [ 'SIT' ] };
+			chair.position.set(0, 0, 1.22);
+			const seat = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.11, 0.76), new THREE.MeshStandardMaterial({ color: 0x216077, roughness: 0.62 }));
+			seat.position.y = 0.54;
+			chair.add(seat);
+			const back = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.72, 0.1), new THREE.MeshStandardMaterial({ color: 0x1b4d62, roughness: 0.62 }));
+			back.position.set(0, 0.91, 0.32);
+			chair.add(back);
+			[ -0.29, 0.29 ].forEach(x => [ -0.23, 0.23 ].forEach(z => {
+				const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.54, 10), metal);
+				leg.position.set(x, 0.27, z);
+				chair.add(leg);
+			}));
+			group.add(chair);
+			this.scene.add(group);
+			const chairWorld = new THREE.Vector3(deskPosition.x, 0, deskPosition.z + 1.22);
+			const workstation = {
+				id: 'desk_01',
+				object: group,
+				actions: [ 'SIT', 'WORK' ],
+				chair: {
+					id: 'chair_01', object: chair, actions: [ 'SIT' ],
+					approachPoint: new THREE.Vector3(chairWorld.x, 0, chairWorld.z + 0.72),
+					sitPoint: new THREE.Vector3(chairWorld.x, 0, chairWorld.z + 0.06),
+					sitRotation: Math.PI
+				},
+				computer: { id: 'computer_01', object: monitor, actions: [ 'READ_EMAIL', 'WRITE_EMAIL', 'MAKE_QUOTE', 'WORK' ] }
+			};
+			this.workstations.set(workstation.id, workstation);
+			this.addMarker('chair_01.approachPoint', workstation.chair.approachPoint, 0x57e6ff);
+			this.addMarker('chair_01.sitPoint', workstation.chair.sitPoint, 0x63e89b);
+			const rotationPoint = workstation.chair.sitPoint.clone().add(new THREE.Vector3(0, 0, -0.46));
+			this.addMarker('chair_01.sitRotation', rotationPoint, 0xffca63);
 		}
 
 		loadFBX(url) {
@@ -256,13 +359,17 @@
 			const skeletonSource = bindMeshesToPrimarySkeleton(model);
 			const retargeted = retargetAnimationClipsToPrimarySkeleton(clips, skeletonSource.primaryMesh.skeleton);
 			const retargetedClips = retargeted.clips;
+			retargetedClips.push(proceduralSittingClip(skeletonSource.primaryMesh.skeleton));
+			const workstationMatches = workstationAnimationScan(clips);
+			const workstationAnimations = { sitDown: '', sitIdle: '', standUp: '', typing: '' };
 			const clipTable = retargetedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
 			global.console.groupCollapsed('[DAT AI Office NPC] animations.fbx clips (' + clips.length + ')');
 			global.console.table(clipTable);
 			global.console.info('[DAT AI Office NPC] Bind ' + skeletonSource.meshCount + ' mesh vào skeleton ' + skeletonSource.primaryMesh.name + '; retarget ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
 			global.console.groupEnd();
 			this.setClipList(clipTable);
-			const animationMap = animationMapFrom(retargetedClips);
+			this.setWorkstationAnimationScan(workstationMatches);
+			const animationMap = animationMapFrom(retargetedClips, workstationAnimations);
 			global.console.log('[DAT AI Office NPC] ANIMATION_MAP', animationMap);
 			if (!animationMap.IDLE || !animationMap.WALKING) throw new Error('Không tự map được Idle/Walk. Clips đã được liệt kê trong Console và panel debug.');
 
@@ -285,9 +392,9 @@
 			this.placeModelOnFloor();
 			this.mixer = new THREE.AnimationMixer(this.model);
 			this.animationController = new global.DAT_NPCAnimationController(this.mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
-			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06 });
+			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(workstationAnimations.typing) });
 			this.animationController.setState(global.DAT_NPC_STATES.IDLE);
-			this.status = 'Sẵn sàng';
+			this.status = 'Sẵn sàng · thiếu Sit, Stand Up và Typing — dùng procedural seated pose';
 			this.start();
 		}
 
@@ -310,8 +417,13 @@
 			this.root.querySelectorAll('[data-npc-action]').forEach(button => button.addEventListener('click', () => {
 				const action = button.dataset.npcAction;
 				if (!this.characterController) return;
-				if (action === 'IDLE') { this.characterController.stop(); this.status = 'Đã chuyển Idle'; return; }
-				if (this.markers[action]) { this.characterController.moveTo(this.markers[action]); this.status = 'Đang đi tới marker ' + action; }
+				const workstation = this.workstations.get('desk_01');
+				if (action === 'IDLE') { this.characterController.stop(); this.characterController.currentInteraction = null; this.characterController.targetObject = null; this.status = 'Đã chuyển Idle'; return; }
+				if (action === 'GO_TO_DESK') { this.characterController.goToWorkstation(workstation); this.status = 'Đang đi tới chair_01.approachPoint'; return; }
+				if (action === 'SIT') { this.characterController.sit(workstation); this.status = 'Đang vào ghế · procedural seated pose'; return; }
+				if (action === 'WORK') { const typing = this.characterController.work(); this.status = typing ? 'Đang làm việc' : 'Typing animation không có · giữ Sitting Idle'; return; }
+				if (action === 'STOP_WORK') { this.characterController.stopWork(); this.status = 'Dừng làm việc · Sitting Idle'; return; }
+				if (action === 'STAND_UP') { this.characterController.standUp(workstation); this.status = 'Đứng lên và lùi về approach point'; }
 			}));
 		}
 
@@ -326,6 +438,24 @@
 			});
 		}
 
+		setWorkstationAnimationScan(clips) {
+			const list = this.root.querySelector('[data-npc-workstation-clips]');
+			if (list) {
+				list.replaceChildren();
+				if (!clips.length) {
+					const item = document.createElement('li');
+					item.textContent = 'Không có clip khớp keyword workstation.';
+					list.appendChild(item);
+				} else clips.forEach(clip => {
+					const item = document.createElement('li');
+					item.textContent = clip.name + ' (' + clip.duration.toFixed(3) + 's)';
+					list.appendChild(item);
+				});
+			}
+			const missing = this.root.querySelector('[data-npc-missing-animations]');
+			if (missing) missing.textContent = 'Thiếu: Sit / Sitting, Sit Down, Stand Up, Typing, Computer, Desk, Mouse, Writing, Talking, Thinking.';
+		}
+
 		start() { if (!this.animationFrame) this.animationFrame = global.requestAnimationFrame(time => this.tick(time)); }
 		tick(time) {
 			if (this.destroyed) return;
@@ -333,11 +463,7 @@
 			const delta = Math.min(0.05, this.previousTime ? (time - this.previousTime) / 1000 : 0);
 			this.previousTime = time;
 			if (this.animationController) this.animationController.update(delta);
-			if (this.characterController) {
-				const hadTarget = this.characterController.getTarget();
-				this.characterController.update(delta);
-				if (hadTarget && !this.characterController.getTarget()) this.status = 'Đã đến target · Idle';
-			}
+			if (this.characterController) this.characterController.update(delta);
 			this.updatePanel();
 			this.renderer.render(this.scene, this.camera);
 		}
@@ -349,6 +475,8 @@
 			const value = (selector, text) => { const element = this.root.querySelector(selector); if (element) element.textContent = text; };
 			value('[data-npc-state]', this.animationController.getState());
 			value('[data-npc-animation]', this.animationController.getAnimation());
+			value('[data-npc-interaction]', this.characterController.currentInteraction || '—');
+			value('[data-npc-target-object]', this.characterController.targetObject || '—');
 			value('[data-npc-position]', [position.x, position.y, position.z].map(number => number.toFixed(2)).join(', '));
 			value('[data-npc-target]', target ? [target.x, target.y, target.z].map(number => number.toFixed(2)).join(', ') : '—');
 			value('[data-npc-status]', this.status || 'Sẵn sàng');

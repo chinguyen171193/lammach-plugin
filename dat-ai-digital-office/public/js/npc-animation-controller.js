@@ -1,7 +1,15 @@
 (function (global) {
 	'use strict';
 
-	const STATES = Object.freeze({ IDLE: 'IDLE', WALKING: 'WALKING' });
+	const STATES = Object.freeze({
+		IDLE: 'IDLE',
+		WALKING: 'WALKING',
+		ALIGNING_TO_CHAIR: 'ALIGNING_TO_CHAIR',
+		SITTING_DOWN: 'SITTING_DOWN',
+		SITTING_IDLE: 'SITTING_IDLE',
+		WORKING: 'WORKING',
+		STANDING_UP: 'STANDING_UP'
+	});
 
 	/** Keeps AnimationMixer state transitions separate from character movement. */
 	class NPCAnimationController {
@@ -25,7 +33,7 @@
 		setState(state) {
 			if (!STATES[state]) throw new Error('NPC state không hợp lệ: ' + state);
 			if (state === this.currentState) return;
-			const clipName = this.animationMap[state];
+			const clipName = this.animationMap[state] || this.animationMap.IDLE;
 			if (!clipName) throw new Error('Chưa map animation cho ' + state);
 			const next = this.action(clipName);
 			next.reset();
@@ -37,8 +45,10 @@
 			if (this.currentAction && this.currentAction !== next) this.currentAction.crossFadeTo(next, this.fadeDuration, true);
 			this.currentAction = next;
 			this.currentState = state;
-			this.currentAnimation = clipName;
+			this.currentAnimation = clipName + (this.animationMap[state] ? '' : ' (fallback Idle)');
 		}
+
+		hasAnimation(state) { return Boolean(this.animationMap[state]); }
 
 		update(delta) { this.mixer.update(delta); }
 		getState() { return this.currentState || STATES.IDLE; }
