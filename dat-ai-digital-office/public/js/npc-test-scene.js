@@ -36,8 +36,8 @@
 		constructor(camera, element) {
 			this.camera = camera;
 			this.element = element;
-			this.target = new global.THREE.Vector3(0, 0.45, 0);
-			this.radius = 9.4;
+			this.target = new global.THREE.Vector3(0.5, 0.72, 0);
+			this.radius = 7.2;
 			this.theta = 0.7;
 			this.phi = 1.08;
 			this.pointer = null;
@@ -219,6 +219,8 @@
 
 			this.character = new THREE.Group();
 			this.character.name = 'employee_001';
+			// Keep the character clear of the debug panel on the left.
+			this.character.position.set(0.75, 0, 0);
 			this.model = model;
 			// Quaternius FBX is +Z-forward; the controller uses Three.js lookAt (-Z-forward).
 			this.model.rotation.y = Math.PI;
@@ -247,7 +249,7 @@
 			const height = box.getSize(new THREE.Vector3()).y;
 			if (!height) throw new Error('Không thể xác định chiều cao employee_001.');
 			// The test scene needs a full-body NPC with ample space around the markers.
-			const scale = 0.85 / height;
+			const scale = 1.45 / height;
 			this.model.scale.setScalar(scale);
 			this.model.updateMatrixWorld(true);
 			box = new THREE.Box3().setFromObject(this.model);
