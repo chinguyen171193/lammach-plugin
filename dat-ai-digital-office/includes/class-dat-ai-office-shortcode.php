@@ -2,7 +2,10 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class DAT_AI_Office_Shortcode {
-	public function __construct() { add_shortcode( 'dat_ai_office', array( $this, 'render' ) ); }
+	public function __construct() {
+		add_shortcode( 'dat_ai_office', array( $this, 'render' ) );
+		add_shortcode( 'dat_ai_office_npc_test', array( $this, 'render_npc_test' ) );
+	}
 
 	public function render( $atts ) {
 		$atts = shortcode_atts( array( 'height' => '760', 'mode' => 'demo', 'theme' => 'dark', 'fullscreen' => 'no', 'show_dashboard' => 'yes', 'show_log' => 'yes', 'show_controls' => 'yes', 'sound' => 'no', 'auto_camera' => 'yes' ), $atts, 'dat_ai_office' );
@@ -21,6 +24,26 @@ class DAT_AI_Office_Shortcode {
 		$assets->public_assets();
 		ob_start();
 		include DAT_AI_OFFICE_DIR . 'templates/digital-office.php';
+		return ob_get_clean();
+	}
+
+	/**
+	 * Isolated 3D NPC proof-of-concept. This is intentionally separate from the
+	 * 2.5D office renderer until the movement model is ready to be shared.
+	 */
+	public function render_npc_test( $atts ) {
+		$atts = shortcode_atts( array( 'height' => '620' ), $atts, 'dat_ai_office_npc_test' );
+		$config = array(
+			'id'         => 'dat-ai-office-npc-' . wp_generate_uuid4(),
+			'height'     => min( 1000, max( 380, absint( $atts['height'] ) ) ),
+			'model_url'  => DAT_AI_OFFICE_URL . 'public/assets/characters/employee_001/employee_001.fbx',
+			'anims_url'  => DAT_AI_OFFICE_URL . 'public/assets/characters/employee_001/animations.fbx',
+			'version'    => DAT_AI_OFFICE_BUILD,
+		);
+		$assets = new DAT_AI_Office_Assets();
+		$assets->npc_test_assets();
+		ob_start();
+		include DAT_AI_OFFICE_DIR . 'templates/npc-test-scene.php';
 		return ob_get_clean();
 	}
 }

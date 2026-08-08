@@ -22,6 +22,15 @@ Model có 5 node gắn skin (Three.js tách thành 13 `SkinnedMesh` theo primiti
 
 Các clip đã được kiểm tra trực tiếp trong GLB: `Idle_Loop`, `Walk_Loop`, `Sitting_Enter`, `Sitting_Idle_Loop`, `Sitting_Exit`. Danh sách đủ 43 clip nằm trong `UAL1-STANDARD-ANIMATIONS.txt`. File được giữ để nghiên cứu nhưng không còn được frontend tải hoặc retarget vào Suit.
 
+## NPC employee_001 (FBX test scene)
+
+- Pack: **Ultimate Modular Men Pack**
+- Tác giả: **Quaternius**
+- Runtime files: `public/assets/characters/employee_001/employee_001.fbx` và `animations.fbx`
+- Nguồn: asset gốc `employee_001_quaternius_min.zip`
+- Giấy phép: CC0 1.0 Universal; bản gốc được lưu tại `docs/assets/employee_001/License.txt`
+- Cấu hình animation đã kiểm tra trực tiếp: `CharacterArmature|Idle` và `CharacterArmature|Walk`
+
 ## Three.js
 
 - Thư viện runtime: Three.js r128 và addon `GLTFLoader`
@@ -30,6 +39,12 @@ Các clip đã được kiểm tra trực tiếp trong GLB: `Idle_Loop`, `Walk_L
 - Giấy phép: MIT, xem `public/js/vendor/three.LICENSE.txt`
 
 Tất cả file được đóng gói cục bộ trong plugin; frontend không tải asset từ CDN.
+
+## fflate
+
+- Thư viện giải nén runtime cho FBX binary nén: `public/js/vendor/fflate.min.js` (0.6.10)
+- Nguồn: <https://github.com/101arrowz/fflate>
+- Giấy phép: MIT, xem `assets/licenses/fflate-MIT-LICENSE.txt`
 
 ## Ready Player Me Face Preview
 
