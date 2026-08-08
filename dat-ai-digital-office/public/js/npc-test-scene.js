@@ -21,6 +21,17 @@
 		});
 	}
 
+	function removeImportedScaleTracks(clips) {
+		return clips.map(clip => {
+			const tracks = clip.tracks.filter(track => !track.name.endsWith('.scale'));
+			if (tracks.length === clip.tracks.length) return clip;
+			// The standalone animation FBX overwrites the scale of the root and
+			// Suit_* meshes. The model FBX needs those original scale values (100),
+			// while animation only needs position/quaternion tracks for its bones.
+			return new global.THREE.AnimationClip(clip.name, clip.duration, tracks);
+		});
+	}
+
 	class NPCOrbitCamera {
 		constructor(camera, element) {
 			this.camera = camera;
@@ -195,12 +206,14 @@
 		installCharacter(model, clips) {
 			const THREE = global.THREE;
 			if (!clips.length) throw new Error('animations.fbx không có animation clip nào.');
-			const clipTable = clips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
+			const sanitizedClips = removeImportedScaleTracks(clips);
+			const clipTable = sanitizedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
 			global.console.groupCollapsed('[DAT AI Office NPC] animations.fbx clips (' + clips.length + ')');
 			global.console.table(clipTable);
+			global.console.info('[DAT AI Office NPC] Đã bỏ scale tracks của FBX animation để giữ đúng kích thước model.');
 			global.console.groupEnd();
 			this.setClipList(clipTable);
-			const animationMap = animationMapFrom(clips);
+			const animationMap = animationMapFrom(sanitizedClips);
 			global.console.log('[DAT AI Office NPC] ANIMATION_MAP', animationMap);
 			if (!animationMap.IDLE || !animationMap.WALKING) throw new Error('Không tự map được Idle/Walk. Clips đã được liệt kê trong Console và panel debug.');
 
@@ -220,7 +233,7 @@
 			this.scene.add(this.character);
 			this.placeModelOnFloor();
 			this.mixer = new THREE.AnimationMixer(this.model);
-			this.animationController = new global.DAT_NPCAnimationController(this.mixer, clips, animationMap, { fadeDuration: 0.32 });
+			this.animationController = new global.DAT_NPCAnimationController(this.mixer, sanitizedClips, animationMap, { fadeDuration: 0.32 });
 			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06 });
 			this.animationController.setState(global.DAT_NPC_STATES.IDLE);
 			this.status = 'Sẵn sàng';
