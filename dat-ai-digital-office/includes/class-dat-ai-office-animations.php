@@ -42,6 +42,7 @@ final class DAT_AI_Office_Animations {
 		return array( 'attachment_id' => $attachment_id, 'url' => wp_get_attachment_url( $attachment_id ), 'format' => $extension, 'label' => get_the_title( $attachment_id ) ?: basename( $file ), 'clip' => '', 'source' => 'media', 'retarget_status' => 'unverified' );
 	}
 	public static function add( $employee, $action, $attachment_id ) {
+		$employee = sanitize_key( $employee ); $action = strtoupper( sanitize_key( $action ) );
 		if ( self::EMPLOYEE !== $employee || ! isset( self::actions()[ $action ] ) ) { return new WP_Error( 'dat_ai_office_animation_input', 'Nhân vật hoặc hành động không hợp lệ.' ); }
 		$asset = self::valid_asset( $attachment_id ); if ( is_wp_error( $asset ) ) { return $asset; }
 		$library = self::library(); if ( ! isset( $library[ $employee ] ) ) { $library[ $employee ] = array(); }
@@ -50,6 +51,7 @@ final class DAT_AI_Office_Animations {
 		$variants[] = $asset; $library[ $employee ][ $action ] = $variants; update_option( self::OPTION, $library, false ); return $asset;
 	}
 	public static function remove( $employee, $action, $index ) {
+		$employee = sanitize_key( $employee ); $action = strtoupper( sanitize_key( $action ) );
 		$library = self::library(); if ( self::EMPLOYEE !== $employee || ! isset( self::actions()[ $action ], $library[ $employee ][ $action ][ $index ] ) ) { return new WP_Error( 'dat_ai_office_animation_input', 'Animation không hợp lệ.' ); }
 		unset( $library[ $employee ][ $action ][ $index ] ); $library[ $employee ][ $action ] = array_values( $library[ $employee ][ $action ] ); update_option( self::OPTION, $library, false ); return true;
 	}
