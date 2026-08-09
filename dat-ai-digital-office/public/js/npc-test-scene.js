@@ -30,7 +30,7 @@
 
 	function bindMeshesToPrimarySkeleton(model) {
 		const primaryMesh = findPrimarySkinnedMesh(model);
-		if (!primaryMesh) throw new Error('employee_001.fbx không có skinned mesh/skeleton hợp lệ.');
+		if (!primaryMesh) throw new Error('Model không có skinned mesh/skeleton hợp lệ.');
 		let meshCount = 0;
 		model.traverse(mesh => {
 			if (!mesh.isSkinnedMesh || !mesh.skeleton) return;
@@ -38,6 +38,26 @@
 			if (mesh !== primaryMesh) mesh.bind(primaryMesh.skeleton, mesh.bindMatrix);
 		});
 		return { primaryMesh, meshCount };
+	}
+
+	function compareSkeletons(reference, candidate) {
+		const candidateByName = new Map(candidate.bones.map(bone => [bone.name, bone]));
+		let matchingNames = 0; let matchingParents = 0;
+		reference.bones.forEach(bone => {
+			const match = candidateByName.get(bone.name); if (!match) return;
+			matchingNames += 1;
+			if ((!bone.parent && !match.parent) || (bone.parent && match.parent && bone.parent.name === match.parent.name)) matchingParents += 1;
+		});
+		const coverage = reference.bones.length ? matchingNames / reference.bones.length : 0;
+		const hierarchy = matchingNames ? matchingParents / matchingNames : 0;
+		return { matchingNames, referenceBones: reference.bones.length, coverage, hierarchy, compatible: coverage >= .9 && hierarchy >= .85 };
+	}
+
+	function retargetBoneName(name, targetsByName) {
+		const finger = name.match(/^(Index|Middle|Ring|Pinky|Thumb)([2-4])([LR])$/);
+		if (!finger || !targetsByName.has(finger[1] + '1' + finger[3])) return name;
+		const shifted = finger[1] + String(Number(finger[2]) - 1) + finger[3];
+		return targetsByName.has(shifted) ? shifted : name;
 	}
 
 	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton) {
@@ -59,7 +79,7 @@
 				// rotations to prevent both feet from turning backwards.
 				const match = track.name.match(/^(.+)\.(quaternion)$/);
 				if (!match || match[1] === 'CharacterArmature' || bindPoseBones.has(match[1])) { skippedTracks += 1; return; }
-				const target = targetsByName.get(match[1]);
+				const target = targetsByName.get(retargetBoneName(match[1], targetsByName));
 				if (!target) { skippedTracks += 1; return; }
 				const retargetedTrack = track.clone();
 				retargetedTrack.name = target.uuid + '.' + match[2];
@@ -167,7 +187,7 @@
 			this.renderer.shadowMap.enabled = true;
 			this.renderer.shadowMap.type = global.THREE.PCFSoftShadowMap;
 			this.renderer.domElement.className = 'dat-npc-test__canvas';
-			this.renderer.domElement.setAttribute('aria-label', 'NPC 3D employee_001. Kéo để quay camera, cuộn để zoom.');
+			this.renderer.domElement.setAttribute('aria-label', 'NPC 3D. Kéo để quay camera, cuộn để zoom.');
 			this.canvasHost.appendChild(this.renderer.domElement);
 			this.addStage();
 			this.orbit = new NPCOrbitCamera(this.camera, this.renderer.domElement);
@@ -180,7 +200,7 @@
 				global.addEventListener('resize', this.resizeHandler);
 			}
 			this.resize();
-			this.loadCharacter();
+			this.loadCharacters();
 		}
 
 		addStage() {
@@ -206,7 +226,8 @@
 			};
 			Object.keys(this.markers).forEach(name => this.addMarker(name, this.markers[name]));
 			this.workstations = new Map();
-			this.addWorkstation();
+			this.addWorkstation('desk_01', new THREE.Vector3(1.6, 0, 0.8));
+			this.addWorkstation('desk_02', new THREE.Vector3(-2.7, 0, 1.5));
 		}
 
 		addMarker(name, position, color) {
@@ -232,12 +253,12 @@
 			this.scene.add(label);
 		}
 
-		addWorkstation() {
+		addWorkstation(deskId, deskPosition) {
 			const THREE = global.THREE;
-			const deskPosition = new THREE.Vector3(1.6, 0, 0.8);
+			const suffix = deskId.replace('desk_', ''); const chairId = 'chair_' + suffix; const computerId = 'computer_' + suffix;
 			const group = new THREE.Group();
-			group.name = 'desk_01';
-			group.userData = { id: 'desk_01', type: 'workstation', actions: [ 'SIT', 'WORK' ] };
+			group.name = deskId;
+			group.userData = { id: deskId, type: 'workstation', actions: [ 'SIT', 'WORK' ] };
 			group.position.copy(deskPosition);
 			const wood = new THREE.MeshStandardMaterial({ color: 0x5f3d28, roughness: 0.72 });
 			const metal = new THREE.MeshStandardMaterial({ color: 0x243847, roughness: 0.48, metalness: 0.55 });
@@ -251,8 +272,8 @@
 				group.add(leg);
 			}));
 			const monitor = new THREE.Group();
-			monitor.name = 'computer_01';
-			monitor.userData = { id: 'computer_01', type: 'computer', actions: [ 'READ_EMAIL', 'WRITE_EMAIL', 'MAKE_QUOTE', 'WORK' ] };
+			monitor.name = computerId;
+			monitor.userData = { id: computerId, type: 'computer', actions: [ 'READ_EMAIL', 'WRITE_EMAIL', 'MAKE_QUOTE', 'WORK' ] };
 			const monitorScreen = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.5, 0.06), screen);
 			monitorScreen.position.y = 1.22;
 			monitor.add(monitorScreen);
@@ -268,8 +289,8 @@
 			monitor.add(mouse);
 			group.add(monitor);
 			const chair = new THREE.Group();
-			chair.name = 'chair_01';
-			chair.userData = { id: 'chair_01', type: 'chair', actions: [ 'SIT' ] };
+			chair.name = chairId;
+			chair.userData = { id: chairId, type: 'chair', actions: [ 'SIT' ] };
 			chair.position.set(0, 0, 1.22);
 			const seat = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.11, 0.76), new THREE.MeshStandardMaterial({ color: 0x216077, roughness: 0.62 }));
 			seat.position.y = 0.54;
@@ -286,53 +307,73 @@
 			this.scene.add(group);
 			const chairWorld = new THREE.Vector3(deskPosition.x, 0, deskPosition.z + 1.22);
 			const workstation = {
-				id: 'desk_01',
+				id: deskId,
 				object: group,
 				actions: [ 'SIT', 'WORK' ],
 				chair: {
-					id: 'chair_01', object: chair, actions: [ 'SIT' ],
+					id: chairId, object: chair, actions: [ 'SIT' ],
 					approachPoint: new THREE.Vector3(chairWorld.x, 0, chairWorld.z + 0.72),
 					sitPoint: new THREE.Vector3(chairWorld.x, 0, chairWorld.z + 0.06),
 					sitRotation: Math.PI
 				},
-				computer: { id: 'computer_01', object: monitor, actions: [ 'READ_EMAIL', 'WRITE_EMAIL', 'MAKE_QUOTE', 'WORK' ] }
+				computer: { id: computerId, object: monitor, actions: [ 'READ_EMAIL', 'WRITE_EMAIL', 'MAKE_QUOTE', 'WORK' ] }
 			};
 			this.workstations.set(workstation.id, workstation);
-			this.addMarker('chair_01.approachPoint', workstation.chair.approachPoint, 0x57e6ff);
-			this.addMarker('chair_01.sitPoint', workstation.chair.sitPoint, 0x63e89b);
+			this.addMarker(chairId + '.approachPoint', workstation.chair.approachPoint, 0x57e6ff);
+			this.addMarker(chairId + '.sitPoint', workstation.chair.sitPoint, 0x63e89b);
 			const rotationPoint = workstation.chair.sitPoint.clone().add(new THREE.Vector3(0, 0, -0.46));
-			this.addMarker('chair_01.sitRotation', rotationPoint, 0xffca63);
+			this.addMarker(chairId + '.sitRotation', rotationPoint, 0xffca63);
 		}
 
 		loadFBX(url) {
 			return new Promise((resolve, reject) => new global.THREE.FBXLoader().load(url, resolve, undefined, reject));
 		}
 
-		async loadCharacter() {
-			try {
-				const modelUrl = this.root.dataset.npcModel;
-				const version = this.root.dataset.npcVersion;
-				const configResponse = await fetch(versionedUrl(this.root.dataset.npcAnimationEndpoint, version), { credentials: 'same-origin' });
-				if (!configResponse.ok) throw new Error('Không đọc được cấu hình chuyển động.');
-				const config = await configResponse.json();
-				const assets = {};
+		loadModel(definition) {
+			const url = versionedUrl(definition.model.url, this.root.dataset.npcVersion);
+			if (definition.model.format === 'fbx') return this.loadFBX(url);
+			if (definition.model.format === 'glb' || definition.model.format === 'gltf') return new Promise((resolve, reject) => new global.THREE.GLTFLoader().load(url, result => resolve(result.scene), undefined, reject));
+			return Promise.reject(new Error('Định dạng model chưa được hỗ trợ.'));
+		}
+
+		loadAnimationAssets(definition) {
+			this.animationAssetCache = this.animationAssetCache || new Map();
+			const profile = definition.animation_profile || definition.id;
+			if (this.animationAssetCache.has(profile)) return this.animationAssetCache.get(profile);
+			const endpoint = this.root.dataset.npcCharactersEndpoint.replace(/\/$/, '') + '/' + encodeURIComponent(definition.id) + '/animations';
+			const request = fetch(versionedUrl(endpoint, this.root.dataset.npcVersion), { credentials: 'same-origin' }).then(async response => {
+				if (!response.ok) throw new Error('Không đọc được cấu hình chuyển động.');
+				const config = await response.json(); const assets = {};
 				await Promise.all(Object.keys(config).map(async action => {
 					const asset = Array.isArray(config[action]) ? config[action][0] : null;
 					if (!asset || asset.format !== 'fbx') return;
-					const source = await this.loadFBX(versionedUrl(asset.url, version));
+					const source = await this.loadFBX(versionedUrl(asset.url, this.root.dataset.npcVersion));
 					const clip = asset.clip ? source.animations.find(item => item.name === asset.clip) : source.animations[0];
 					if (clip) assets[action] = { asset, clip };
+				})); return assets;
+			});
+			this.animationAssetCache.set(profile, request); return request;
+		}
+
+		async loadCharacters() {
+			try {
+				const response = await fetch(versionedUrl(this.root.dataset.npcCharactersEndpoint, this.root.dataset.npcVersion), { credentials: 'same-origin' });
+				if (!response.ok) throw new Error('Không đọc được Character Registry.');
+				this.characterDefinitions = await response.json(); this.characters = new Map(); this.populateCharacterSelector();
+				await Promise.all(this.characterDefinitions.filter(definition => definition.model && definition.model.available).map(async definition => {
+					try { const [model, assets] = await Promise.all([this.loadModel(definition), this.loadAnimationAssets(definition)]); if (!this.destroyed) this.installCharacter(definition, model, assets); }
+					catch (error) { global.console.error('[DAT AI Office NPC] Không tải được ' + definition.id + ':', error); }
 				}));
-				const results = await this.loadFBX(versionedUrl(modelUrl, version));
-				if (this.destroyed) return;
-				this.installCharacter(results, assets);
+				if (!this.characters.size) throw new Error('Không có model nhân vật khả dụng.');
+				this.evaluateSkeletonCompatibility();
+				this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value); this.start();
 			} catch (error) {
-				global.console.error('[DAT AI Office NPC] Không tải được FBX:', error);
-				this.showError('Không tải được employee_001 hoặc animations.fbx. Mở Console để xem lỗi chi tiết.');
+				global.console.error('[DAT AI Office NPC] Không tải được Character Registry:', error);
+				this.showError('Không tải được Character Registry hoặc model NPC. Mở Console để xem lỗi chi tiết.');
 			}
 		}
 
-		installCharacter(model, assets) {
+		installCharacter(definition, model, assets) {
 			const THREE = global.THREE;
 			// FBXLoader exposes duplicate, chained skeletons for the Suit_* meshes.
 			// Driving all of them compounds bone transforms, most visibly in the legs.
@@ -352,59 +393,86 @@
 			global.console.table(clipTable);
 			global.console.info('[DAT AI Office NPC] Resolver đã load: ' + Object.keys(resolvedActions).join(', '));
 			global.console.groupEnd();
-			this.setClipList(clipTable);
-			this.setWorkstationAnimationScan([]);
 			const animationMap = animationMapFrom(resolvedActions);
 			global.console.log('[DAT AI Office NPC] ANIMATION_MAP', animationMap);
 			if (!animationMap.IDLE || !animationMap.WALKING) throw new Error('Không tự map được Idle/Walk. Clips đã được liệt kê trong Console và panel debug.');
 
-			this.character = new THREE.Group();
-			this.character.name = 'employee_001';
-			// Keep the character clear of the debug panel on the left.
-			this.character.position.set(0.75, 0, 0);
-			this.model = model;
+			const character = new THREE.Group();
+			character.name = definition.id;
+			character.position.set(Number(definition.spawn && definition.spawn.x) || 0, Number(definition.spawn && definition.spawn.y) || 0, Number(definition.spawn && definition.spawn.z) || 0);
 			// The Quaternius model faces +Z, which matches Object3D.lookAt().
 			// Rotating it 180° makes the walking animation move backwards.
-			this.model.traverse(object => {
+			model.traverse(object => {
 				if (!object.isMesh) return;
 				object.castShadow = true;
 				object.receiveShadow = true;
 				const materials = Array.isArray(object.material) ? object.material : [object.material];
 				materials.forEach(material => { if (material) material.side = THREE.FrontSide; });
 			});
-			this.character.add(this.model);
-			this.scene.add(this.character);
-			this.placeModelOnFloor();
-			this.mixer = new THREE.AnimationMixer(this.model);
-			this.animationController = new global.DAT_NPCAnimationController(this.mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
-			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING) });
-			this.animationController.setState(global.DAT_NPC_STATES.IDLE);
-			this.status = 'Sẵn sàng · thư viện chuyển động đã tải';
-			this.start();
+			character.add(model);
+			this.scene.add(character);
+			this.placeModelOnFloor(model);
+			this.addCharacterLabel(character, definition);
+			const mixer = new THREE.AnimationMixer(model);
+			const animationController = new global.DAT_NPCAnimationController(mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
+			const characterController = new global.DAT_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING), workstationResolver: id => this.workstations.get(id) });
+			animationController.setState(global.DAT_NPC_STATES.IDLE);
+			this.characters.set(definition.id, { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, skeleton: skeletonSource.primaryMesh.skeleton, skeletonStatus: definition.skeleton_status });
 		}
 
-		placeModelOnFloor() {
+		placeModelOnFloor(model) {
 			const THREE = global.THREE;
-			this.model.updateMatrixWorld(true);
-			let box = new THREE.Box3().setFromObject(this.model);
+			model.updateMatrixWorld(true);
+			let box = new THREE.Box3().setFromObject(model);
 			const height = box.getSize(new THREE.Vector3()).y;
-			if (!height) throw new Error('Không thể xác định chiều cao employee_001.');
+			if (!height) throw new Error('Không thể xác định chiều cao model nhân vật.');
 			// The test scene needs a full-body NPC with ample space around the markers.
 			const scale = 1.45 / height;
-			this.model.scale.setScalar(scale);
-			this.model.updateMatrixWorld(true);
-			box = new THREE.Box3().setFromObject(this.model);
-			this.model.position.y -= box.min.y;
-			this.model.updateMatrixWorld(true);
+			model.scale.setScalar(scale);
+			model.updateMatrixWorld(true);
+			box = new THREE.Box3().setFromObject(model);
+			model.position.y -= box.min.y;
+			model.updateMatrixWorld(true);
+		}
+
+		addCharacterLabel(character, definition) {
+			const THREE = global.THREE; const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 96;
+			const context = canvas.getContext('2d'); context.fillStyle = 'rgba(5, 20, 31, .8)'; context.fillRect(8, 8, 240, 80); context.fillStyle = '#f2fbff'; context.font = 'bold 24px sans-serif'; context.textAlign = 'center'; context.fillText(definition.name, 128, 42); context.fillStyle = '#8cdaff'; context.font = '18px sans-serif'; context.fillText(definition.role, 128, 68);
+			const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false })); label.position.set(0, 1.88, 0); label.scale.set(1.45, .55, 1); character.add(label);
+		}
+
+		populateCharacterSelector() {
+			const select = this.root.querySelector('[data-npc-character-select]'); if (!select || !this.characterDefinitions) return;
+			select.replaceChildren(); this.characterDefinitions.forEach(definition => { const option = document.createElement('option'); option.value = definition.id; option.textContent = definition.name + ' — ' + definition.role + (definition.model.available ? '' : ' (Chưa có model)'); option.disabled = !definition.model.available; select.appendChild(option); }); select.disabled = false;
+		}
+
+		setActiveCharacter(employeeId) {
+			const record = this.characters.get(employeeId); if (!record) return;
+			this.scenario = null; this.activeCharacterId = employeeId; this.character = record.character; this.model = record.model; this.mixer = record.mixer; this.animationController = record.animationController; this.characterController = record.characterController; this.status = record.definition.name + ' · Skeleton: ' + record.skeletonStatus;
+			const select = this.root.querySelector('[data-npc-character-select]'); if (select) select.value = employeeId;
+			this.setClipList(record.clips); this.setWorkstationAnimationScan([]);
+		}
+
+		evaluateSkeletonCompatibility() {
+			const reference = this.characters.get('employee_001'); if (!reference) return;
+			this.characters.forEach(record => {
+				if (record.id === reference.id) { record.skeletonStatus = 'Chung bộ chuyển động'; return; }
+				const result = compareSkeletons(reference.skeleton, record.skeleton);
+				record.skeletonStatus = result.compatible ? 'Chung bộ chuyển động' : 'Cần chuyển xương';
+				global.console.info('[DAT AI Office NPC] Skeleton ' + record.id + ': ' + record.skeletonStatus, result);
+			});
 		}
 
 		bindPanel() {
+			const characterSelect = this.root.querySelector('[data-npc-character-select]');
+			if (characterSelect) characterSelect.addEventListener('change', event => this.setActiveCharacter(event.target.value));
 			this.root.querySelectorAll('[data-npc-action]').forEach(button => button.addEventListener('click', () => {
 				const action = button.dataset.npcAction;
 				if (!this.characterController) return;
 				const workstation = this.workstations.get('desk_01');
 				if (action === 'AUTO_WORK') { this.startNaturalWorkScenario(workstation); return; }
 				this.scenario = null;
+				if (action === 'GO_A' || action === 'GO_B' || action === 'GO_C') { const marker = this.markers[action.slice(-1)]; this.characterController.moveTo(marker); this.status = 'Đang đi tới Marker ' + action.slice(-1); return; }
 				if (action === 'IDLE') { this.characterController.stop(); this.characterController.currentInteraction = null; this.characterController.targetObject = null; this.status = 'Đã chuyển Idle'; return; }
 				if (action === 'GO_TO_DESK') { this.characterController.goToWorkstation(workstation); this.status = 'Đang đi tới chair_01.approachPoint'; return; }
 				if (action === 'SIT') { const sitting = this.characterController.sit(workstation); this.status = sitting ? 'Đang phát chuyển động: Ngồi xuống' : 'Chưa có chuyển động: Ngồi xuống'; return; }
@@ -508,7 +576,11 @@
 				});
 			}
 			const missing = this.root.querySelector('[data-npc-missing-animations]');
-			if (missing) missing.textContent = 'Thiếu: Sit / Sitting, Sit Down, Stand Up, Typing, Computer, Desk, Mouse, Writing, Talking, Thinking.';
+			if (missing && this.animationController) {
+				const checks = [ [ global.DAT_NPC_STATES.SITTING_DOWN, 'Ngồi xuống' ], [ global.DAT_NPC_STATES.SITTING_IDLE, 'Ngồi chờ' ], [ global.DAT_NPC_STATES.STANDING_UP, 'Đứng dậy' ], [ global.DAT_NPC_STATES.TYPING, 'Gõ bàn phím' ], [ global.DAT_NPC_STATES.USING_MOUSE, 'Dùng chuột' ], [ global.DAT_NPC_STATES.THINKING, 'Suy nghĩ' ] ];
+				const absent = checks.filter(check => !this.animationController.hasAnimation(check[0])).map(check => check[1]);
+				missing.textContent = absent.length ? 'Thiếu: ' + absent.join(', ') + '.' : 'Đã có các chuyển động workstation chính.';
+			}
 		}
 
 		start() { if (!this.animationFrame) this.animationFrame = global.requestAnimationFrame(time => this.tick(time)); }
@@ -517,8 +589,7 @@
 			this.animationFrame = global.requestAnimationFrame(next => this.tick(next));
 			const delta = Math.min(0.05, this.previousTime ? (time - this.previousTime) / 1000 : 0);
 			this.previousTime = time;
-			if (this.animationController) this.animationController.update(delta);
-			if (this.characterController) this.characterController.update(delta);
+			if (this.characters) this.characters.forEach(record => { record.animationController.update(delta); record.characterController.update(delta); });
 			this.updateScenario(delta);
 			this.updatePanel();
 			this.renderer.render(this.scene, this.camera);
@@ -559,7 +630,7 @@
 			if (this.resizeObserver) this.resizeObserver.disconnect();
 			if (this.resizeHandler) global.removeEventListener('resize', this.resizeHandler);
 			if (this.orbit) this.orbit.destroy();
-			if (this.animationController) this.animationController.destroy();
+			if (this.characters) this.characters.forEach(record => record.animationController.destroy());
 			if (this.renderer) this.renderer.dispose();
 		}
 	}

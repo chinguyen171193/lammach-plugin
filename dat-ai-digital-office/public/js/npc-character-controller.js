@@ -9,6 +9,7 @@
 			this.speed = Number((options || {}).speed) || 1.6;
 			this.arrivalThreshold = Number((options || {}).arrivalThreshold) || 0.055;
 			this.typingAvailable = Boolean((options || {}).typingAvailable);
+			this.workstationResolver = (options || {}).workstationResolver || null;
 			this.target = null;
 			this.targetObject = null;
 			this.currentInteraction = null;
@@ -48,6 +49,7 @@
 		}
 
 		goToWorkstation(workstation) {
+			if (typeof workstation === 'string' && this.workstationResolver) workstation = this.workstationResolver(workstation);
 			if (!workstation || !workstation.chair) throw new Error('Workstation không có chair interaction metadata.');
 			this.currentInteraction = workstation.id;
 			this.targetObject = workstation.id;
@@ -57,6 +59,7 @@
 		}
 
 		sit(workstation) {
+			if (typeof workstation === 'string' && this.workstationResolver) workstation = this.workstationResolver(workstation);
 			if (!workstation || !workstation.chair) return;
 			if (!this.animationController.hasAnimation(global.DAT_NPC_STATES.SITTING_DOWN)) { this.animationController.setState(global.DAT_NPC_STATES.WAITING_AT_CHAIR); return false; }
 			this.currentInteraction = workstation.id;
@@ -88,6 +91,7 @@
 		}
 
 		standUp(workstation) {
+			if (typeof workstation === 'string' && this.workstationResolver) workstation = this.workstationResolver(workstation);
 			if (!workstation || !workstation.chair || !this.animationController.hasAnimation(global.DAT_NPC_STATES.STANDING_UP)) return false;
 			this.targetObject = workstation.chair.id;
 			this.animationController.setState(global.DAT_NPC_STATES.STANDING_UP);

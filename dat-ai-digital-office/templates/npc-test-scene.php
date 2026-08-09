@@ -1,8 +1,10 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
-<section id="<?php echo esc_attr( $config['id'] ); ?>" class="dat-npc-test" data-dat-npc-test data-npc-model="<?php echo esc_url( $config['model_url'] ); ?>" data-npc-animation-endpoint="<?php echo esc_url( $config['animations_endpoint'] ); ?>" data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" style="--dat-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
+<section id="<?php echo esc_attr( $config['id'] ); ?>" class="dat-npc-test" data-dat-npc-test data-npc-characters-endpoint="<?php echo esc_url( $config['characters_endpoint'] ); ?>" data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" style="--dat-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
 	<div class="dat-npc-test__canvas-wrap" data-npc-canvas></div>
 	<aside class="dat-npc-test__panel" data-npc-debug aria-label="NPC debug panel">
-		<h2>employee_001 · NPC Test</h2>
+		<h2>NPC Test</h2>
+		<label for="dat-npc-character-select">Nhân vật đang điều khiển</label>
+		<select id="dat-npc-character-select" data-npc-character-select disabled><option>Đang tải…</option></select>
 		<dl>
 			<div><dt>Current State</dt><dd data-npc-state>Đang tải…</dd></div>
 			<div><dt>Current Animation</dt><dd data-npc-animation>—</dd></div>
@@ -14,6 +16,9 @@
 		</dl>
 		<div class="dat-npc-test__actions" aria-label="NPC movement controls">
 			<button type="button" data-npc-action="AUTO_WORK">Tình huống tự động</button>
+			<button type="button" data-npc-action="GO_A">Đi A</button>
+			<button type="button" data-npc-action="GO_B">Đi B</button>
+			<button type="button" data-npc-action="GO_C">Đi C</button>
 			<button type="button" data-npc-action="GO_TO_DESK">Go To Desk</button>
 			<button type="button" data-npc-action="SIT">Sit</button>
 			<button type="button" data-npc-action="WORK">Work</button>

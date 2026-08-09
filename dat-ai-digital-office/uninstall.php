@@ -10,3 +10,4 @@ foreach ( array( 'dat_ai_departments', 'dat_ai_agents', 'dat_ai_tasks', 'dat_ai_
 delete_option( 'dat_ai_office_settings' );
 delete_option( 'dat_ai_office_seeded' );
 delete_option( 'dat_ai_office_animation_library' );
+delete_option( 'dat_ai_office_character_models' );

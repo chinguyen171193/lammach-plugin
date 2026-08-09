@@ -36,8 +36,7 @@ class DAT_AI_Office_Shortcode {
 		$config = array(
 			'id'         => 'dat-ai-office-npc-' . wp_generate_uuid4(),
 			'height'     => min( 1000, max( 380, absint( $atts['height'] ) ) ),
-			'model_url'  => DAT_AI_OFFICE_URL . 'public/assets/characters/employee_001/employee_001.fbx',
-			'animations_endpoint' => rest_url( 'dat-ai-office/v1/characters/employee_001/animations' ),
+			'characters_endpoint' => rest_url( 'dat-ai-office/v1/characters' ),
 			'version'    => DAT_AI_OFFICE_BUILD,
 		);
 		$assets = new DAT_AI_Office_Assets();

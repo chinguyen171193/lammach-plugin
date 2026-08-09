@@ -34,6 +34,10 @@ class DAT_AI_Office_Assets {
 		// The preview contains the shortcode but is rendered after admin_head.
 		// Queue its public renderer here so both CSS and JavaScript are printed.
 		$current_page = sanitize_key( $_GET['page'] ?? '' );
+		if ( 'dat-ai-office-characters' === $current_page ) {
+			wp_enqueue_media();
+			wp_enqueue_script( 'dat-ai-office-characters', DAT_AI_OFFICE_URL . 'admin/js/characters.js', array( 'jquery', 'media-editor' ), DAT_AI_OFFICE_VERSION, true );
+		}
 		if ( 'dat-ai-office-animation-library' === $current_page ) {
 			wp_enqueue_media();
 			wp_enqueue_script( 'dat-ai-office-three', DAT_AI_OFFICE_URL . 'public/js/vendor/three.min.js', array(), '0.128.0', true );
@@ -69,8 +73,9 @@ class DAT_AI_Office_Assets {
 		wp_enqueue_script( 'dat-ai-office-three', DAT_AI_OFFICE_URL . 'public/js/vendor/three.min.js', array(), '0.128.0', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-fflate', DAT_AI_OFFICE_URL . 'public/js/vendor/fflate.min.js', array(), '0.6.10', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-fbx-loader', DAT_AI_OFFICE_URL . 'public/js/vendor/FBXLoader.js', array( 'dat-ai-office-three', 'dat-ai-office-fflate' ), '0.128.0', $in_footer );
+		wp_enqueue_script( 'dat-ai-office-gltf-loader', DAT_AI_OFFICE_URL . 'public/js/vendor/GLTFLoader.js', array( 'dat-ai-office-three' ), '0.128.0', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-npc-animation-controller', DAT_AI_OFFICE_URL . 'public/js/npc-animation-controller.js', array( 'dat-ai-office-three' ), DAT_AI_OFFICE_VERSION, $in_footer );
 		wp_enqueue_script( 'dat-ai-office-npc-character-controller', DAT_AI_OFFICE_URL . 'public/js/npc-character-controller.js', array( 'dat-ai-office-three', 'dat-ai-office-npc-animation-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
-		wp_enqueue_script( 'dat-ai-office-npc-test-scene', DAT_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'dat-ai-office-fbx-loader', 'dat-ai-office-npc-animation-controller', 'dat-ai-office-npc-character-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
+		wp_enqueue_script( 'dat-ai-office-npc-test-scene', DAT_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'dat-ai-office-fbx-loader', 'dat-ai-office-gltf-loader', 'dat-ai-office-npc-animation-controller', 'dat-ai-office-npc-character-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
 	}
 }

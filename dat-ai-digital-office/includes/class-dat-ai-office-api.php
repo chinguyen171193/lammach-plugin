@@ -17,6 +17,9 @@ class DAT_AI_Office_API {
 		register_rest_route( $this->namespace, '/characters/(?P<employee>[a-z0-9_-]+)/animations', array(
 			'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, 'character_animations' ), 'permission_callback' => '__return_true',
 		) );
+		register_rest_route( $this->namespace, '/characters', array(
+			'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, 'characters' ), 'permission_callback' => '__return_true',
+		) );
 	}
 
 	public function can_manage( WP_REST_Request $request ) {
@@ -30,9 +33,10 @@ class DAT_AI_Office_API {
 	public function agents() { return rest_ensure_response( DAT_AI_Office::dataset()['agents'] ); }
 	public function workflows() { return rest_ensure_response( DAT_AI_Office::dataset()['workflows'] ); }
 	public function events() { return rest_ensure_response( array( 'logs' => DAT_AI_Office::recent_logs(), 'events' => $this->recent_events() ) ); }
+	public function characters() { return rest_ensure_response( DAT_AI_Office_Characters::public_definitions() ); }
 	public function character_animations( WP_REST_Request $request ) {
 		$employee = sanitize_key( $request['employee'] );
-		if ( DAT_AI_Office_Animations::EMPLOYEE !== $employee ) { return new WP_Error( 'dat_ai_office_character', 'Không tìm thấy nhân vật.', array( 'status' => 404 ) ); }
+		if ( ! DAT_AI_Office_Characters::exists( $employee ) ) { return new WP_Error( 'dat_ai_office_character', 'Không tìm thấy nhân vật.', array( 'status' => 404 ) ); }
 		return rest_ensure_response( DAT_AI_Office_Animations::public_assets( $employee ) );
 	}
 	public function tasks() { global $wpdb; $tables = DAT_AI_Office::tables(); return rest_ensure_response( $wpdb->get_results( "SELECT id, title, description, department, assignee, priority, status, progress, due_at, workflow_key FROM {$tables['tasks']} ORDER BY id DESC LIMIT 100", ARRAY_A ) ); }
