@@ -74,8 +74,9 @@ class DAT_AI_Office_Assets {
 		wp_enqueue_script( 'dat-ai-office-fflate', DAT_AI_OFFICE_URL . 'public/js/vendor/fflate.min.js', array(), '0.6.10', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-fbx-loader', DAT_AI_OFFICE_URL . 'public/js/vendor/FBXLoader.js', array( 'dat-ai-office-three', 'dat-ai-office-fflate' ), '0.128.0', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-gltf-loader', DAT_AI_OFFICE_URL . 'public/js/vendor/GLTFLoader.js', array( 'dat-ai-office-three' ), '0.128.0', $in_footer );
+		wp_enqueue_script( 'dat-ai-office-skeleton-utils', DAT_AI_OFFICE_URL . 'public/js/vendor/SkeletonUtils.js', array( 'dat-ai-office-three' ), '0.128.0', $in_footer );
 		wp_enqueue_script( 'dat-ai-office-npc-animation-controller', DAT_AI_OFFICE_URL . 'public/js/npc-animation-controller.js', array( 'dat-ai-office-three' ), DAT_AI_OFFICE_VERSION, $in_footer );
 		wp_enqueue_script( 'dat-ai-office-npc-character-controller', DAT_AI_OFFICE_URL . 'public/js/npc-character-controller.js', array( 'dat-ai-office-three', 'dat-ai-office-npc-animation-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
-		wp_enqueue_script( 'dat-ai-office-npc-test-scene', DAT_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'dat-ai-office-fbx-loader', 'dat-ai-office-gltf-loader', 'dat-ai-office-npc-animation-controller', 'dat-ai-office-npc-character-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
+		wp_enqueue_script( 'dat-ai-office-npc-test-scene', DAT_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'dat-ai-office-fbx-loader', 'dat-ai-office-gltf-loader', 'dat-ai-office-skeleton-utils', 'dat-ai-office-npc-animation-controller', 'dat-ai-office-npc-character-controller' ), DAT_AI_OFFICE_VERSION, $in_footer );
 	}
 }

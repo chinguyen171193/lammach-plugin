@@ -60,8 +60,33 @@
 		return targetsByName.has(shifted) ? shifted : name;
 	}
 
-	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton, referenceSkeleton) {
+	function worldSpaceRetargetNameMap(targetSkeleton, referenceSkeleton) {
+		const referenceByName = new Set(referenceSkeleton.bones.map(bone => bone.name)); const names = {};
+		targetSkeleton.bones.forEach(bone => {
+			const finger = bone.name.match(/^(Index|Middle|Ring|Pinky|Thumb)([1-3])([LR])$/);
+			if (!finger || referenceByName.has(bone.name)) return;
+			const sourceName = finger[1] + String(Number(finger[2]) + 1) + finger[3];
+			if (referenceByName.has(sourceName)) names[bone.name] = sourceName;
+		});
+		return names;
+	}
+
+	function retargetWorldSpaceClip(clip, targetMesh, referenceMesh) {
+		const THREE = global.THREE; const targetByName = new Map(targetMesh.skeleton.bones.map(bone => [bone.name, bone]));
+		const converted = THREE.SkeletonUtils.retargetClip(targetMesh, referenceMesh, clip, { hip: 'Hips', names: worldSpaceRetargetNameMap(targetMesh.skeleton, referenceMesh.skeleton), preservePosition: true, preserveHipPosition: true, useFirstFramePosition: true, fps: 30 });
+		targetMesh.skeleton.pose(); targetMesh.updateMatrixWorld(true);
+		const tracks = converted.tracks.reduce((out, track) => {
+			const match = track.name.match(/^\.bones\[(.+)]\.quaternion$/); const target = match && targetByName.get(match[1]);
+			if (!target || [ 'FootL', 'FootR' ].indexOf(target.name) !== -1) return out;
+			const next = track.clone(); next.name = target.uuid + '.quaternion'; out.push(next); return out;
+		}, []);
+		return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+	}
+
+	function retargetAnimationClipsToPrimarySkeleton(clips, targetMesh, referenceMesh) {
 		const THREE = global.THREE;
+		const skeleton = targetMesh.skeleton; const referenceSkeleton = referenceMesh ? referenceMesh.skeleton : skeleton;
+		if (referenceMesh && referenceMesh !== targetMesh && THREE.SkeletonUtils) return { clips: clips.map(clip => retargetWorldSpaceClip(clip, targetMesh, referenceMesh)), targetBoneNames: skeleton.bones.length, skippedTracks: 0 };
 		const bindPoseBones = new Set([ 'FootL', 'FootR' ]);
 		const targetsByName = new Map();
 		const referenceByName = new Map();
@@ -393,9 +418,9 @@
 			const retargetedClips = [];
 			const resolvedActions = {};
 			const referenceRecord = this.characters.get('employee_001');
-			const referenceSkeleton = referenceRecord ? referenceRecord.skeleton : skeletonSource.primaryMesh.skeleton;
+			const referenceMesh = referenceRecord ? referenceRecord.primaryMesh : skeletonSource.primaryMesh;
 			Object.keys(assets).forEach(action => {
-				const retargeted = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh.skeleton, referenceSkeleton).clips[0];
+				const retargeted = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh, referenceMesh).clips[0];
 				if (!retargeted || !retargeted.tracks.length) return;
 				retargeted.name = '__action__' + action;
 				retargetedClips.push(retargeted); resolvedActions[action] = retargeted.name;
@@ -430,7 +455,7 @@
 			const animationController = new global.DAT_NPCAnimationController(mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
 			const characterController = new global.DAT_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING), workstationResolver: id => this.workstations.get(id) });
 			animationController.setState(global.DAT_NPC_STATES.IDLE);
-			this.characters.set(definition.id, { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, skeleton: skeletonSource.primaryMesh.skeleton, skeletonStatus: definition.skeleton_status });
+			this.characters.set(definition.id, { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonStatus: definition.skeleton_status });
 		}
 
 		placeModelOnFloor(model) {
