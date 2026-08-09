@@ -60,13 +60,15 @@
 		return targetsByName.has(shifted) ? shifted : name;
 	}
 
-	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton) {
+	function retargetAnimationClipsToPrimarySkeleton(clips, skeleton, referenceSkeleton) {
 		const THREE = global.THREE;
 		const bindPoseBones = new Set([ 'FootL', 'FootR' ]);
 		const targetsByName = new Map();
+		const referenceByName = new Map();
 		skeleton.bones.forEach(bone => {
 			if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone);
 		});
+		(referenceSkeleton || skeleton).bones.forEach(bone => { if (!referenceByName.has(bone.name)) referenceByName.set(bone.name, bone); });
 		let skippedTracks = 0;
 		const retargetedClips = clips.map(clip => {
 			const tracks = [];
@@ -83,6 +85,15 @@
 				if (!target) { skippedTracks += 1; return; }
 				const retargetedTrack = track.clone();
 				retargetedTrack.name = target.uuid + '.' + match[2];
+				const reference = referenceByName.get(match[1]);
+				if (reference && referenceSkeleton && referenceSkeleton !== skeleton) {
+					const inverseReferenceBind = reference.quaternion.clone().invert();
+					for (let index = 0; index < retargetedTrack.values.length; index += 4) {
+						const animated = new THREE.Quaternion(retargetedTrack.values[index], retargetedTrack.values[index + 1], retargetedTrack.values[index + 2], retargetedTrack.values[index + 3]);
+						const corrected = target.quaternion.clone().multiply(inverseReferenceBind.clone().multiply(animated));
+						retargetedTrack.values[index] = corrected.x; retargetedTrack.values[index + 1] = corrected.y; retargetedTrack.values[index + 2] = corrected.z; retargetedTrack.values[index + 3] = corrected.w;
+					}
+				}
 				tracks.push(retargetedTrack);
 			});
 			return new THREE.AnimationClip(clip.name, clip.duration, tracks);
@@ -360,10 +371,10 @@
 				const response = await fetch(versionedUrl(this.root.dataset.npcCharactersEndpoint, this.root.dataset.npcVersion), { credentials: 'same-origin' });
 				if (!response.ok) throw new Error('Không đọc được Character Registry.');
 				this.characterDefinitions = await response.json(); this.characters = new Map(); this.populateCharacterSelector();
-				await Promise.all(this.characterDefinitions.filter(definition => definition.model && definition.model.available).map(async definition => {
-					try { const [model, assets] = await Promise.all([this.loadModel(definition), this.loadAnimationAssets(definition)]); if (!this.destroyed) this.installCharacter(definition, model, assets); }
-					catch (error) { global.console.error('[DAT AI Office NPC] Không tải được ' + definition.id + ':', error); }
-				}));
+				const available = this.characterDefinitions.filter(definition => definition.model && definition.model.available);
+				const install = async definition => { try { const [model, assets] = await Promise.all([this.loadModel(definition), this.loadAnimationAssets(definition)]); if (!this.destroyed) this.installCharacter(definition, model, assets); } catch (error) { global.console.error('[DAT AI Office NPC] Không tải được ' + definition.id + ':', error); } };
+				const reference = available.find(definition => definition.id === 'employee_001'); if (reference) await install(reference);
+				await Promise.all(available.filter(definition => definition.id !== 'employee_001').map(install));
 				if (!this.characters.size) throw new Error('Không có model nhân vật khả dụng.');
 				this.evaluateSkeletonCompatibility();
 				this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value); this.start();
@@ -381,8 +392,10 @@
 			const skeletonSource = bindMeshesToPrimarySkeleton(model);
 			const retargetedClips = [];
 			const resolvedActions = {};
+			const referenceRecord = this.characters.get('employee_001');
+			const referenceSkeleton = referenceRecord ? referenceRecord.skeleton : skeletonSource.primaryMesh.skeleton;
 			Object.keys(assets).forEach(action => {
-				const retargeted = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh.skeleton).clips[0];
+				const retargeted = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh.skeleton, referenceSkeleton).clips[0];
 				if (!retargeted || !retargeted.tracks.length) return;
 				retargeted.name = '__action__' + action;
 				retargetedClips.push(retargeted); resolvedActions[action] = retargeted.name;
