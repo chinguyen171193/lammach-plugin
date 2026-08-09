@@ -2,7 +2,7 @@
 /**
  * Plugin Name: LM AI Digital Office
  * Description: Văn phòng số 2.5D mô phỏng nhân viên và AI Agent phối hợp vận hành doanh nghiệp.
- * Version: 1.7.10
+ * Version: 1.7.11
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: DAT
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'DAT_AI_OFFICE_VERSION', '1.7.10' );
+define( 'DAT_AI_OFFICE_VERSION', '1.7.11' );
 define( 'DAT_AI_OFFICE_BUILD', '2026.08.09-employee-002-world-retarget-retry-01' );
 define( 'DAT_AI_OFFICE_FILE', __FILE__ );
 define( 'DAT_AI_OFFICE_DIR', plugin_dir_path( __FILE__ ) );

@@ -4,24 +4,30 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 /** Character registry. Controllers and animation profiles are shared at runtime. */
 final class DAT_AI_Office_Characters {
 	const OPTION = 'dat_ai_office_character_models';
-	const DEFAULT_PROFILE = 'default_humanoid';
+	const DEFAULT_PROFILE = 'default_quaternius_male';
+	const FEMALE_PROFILE = 'default_quaternius_female';
 
 	public static function profiles() {
-		return array( self::DEFAULT_PROFILE => array( 'label' => 'Mặc định', 'animation_owner' => 'employee_001' ) );
+		return array(
+			self::DEFAULT_PROFILE => array( 'label' => 'Quaternius nam', 'animation_owner' => 'employee_001', 'retarget' => 'Direct' ),
+			self::FEMALE_PROFILE => array( 'label' => 'Quaternius nữ', 'animation_owner' => 'employee_002', 'retarget' => 'Retargeted' ),
+		);
 	}
 
 	public static function definitions() {
 		return array(
-			'employee_001' => self::definition( 'employee_001', 'Employee 001', 'Sale', 'public/assets/characters/employee_001/employee_001.fbx', 'Tương thích', array( 'x' => 0.75, 'y' => 0, 'z' => 0 ) ),
-			'employee_002' => self::definition( 'employee_002', 'Employee 002', 'Chăm sóc khách hàng', 'public/assets/characters/employee_002/employee_002.fbx', 'Cần chuyển xương', array( 'x' => -1.8, 'y' => 0, 'z' => 0 ) ),
+			'employee_001' => self::definition( 'employee_001', 'Employee 001', 'Sale', 'public/assets/characters/employee_001/employee_001.fbx', 'Tương thích trực tiếp', array( 'x' => 0.75, 'y' => 0, 'z' => 0 ), self::DEFAULT_PROFILE ),
+			'employee_002' => self::definition( 'employee_002', 'Employee 002', 'Chăm sóc khách hàng', 'public/assets/characters/employee_002/employee_002.fbx', 'Cần retarget', array( 'x' => -1.8, 'y' => 0, 'z' => 0 ), self::FEMALE_PROFILE ),
 		);
 	}
 
-	private static function definition( $id, $name, $role, $fallback, $skeleton_status, $spawn ) {
+	private static function definition( $id, $name, $role, $fallback, $skeleton_status, $spawn, $animation_profile ) {
 		$model = self::model( $id, $fallback );
+		$profiles = self::profiles();
+		$retarget_mode = $profiles[ $animation_profile ]['retarget'] ?? 'Failed';
 		return array(
-			'id' => $id, 'name' => $name, 'role' => $role, 'type' => 'npc', 'default_state' => 'IDLE', 'animation_profile' => self::DEFAULT_PROFILE,
-			'model' => $model, 'skeleton_status' => $model['available'] ? ( 'media' === $model['source'] ? 'Chưa kiểm tra' : $skeleton_status ) : 'Chưa có model', 'spawn' => $spawn,
+			'id' => $id, 'name' => $name, 'role' => $role, 'type' => 'npc', 'default_state' => 'IDLE', 'animation_profile' => $animation_profile,
+			'retarget_mode' => $retarget_mode, 'model' => $model, 'skeleton_status' => $model['available'] ? ( 'media' === $model['source'] ? 'Chưa kiểm tra' : $skeleton_status ) : 'Chưa có model', 'spawn' => $spawn,
 		);
 	}
 
@@ -59,7 +65,7 @@ final class DAT_AI_Office_Characters {
 
 	public static function public_definitions() {
 		return array_values( array_map( static function( $definition ) {
-			return array( 'id' => $definition['id'], 'name' => $definition['name'], 'role' => $definition['role'], 'type' => $definition['type'], 'default_state' => $definition['default_state'], 'animation_profile' => $definition['animation_profile'], 'model' => $definition['model'], 'skeleton_status' => $definition['skeleton_status'], 'spawn' => $definition['spawn'] );
+			return array( 'id' => $definition['id'], 'name' => $definition['name'], 'role' => $definition['role'], 'type' => $definition['type'], 'default_state' => $definition['default_state'], 'animation_profile' => $definition['animation_profile'], 'retarget_mode' => $definition['retarget_mode'], 'model' => $definition['model'], 'skeleton_status' => $definition['skeleton_status'], 'spawn' => $definition['spawn'] );
 		}, self::definitions() ) );
 	}
 }

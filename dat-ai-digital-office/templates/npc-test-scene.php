@@ -6,6 +6,13 @@
 		<label for="dat-npc-character-select">Nhân vật đang điều khiển</label>
 		<select id="dat-npc-character-select" data-npc-character-select disabled><option>Đang tải…</option></select>
 		<dl>
+			<div><dt>Character</dt><dd data-npc-character>Đang tải…</dd></div>
+			<div><dt>Skeleton</dt><dd data-npc-skeleton>—</dd></div>
+			<div><dt>Retarget Profile</dt><dd data-npc-retarget-profile>—</dd></div>
+			<div><dt>Source Skeleton</dt><dd data-npc-source-skeleton>—</dd></div>
+			<div><dt>Target Skeleton</dt><dd data-npc-target-skeleton>—</dd></div>
+			<div><dt>Rest Pose Match</dt><dd data-npc-rest-pose-match>—</dd></div>
+			<div><dt>Retarget</dt><dd data-npc-retarget>—</dd></div>
 			<div><dt>Current State</dt><dd data-npc-state>Đang tải…</dd></div>
 			<div><dt>Current Animation</dt><dd data-npc-animation>—</dd></div>
 			<div><dt>Current Interaction</dt><dd data-npc-interaction>—</dd></div>
@@ -25,7 +32,14 @@
 			<button type="button" data-npc-action="STOP_WORK">Stop Work</button>
 			<button type="button" data-npc-action="STAND_UP">Stand Up</button>
 			<button type="button" data-npc-action="IDLE">Idle</button>
+			<button type="button" data-npc-action="REST_POSE">Xem tư thế gốc</button>
+			<button type="button" data-npc-action="PLAY_IDLE">Chạy Chờ việc</button>
+			<button type="button" data-npc-action="TOGGLE_SKELETON">Hiện bộ xương</button>
 		</div>
+		<details class="dat-npc-test__clips">
+			<summary>Bone mapping (Developer)</summary>
+			<ul data-npc-bone-map><li>Chọn nhân vật để xem mapping.</li></ul>
+		</details>
 		<details class="dat-npc-test__clips" open>
 			<summary>Animation clips (xem thêm trong Console)</summary>
 			<ul data-npc-clips><li>Đang đọc animations.fbx…</li></ul>

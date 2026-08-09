@@ -18,10 +18,13 @@ final class DAT_AI_Office_Animations {
 	}
 	public static function upload_mimes( $mimes ) { $mimes['fbx'] = 'application/octet-stream'; $mimes['glb'] = 'model/gltf-binary'; $mimes['gltf'] = 'model/gltf+json'; return $mimes; }
 	public static function default_library() {
-		$base = DAT_AI_OFFICE_URL . 'public/assets/characters/employee_001/animations.fbx';
+		$base = DAT_AI_OFFICE_URL . 'public/assets/characters/employee_001/animations.fbx'; $female_base = DAT_AI_OFFICE_URL . 'public/assets/characters/employee_002/animations.fbx';
 		return array( self::EMPLOYEE => array(
 			'IDLE' => array( array( 'attachment_id' => 0, 'url' => $base, 'format' => 'fbx', 'label' => 'Idle 01', 'clip' => 'CharacterArmature|Idle_Neutral', 'source' => 'bundled', 'retarget_status' => 'compatible' ) ),
 			'WALKING' => array( array( 'attachment_id' => 0, 'url' => $base, 'format' => 'fbx', 'label' => 'Walk 01', 'clip' => 'CharacterArmature|Walk', 'source' => 'bundled', 'retarget_status' => 'compatible' ) ),
+		), 'employee_002' => array(
+			'IDLE' => array( array( 'attachment_id' => 0, 'url' => $female_base, 'format' => 'fbx', 'label' => 'Female Idle 01', 'clip' => 'Idle_Neutral', 'source' => 'bundled', 'retarget_status' => 'retargeted' ) ),
+			'WALKING' => array( array( 'attachment_id' => 0, 'url' => $female_base, 'format' => 'fbx', 'label' => 'Female Walk 01', 'clip' => 'Walk', 'source' => 'bundled', 'retarget_status' => 'retargeted' ) ),
 		) );
 	}
 	public static function library() { return wp_parse_args( get_option( self::OPTION, array() ), self::default_library() ); }

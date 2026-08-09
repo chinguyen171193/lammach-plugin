@@ -53,81 +53,73 @@
 		return { matchingNames, referenceBones: reference.bones.length, coverage, hierarchy, compatible: coverage >= .9 && hierarchy >= .85 };
 	}
 
-	function retargetBoneName(name, targetsByName) {
-		const finger = name.match(/^(Index|Middle|Ring|Pinky|Thumb)([2-4])([LR])$/);
-		if (!finger || !targetsByName.has(finger[1] + '1' + finger[3])) return name;
-		const shifted = finger[1] + String(Number(finger[2]) - 1) + finger[3];
-		return targetsByName.has(shifted) ? shifted : name;
+	function sourceRigFromAnimationFBX(source) {
+		const bones = [];
+		source.traverse(object => { if (object.isBone) bones.push(object); });
+		if (!bones.length) return null;
+		source.updateMatrixWorld(true);
+		// Animation-only FBX files have no SkinnedMesh. SkeletonUtils accepts an
+		// Object3D carrying a Skeleton, so deltas are derived from the female
+		// animation's own rest pose rather than copied from the male rig.
+		source.skeleton = new global.THREE.Skeleton(bones);
+		return source;
 	}
 
-	function worldSpaceRetargetNameMap(targetSkeleton, referenceSkeleton) {
-		const referenceByName = new Set(referenceSkeleton.bones.map(bone => bone.name)); const names = {};
-		targetSkeleton.bones.forEach(bone => {
-			const finger = bone.name.match(/^(Index|Middle|Ring|Pinky|Thumb)([1-3])([LR])$/);
-			if (!finger || referenceByName.has(bone.name)) return;
-			const sourceName = finger[1] + String(Number(finger[2]) + 1) + finger[3];
-			if (referenceByName.has(sourceName)) names[bone.name] = sourceName;
-		});
+	function humanoidBoneMap(skeleton) {
+		const names = new Set(skeleton.bones.map(bone => bone.name)); const pick = (...choices) => choices.find(name => names.has(name)) || '';
+		return {
+			hips: pick('Hips'), spine: pick('Abdomen', 'Spine'), chest: pick('Chest', 'Torso'), neck: pick('Neck'), head: pick('Head'),
+			leftShoulder: pick('ShoulderL'), leftUpperArm: pick('UpperArmL'), leftLowerArm: pick('LowerArmL'), leftHand: pick('HandL', 'WristL'),
+			rightShoulder: pick('ShoulderR'), rightUpperArm: pick('UpperArmR'), rightLowerArm: pick('LowerArmR'), rightHand: pick('HandR', 'WristR'),
+			leftUpperLeg: pick('UpperLegL'), leftLowerLeg: pick('LowerLegL'), leftFoot: pick('FootL'),
+			rightUpperLeg: pick('UpperLegR'), rightLowerLeg: pick('LowerLegR'), rightFoot: pick('FootR')
+		};
+	}
+
+	function retargetNameMap(targetSkeleton, sourceSkeleton) {
+		const sourceNames = new Set(sourceSkeleton.bones.map(bone => bone.name)); const names = {};
+		// Formal.fbx calls these joints HandL/R; the official female animation FBX
+		// calls the same joints WristL/R. No left/right or upper/lower swap occurs.
+		if (sourceNames.has('WristL')) names.HandL = 'WristL';
+		if (sourceNames.has('WristR')) names.HandR = 'WristR';
 		return names;
 	}
 
-	function retargetWorldSpaceClip(clip, targetMesh, referenceMesh) {
+	function retargetWorldSpaceClip(clip, targetMesh, sourceRig) {
 		const THREE = global.THREE; const targetByName = new Map(targetMesh.skeleton.bones.map(bone => [bone.name, bone]));
-		const converted = THREE.SkeletonUtils.retargetClip(targetMesh, referenceMesh, clip, { hip: 'Hips', names: worldSpaceRetargetNameMap(targetMesh.skeleton, referenceMesh.skeleton), preservePosition: true, preserveHipPosition: true, useFirstFramePosition: true, fps: 30 });
+		sourceRig.skeleton.pose(); sourceRig.updateMatrixWorld(true); targetMesh.skeleton.pose(); targetMesh.updateMatrixWorld(true);
+		const converted = THREE.SkeletonUtils.retargetClip(targetMesh, sourceRig, clip, { hip: 'Hips', names: retargetNameMap(targetMesh.skeleton, sourceRig.skeleton), preservePosition: true, preserveHipPosition: true, useFirstFramePosition: true, fps: 30 });
 		targetMesh.skeleton.pose(); targetMesh.updateMatrixWorld(true);
 		const tracks = converted.tracks.reduce((out, track) => {
 			const match = track.name.match(/^\.bones\[(.+)]\.quaternion$/); const target = match && targetByName.get(match[1]);
+			// Controller owns world/root motion. Retarget only bone rotations; this
+			// prevents source limb translations from collapsing the target skeleton.
 			if (!target || [ 'FootL', 'FootR' ].indexOf(target.name) !== -1) return out;
 			const next = track.clone(); next.name = target.uuid + '.quaternion'; out.push(next); return out;
 		}, []);
 		return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 	}
 
-	function retargetAnimationClipsToPrimarySkeleton(clips, targetMesh, referenceMesh) {
-		const THREE = global.THREE;
-		const skeleton = targetMesh.skeleton; const referenceSkeleton = referenceMesh ? referenceMesh.skeleton : skeleton;
-		if (referenceMesh && referenceMesh !== targetMesh && THREE.SkeletonUtils) return { clips: clips.map(clip => retargetWorldSpaceClip(clip, targetMesh, referenceMesh)), targetBoneNames: skeleton.bones.length, skippedTracks: 0 };
-		const bindPoseBones = new Set([ 'FootL', 'FootR' ]);
-		const targetsByName = new Map();
-		const referenceByName = new Map();
-		skeleton.bones.forEach(bone => {
-			if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone);
-		});
-		(referenceSkeleton || skeleton).bones.forEach(bone => { if (!referenceByName.has(bone.name)) referenceByName.set(bone.name, bone); });
+	function retargetAnimationClipsToPrimarySkeleton(clips, targetMesh, sourceRig, retargetMode) {
+		const THREE = global.THREE; const skeleton = targetMesh.skeleton;
+		if (retargetMode === 'Retargeted') {
+			if (!sourceRig || !sourceRig.skeleton || !THREE.SkeletonUtils) return { clips: [], targetBoneNames: skeleton.bones.length, skippedTracks: 0, failed: true };
+			return { clips: clips.map(clip => retargetWorldSpaceClip(clip, targetMesh, sourceRig)).filter(clip => clip.tracks.length), targetBoneNames: skeleton.bones.length, skippedTracks: 0, failed: false };
+		}
+		const bindPoseBones = new Set([ 'FootL', 'FootR' ]); const targetsByName = new Map();
+		skeleton.bones.forEach(bone => { if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone); });
 		let skippedTracks = 0;
 		const retargetedClips = clips.map(clip => {
 			const tracks = [];
 			clip.tracks.forEach(track => {
-				// The animation-only FBX has different local bone positions from the
-				// character model. Applying those tracks collapses the hips and legs
-				// below the floor. The rotation tracks are compatible and animate the
-				// rig without changing its authored bind pose. FootL/FootR also use
-				// an opposite local axis in the animation export, so keep their bind
-				// rotations to prevent both feet from turning backwards.
 				const match = track.name.match(/^(.+)\.(quaternion)$/);
 				if (!match || match[1] === 'CharacterArmature' || bindPoseBones.has(match[1])) { skippedTracks += 1; return; }
-				const target = targetsByName.get(retargetBoneName(match[1], targetsByName));
-				if (!target) { skippedTracks += 1; return; }
-				const retargetedTrack = track.clone();
-				retargetedTrack.name = target.uuid + '.' + match[2];
-				const reference = referenceByName.get(match[1]);
-				if (reference && referenceSkeleton && referenceSkeleton !== skeleton) {
-					const inverseReferenceBind = reference.quaternion.clone().invert();
-					for (let index = 0; index < retargetedTrack.values.length; index += 4) {
-						const animated = new THREE.Quaternion(retargetedTrack.values[index], retargetedTrack.values[index + 1], retargetedTrack.values[index + 2], retargetedTrack.values[index + 3]);
-						const corrected = target.quaternion.clone().multiply(inverseReferenceBind.clone().multiply(animated));
-						retargetedTrack.values[index] = corrected.x; retargetedTrack.values[index + 1] = corrected.y; retargetedTrack.values[index + 2] = corrected.z; retargetedTrack.values[index + 3] = corrected.w;
-					}
-				}
-				tracks.push(retargetedTrack);
+				const target = targetsByName.get(match[1]); if (!target) { skippedTracks += 1; return; }
+				const retargetedTrack = track.clone(); retargetedTrack.name = target.uuid + '.' + match[2]; tracks.push(retargetedTrack);
 			});
 			return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 		});
-		return {
-			clips: retargetedClips,
-			targetBoneNames: targetsByName.size,
-			skippedTracks
-		};
+		return { clips: retargetedClips, targetBoneNames: targetsByName.size, skippedTracks, failed: false };
 	}
 
 
@@ -385,7 +377,7 @@
 					if (!asset || asset.format !== 'fbx') return;
 					const source = await this.loadFBX(versionedUrl(asset.url, this.root.dataset.npcVersion));
 					const clip = asset.clip ? source.animations.find(item => item.name === asset.clip) : source.animations[0];
-					if (clip) assets[action] = { asset, clip };
+					if (clip) assets[action] = { asset, clip, sourceRig: sourceRigFromAnimationFBX(source) };
 				})); return assets;
 			});
 			this.animationAssetCache.set(profile, request); return request;
@@ -417,15 +409,21 @@
 			const skeletonSource = bindMeshesToPrimarySkeleton(model);
 			const retargetedClips = [];
 			const resolvedActions = {};
-			const referenceRecord = this.characters.get('employee_001');
-			const referenceMesh = referenceRecord ? referenceRecord.primaryMesh : skeletonSource.primaryMesh;
+			const retargetMode = definition.retarget_mode || 'Direct';
+			let retargetFailed = false;
 			Object.keys(assets).forEach(action => {
-				const retargeted = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh, referenceMesh).clips[0];
+				const result = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh, assets[action].sourceRig, retargetMode);
+				if (result.failed) retargetFailed = true;
+				const retargeted = result.clips[0];
 				if (!retargeted || !retargeted.tracks.length) return;
 				retargeted.name = '__action__' + action;
 				retargetedClips.push(retargeted); resolvedActions[action] = retargeted.name;
 			});
-			if (!resolvedActions.IDLE || !resolvedActions.WALKING) throw new Error('Cấu hình phải có Chờ việc và Đi bộ hợp lệ.');
+			if ((!resolvedActions.IDLE || !resolvedActions.WALKING) && retargetMode !== 'Retargeted') throw new Error('Cấu hình phải có Chờ việc và Đi bộ hợp lệ.');
+			if (!resolvedActions.IDLE || !resolvedActions.WALKING) {
+				const bindClip = new THREE.AnimationClip('__bind_rest__', 0, []);
+				retargetedClips.push(bindClip); resolvedActions.IDLE = bindClip.name; resolvedActions.WALKING = bindClip.name; retargetFailed = true;
+			}
 			const clipTable = retargetedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
 			global.console.groupCollapsed('[DAT AI Office NPC] animation library (' + retargetedClips.length + ')');
 			global.console.table(clipTable);
@@ -455,7 +453,9 @@
 			const animationController = new global.DAT_NPCAnimationController(mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
 			const characterController = new global.DAT_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING), workstationResolver: id => this.workstations.get(id) });
 			animationController.setState(global.DAT_NPC_STATES.IDLE);
-			this.characters.set(definition.id, { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonStatus: definition.skeleton_status });
+			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null };
+			this.characters.set(definition.id, record);
+			this.logSkeleton(record);
 		}
 
 		placeModelOnFloor(model) {
@@ -488,17 +488,48 @@
 			const record = this.characters.get(employeeId); if (!record) return;
 			this.scenario = null; this.activeCharacterId = employeeId; this.character = record.character; this.model = record.model; this.mixer = record.mixer; this.animationController = record.animationController; this.characterController = record.characterController; this.status = record.definition.name + ' · Skeleton: ' + record.skeletonStatus;
 			const select = this.root.querySelector('[data-npc-character-select]'); if (select) select.value = employeeId;
-			this.setClipList(record.clips); this.setWorkstationAnimationScan([]);
+			this.setClipList(record.clips); this.setWorkstationAnimationScan([]); this.setBoneMap(record);
 		}
 
 		evaluateSkeletonCompatibility() {
 			const reference = this.characters.get('employee_001'); if (!reference) return;
 			this.characters.forEach(record => {
-				if (record.id === reference.id) { record.skeletonStatus = 'Chung bộ chuyển động'; return; }
+				if (record.id === reference.id) { record.skeletonStatus = 'Tương thích trực tiếp'; return; }
 				const result = compareSkeletons(reference.skeleton, record.skeleton);
-				record.skeletonStatus = result.compatible ? 'Chung bộ chuyển động' : 'Cần chuyển xương';
+				record.skeletonStatus = result.compatible && record.definition.retarget_mode === 'Direct' ? 'Tương thích trực tiếp' : 'Cần retarget';
 				global.console.info('[DAT AI Office NPC] Skeleton ' + record.id + ': ' + record.skeletonStatus, result);
 			});
+		}
+
+		logSkeleton(record) {
+			const rows = record.skeleton.bones.map(bone => ({ bone: bone.name, parent: bone.parent && bone.parent.isBone ? bone.parent.name : '—', restPosition: bone.position.toArray().map(value => Number(value.toFixed(5))).join(', '), restRotation: bone.quaternion.toArray().map(value => Number(value.toFixed(5))).join(', ') }));
+			global.console.groupCollapsed('[DAT AI Office NPC] Skeleton ' + record.id + ' (' + rows.length + ' bones)');
+			global.console.table(rows);
+			if (record.sourceRig && record.sourceRig.skeleton) {
+				const sourceRows = record.sourceRig.skeleton.bones.map(bone => ({ bone: bone.name, parent: bone.parent && bone.parent.isBone ? bone.parent.name : '—', restPosition: bone.position.toArray().map(value => Number(value.toFixed(5))).join(', '), restRotation: bone.quaternion.toArray().map(value => Number(value.toFixed(5))).join(', ') }));
+				global.console.info('[DAT AI Office NPC] Source animation skeleton (' + sourceRows.length + ' bones)'); global.console.table(sourceRows);
+			}
+			global.console.log('[DAT AI Office NPC] Humanoid Bone Map', humanoidBoneMap(record.skeleton));
+			global.console.groupEnd();
+		}
+
+		setBoneMap(record) {
+			const list = this.root.querySelector('[data-npc-bone-map]'); if (!list) return;
+			const targetMap = humanoidBoneMap(record.skeleton); const sourceMap = record.sourceRig && record.sourceRig.skeleton ? humanoidBoneMap(record.sourceRig.skeleton) : {};
+			list.replaceChildren(); Object.keys(targetMap).forEach(key => {
+				const item = document.createElement('li'); item.textContent = key + ': Source ' + (sourceMap[key] || '—') + ' → Target ' + (targetMap[key] || '—'); list.appendChild(item);
+			});
+		}
+
+		showRestPose() {
+			const record = this.characters.get(this.activeCharacterId); if (!record) return;
+			this.scenario = null; record.characterController.target = null; record.mixer.stopAllAction(); record.animationController.currentAction = null; record.animationController.currentState = 'REST_POSE'; record.animationController.currentAnimation = 'Bind / Rest Pose'; record.skeleton.pose(); record.model.updateMatrixWorld(true); this.status = 'Đang xem tư thế gốc (không áp animation).';
+		}
+
+		toggleSkeleton() {
+			const record = this.characters.get(this.activeCharacterId); if (!record) return;
+			if (!record.skeletonHelper) { record.skeletonHelper = new global.THREE.SkeletonHelper(record.model); record.skeletonHelper.material.linewidth = 2; this.scene.add(record.skeletonHelper); }
+			record.skeletonHelper.visible = !record.skeletonHelper.visible; this.status = record.skeletonHelper.visible ? 'Đang hiển thị bộ xương.' : 'Đã ẩn bộ xương.';
 		}
 
 		bindPanel() {
@@ -508,6 +539,9 @@
 				const action = button.dataset.npcAction;
 				if (!this.characterController) return;
 				const workstation = this.workstations.get('desk_01');
+				if (action === 'REST_POSE') { this.showRestPose(); return; }
+				if (action === 'TOGGLE_SKELETON') { this.toggleSkeleton(); return; }
+				if (action === 'PLAY_IDLE') { if (this.characters.get(this.activeCharacterId).retargetStatus === 'Failed') { this.showRestPose(); this.status = 'Lỗi chuyển động: bộ xương chưa tương thích.'; } else { this.characterController.stop(); this.status = 'Đang chạy Chờ việc.'; } return; }
 				if (action === 'AUTO_WORK') { this.startNaturalWorkScenario(workstation); return; }
 				this.scenario = null;
 				if (action === 'GO_A' || action === 'GO_B' || action === 'GO_C') { const marker = this.markers[action.slice(-1)]; this.characterController.moveTo(marker); this.status = 'Đang đi tới Marker ' + action.slice(-1); return; }
@@ -635,9 +669,17 @@
 
 		updatePanel() {
 			if (!this.characterController) return;
+			const record = this.characters.get(this.activeCharacterId);
 			const position = this.character.position;
 			const target = this.characterController.getTarget();
 			const value = (selector, text) => { const element = this.root.querySelector(selector); if (element) element.textContent = text; };
+			value('[data-npc-character]', record.definition.id);
+			value('[data-npc-skeleton]', record.skeletonStatus);
+			value('[data-npc-retarget-profile]', record.definition.animation_profile || '—');
+			value('[data-npc-source-skeleton]', record.sourceRig && record.sourceRig.skeleton ? record.sourceRig.skeleton.bones.length + ' bones' : 'Model native');
+			value('[data-npc-target-skeleton]', record.skeleton.bones.length + ' bones');
+			value('[data-npc-rest-pose-match]', record.retargetStatus === 'Direct' ? 'Có' : (record.retargetStatus === 'Failed' ? 'Không xác nhận' : 'Không — dùng retarget'));
+			value('[data-npc-retarget]', record.retargetStatus);
 			value('[data-npc-state]', this.animationController.getState());
 			value('[data-npc-animation]', this.animationController.getAnimation());
 			value('[data-npc-interaction]', this.characterController.currentInteraction || '—');
