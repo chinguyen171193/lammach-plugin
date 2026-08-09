@@ -14,7 +14,8 @@
 	function animationMapFrom(actions) {
 		return Object.freeze({
 			IDLE: actions.IDLE || '', WALKING: actions.WALKING || '', ALIGNING_TO_CHAIR: actions.IDLE || '', WAITING_AT_CHAIR: actions.IDLE || '',
-			SITTING_DOWN: actions.SIT_DOWN || '', SITTING_IDLE: actions.SITTING_IDLE || '', WORKING: actions.TYPING || '', STANDING_UP: actions.STAND_UP || ''
+			SITTING_DOWN: actions.SIT_DOWN || '', SITTING_IDLE: actions.SITTING_IDLE || '', WORKING: actions.TYPING || '', TYPING: actions.TYPING || '',
+			USING_MOUSE: actions.USING_MOUSE || '', THINKING: actions.THINKING || '', READING: actions.READING || '', WRITING: actions.WRITING || '', TALKING: actions.TALKING || '', PHONE_CALL: actions.PHONE_CALL || '', STANDING_UP: actions.STAND_UP || ''
 		});
 	}
 
@@ -151,6 +152,7 @@
 			this.destroyed = false;
 			this.previousTime = 0;
 			this.animationFrame = 0;
+			this.scenario = null;
 			this.init();
 		}
 
@@ -401,6 +403,8 @@
 				const action = button.dataset.npcAction;
 				if (!this.characterController) return;
 				const workstation = this.workstations.get('desk_01');
+				if (action === 'AUTO_WORK') { this.startNaturalWorkScenario(workstation); return; }
+				this.scenario = null;
 				if (action === 'IDLE') { this.characterController.stop(); this.characterController.currentInteraction = null; this.characterController.targetObject = null; this.status = 'Đã chuyển Idle'; return; }
 				if (action === 'GO_TO_DESK') { this.characterController.goToWorkstation(workstation); this.status = 'Đang đi tới chair_01.approachPoint'; return; }
 				if (action === 'SIT') { const sitting = this.characterController.sit(workstation); this.status = sitting ? 'Đang phát chuyển động: Ngồi xuống' : 'Chưa có chuyển động: Ngồi xuống'; return; }
@@ -408,6 +412,74 @@
 				if (action === 'STOP_WORK') { this.characterController.stopWork(); this.status = 'Dừng làm việc · Sitting Idle'; return; }
 				if (action === 'STAND_UP') { const standing = this.characterController.standUp(workstation); this.status = standing ? 'Đang phát chuyển động: Đứng dậy' : 'Chưa có chuyển động: Đứng dậy'; }
 			}));
+		}
+
+		randomDuration(minimum, maximum) { return minimum + Math.random() * (maximum - minimum); }
+
+		availableScenarioSteps() {
+			const states = global.DAT_NPC_STATES;
+			const definitions = [
+				{ state: states.TYPING, label: 'Gõ bàn phím', minimum: 4.8, maximum: 7.2 },
+				{ state: states.USING_MOUSE, label: 'Dùng chuột', minimum: 2.2, maximum: 3.8 },
+				{ state: states.THINKING, label: 'Suy nghĩ', minimum: 2.8, maximum: 4.6 },
+				{ state: states.READING, label: 'Đọc tài liệu', minimum: 3.6, maximum: 5.6 },
+				{ state: states.WRITING, label: 'Viết tài liệu', minimum: 3.4, maximum: 5.2 }
+			];
+			return definitions.filter(step => this.animationController.hasAnimation(step.state));
+		}
+
+		startNaturalWorkScenario(workstation) {
+			const states = global.DAT_NPC_STATES;
+			const available = this.availableScenarioSteps();
+			if (!this.animationController.hasAnimation(states.SITTING_DOWN) || !this.animationController.hasAnimation(states.SITTING_IDLE)) {
+				this.status = 'Không thể chạy tình huống: cần Ngồi xuống và Ngồi chờ.';
+				return;
+			}
+			if (!available.length) { this.status = 'Không thể chạy tình huống: chưa có chuyển động làm việc tương thích.'; return; }
+			this.characterController.stop();
+			this.characterController.currentInteraction = null;
+			this.characterController.targetObject = null;
+			const preferred = [ states.TYPING, states.USING_MOUSE, states.TYPING, states.THINKING, states.READING, states.USING_MOUSE, states.TYPING ];
+			const plan = preferred.map(state => available.find(step => step.state === state)).filter(Boolean);
+			if (!plan.length) { this.status = 'Không thể tạo chuỗi hành động làm việc.'; return; }
+			this.scenario = { phase: 'arriving', workstation, plan, index: 0, timer: 0 };
+			this.characterController.goToWorkstation(workstation);
+			this.status = 'Tình huống tự động: đang đi tới bàn làm việc.';
+		}
+
+		startScenarioStep() {
+			const scenario = this.scenario;
+			if (!scenario) return;
+			const step = scenario.plan[scenario.index];
+			if (!step) { scenario.phase = 'before-stand'; scenario.timer = this.randomDuration(1.4, 2.3); this.characterController.stopWork(); this.status = 'Tình huống tự động: hoàn tất công việc, chuẩn bị đứng dậy.'; return; }
+			if (!this.characterController.performSeatedAction(step.state, 'computer_01')) { scenario.index += 1; this.startScenarioStep(); return; }
+			scenario.phase = 'acting';
+			scenario.timer = this.randomDuration(step.minimum, step.maximum);
+			this.status = 'Tình huống tự động: ' + step.label + '.';
+		}
+
+		updateScenario(delta) {
+			const scenario = this.scenario;
+			if (!scenario) return;
+			const states = global.DAT_NPC_STATES;
+			if (scenario.phase === 'arriving') {
+				if (this.animationController.getState() === states.WAITING_AT_CHAIR) { this.status = 'Tình huống dừng: Chưa có chuyển động Ngồi xuống.'; this.scenario = null; return; }
+				if (this.animationController.getState() === states.SITTING_IDLE && !this.characterController.getTarget()) { scenario.phase = 'before-action'; scenario.timer = this.randomDuration(.8, 1.5); this.status = 'Tình huống tự động: đã ngồi, bắt đầu công việc.'; }
+				return;
+			}
+			if (scenario.phase === 'standing') {
+				if (this.animationController.getState() === states.IDLE && !this.characterController.getTarget()) { this.status = 'Tình huống tự động đã hoàn tất · NPC đang Idle.'; this.scenario = null; }
+				return;
+			}
+			scenario.timer -= delta;
+			if (scenario.timer > 0) return;
+			if (scenario.phase === 'before-action') { this.startScenarioStep(); return; }
+			if (scenario.phase === 'acting') { this.characterController.stopWork(); scenario.index += 1; scenario.phase = 'between-actions'; scenario.timer = this.randomDuration(.65, 1.25); return; }
+			if (scenario.phase === 'between-actions') { this.startScenarioStep(); return; }
+			if (scenario.phase === 'before-stand') {
+				if (!this.characterController.standUp(scenario.workstation)) { this.status = 'Tình huống kết thúc tại ghế: Chưa có chuyển động Đứng dậy.'; this.scenario = null; return; }
+				scenario.phase = 'standing'; this.status = 'Tình huống tự động: đứng dậy và trở về Idle.';
+			}
 		}
 
 		setClipList(clips) {
@@ -440,13 +512,14 @@
 		}
 
 		start() { if (!this.animationFrame) this.animationFrame = global.requestAnimationFrame(time => this.tick(time)); }
-		tick(time) {
+			tick(time) {
 			if (this.destroyed) return;
 			this.animationFrame = global.requestAnimationFrame(next => this.tick(next));
 			const delta = Math.min(0.05, this.previousTime ? (time - this.previousTime) / 1000 : 0);
 			this.previousTime = time;
 			if (this.animationController) this.animationController.update(delta);
 			if (this.characterController) this.characterController.update(delta);
+			this.updateScenario(delta);
 			this.updatePanel();
 			this.renderer.render(this.scene, this.camera);
 		}

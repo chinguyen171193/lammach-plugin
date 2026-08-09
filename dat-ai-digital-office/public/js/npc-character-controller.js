@@ -71,11 +71,14 @@
 		}
 
 		work() {
-			if (!this.currentInteraction) return false;
-			if (!this.typingAvailable) return false;
-			this.targetObject = 'computer_01';
-			this.animationController.setState(global.DAT_NPC_STATES.WORKING);
-			return this.typingAvailable;
+			return this.performSeatedAction(global.DAT_NPC_STATES.TYPING, 'computer_01');
+		}
+
+		performSeatedAction(state, targetObject) {
+			if (!this.currentInteraction || !this.animationController.hasAnimation(state)) return false;
+			this.targetObject = targetObject || 'computer_01';
+			this.animationController.setState(state);
+			return true;
 		}
 
 		stopWork() {

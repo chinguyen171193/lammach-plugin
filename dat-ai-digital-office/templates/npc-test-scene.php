@@ -13,6 +13,7 @@
 			<div><dt>Status</dt><dd data-npc-status>Đang tải FBX…</dd></div>
 		</dl>
 		<div class="dat-npc-test__actions" aria-label="NPC movement controls">
+			<button type="button" data-npc-action="AUTO_WORK">Tình huống tự động</button>
 			<button type="button" data-npc-action="GO_TO_DESK">Go To Desk</button>
 			<button type="button" data-npc-action="SIT">Sit</button>
 			<button type="button" data-npc-action="WORK">Work</button>
