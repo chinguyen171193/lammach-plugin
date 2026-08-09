@@ -104,7 +104,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          timeout: 180000
+          timeout: 240000
           local-dir: ./dat-ai-digital-office/
           server-dir: /public_html/wp-content/plugins/dat-ai-digital-office/
           dangerous-clean-slate: false
