@@ -19,25 +19,20 @@
 		});
 	}
 
-	function findPrimarySkinnedMesh(model) {
+	function findSkinnedMeshes(model) {
 		const meshes = [];
 		model.traverse(object => {
 			if (object.isSkinnedMesh && object.skeleton && object.skeleton.bones.length) meshes.push(object);
 		});
-		if (!meshes.length) return null;
-		return meshes.find(mesh => mesh.name === 'Suit_Legs') || meshes[0];
+		return meshes;
 	}
 
-	function bindMeshesToPrimarySkeleton(model) {
-		const primaryMesh = findPrimarySkinnedMesh(model);
+	function prepareModelSkeletons(model, shareSkeleton) {
+		const meshes = findSkinnedMeshes(model);
+		const primaryMesh = meshes.find(mesh => mesh.name === 'Suit_Legs') || meshes[0];
 		if (!primaryMesh) throw new Error('Model không có skinned mesh/skeleton hợp lệ.');
-		let meshCount = 0;
-		model.traverse(mesh => {
-			if (!mesh.isSkinnedMesh || !mesh.skeleton) return;
-			meshCount += 1;
-			if (mesh !== primaryMesh) mesh.bind(primaryMesh.skeleton, mesh.bindMatrix);
-		});
-		return { primaryMesh, meshCount };
+		if (shareSkeleton) meshes.forEach(mesh => { if (mesh !== primaryMesh) mesh.bind(primaryMesh.skeleton, mesh.bindMatrix); });
+		return { primaryMesh, meshes: shareSkeleton ? [ primaryMesh ] : meshes, meshCount: meshes.length };
 	}
 
 	function compareSkeletons(reference, candidate) {
@@ -100,11 +95,16 @@
 		return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 	}
 
-	function retargetAnimationClipsToPrimarySkeleton(clips, targetMesh, sourceRig, retargetMode) {
-		const THREE = global.THREE; const skeleton = targetMesh.skeleton;
+	function retargetAnimationClipsToPrimarySkeleton(clips, targetMeshes, sourceRig, retargetMode) {
+		const THREE = global.THREE; const targets = Array.isArray(targetMeshes) ? targetMeshes : [ targetMeshes ]; const targetMesh = targets[0]; const skeleton = targetMesh.skeleton;
 		if (retargetMode === 'Retargeted') {
 			if (!sourceRig || !sourceRig.skeleton || !THREE.SkeletonUtils) return { clips: [], targetBoneNames: skeleton.bones.length, skippedTracks: 0, failed: true };
-			return { clips: clips.map(clip => retargetWorldSpaceClip(clip, targetMesh, sourceRig)).filter(clip => clip.tracks.length), targetBoneNames: skeleton.bones.length, skippedTracks: 0, failed: false };
+			const retargeted = clips.map(clip => {
+				const tracks = [];
+				targets.forEach(mesh => tracks.push(...retargetWorldSpaceClip(clip, mesh, sourceRig).tracks));
+				return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+			}).filter(clip => clip.tracks.length);
+			return { clips: retargeted, targetBoneNames: targets.reduce((count, mesh) => count + mesh.skeleton.bones.length, 0), skippedTracks: 0, failed: false };
 		}
 		const bindPoseBones = new Set([ 'FootL', 'FootR' ]); const targetsByName = new Map();
 		skeleton.bones.forEach(bone => { if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone); });
@@ -403,16 +403,17 @@
 
 		installCharacter(definition, model, assets) {
 			const THREE = global.THREE;
-			// FBXLoader exposes duplicate, chained skeletons for the Suit_* meshes.
-			// Driving all of them compounds bone transforms, most visibly in the legs.
-			// Bind every mesh to the valid Suit_Legs skeleton and animate it once.
-			const skeletonSource = bindMeshesToPrimarySkeleton(model);
+			// Employee 001 exports compatible duplicate rig data and can share one
+			// skeleton. Formal.fbx instead has four separately-bound body meshes;
+			// rebinding them to the head mesh corrupts skin matrices. Keep each female
+			// mesh skeleton and emit retarget tracks for every one.
+			const retargetMode = definition.retarget_mode || 'Direct';
+			const skeletonSource = prepareModelSkeletons(model, retargetMode === 'Direct');
 			const retargetedClips = [];
 			const resolvedActions = {};
-			const retargetMode = definition.retarget_mode || 'Direct';
 			let retargetFailed = false;
 			Object.keys(assets).forEach(action => {
-				const result = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh, assets[action].sourceRig, retargetMode);
+				const result = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.meshes, assets[action].sourceRig, retargetMode);
 				if (result.failed) retargetFailed = true;
 				const retargeted = result.clips[0];
 				if (!retargeted || !retargeted.tracks.length) return;
@@ -453,7 +454,7 @@
 			const animationController = new global.DAT_NPCAnimationController(mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
 			const characterController = new global.DAT_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING), workstationResolver: id => this.workstations.get(id) });
 			animationController.setState(global.DAT_NPC_STATES.IDLE);
-			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null };
+			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null };
 			this.characters.set(definition.id, record);
 			this.logSkeleton(record);
 		}
@@ -523,7 +524,8 @@
 
 		showRestPose() {
 			const record = this.characters.get(this.activeCharacterId); if (!record) return;
-			this.scenario = null; record.characterController.target = null; record.mixer.stopAllAction(); record.animationController.currentAction = null; record.animationController.currentState = 'REST_POSE'; record.animationController.currentAnimation = 'Bind / Rest Pose'; record.skeleton.pose(); record.model.updateMatrixWorld(true); this.status = 'Đang xem tư thế gốc (không áp animation).';
+			this.scenario = null; record.characterController.target = null; record.mixer.stopAllAction(); record.animationController.currentAction = null; record.animationController.currentState = 'REST_POSE'; record.animationController.currentAnimation = 'Bind / Rest Pose';
+			const posed = new Set(); (record.skeletonMeshes || [ record.primaryMesh ]).forEach(mesh => { if (!posed.has(mesh.skeleton)) { mesh.skeleton.pose(); posed.add(mesh.skeleton); } }); record.model.updateMatrixWorld(true); this.status = 'Đang xem tư thế gốc (không áp animation).';
 		}
 
 		toggleSkeleton() {
