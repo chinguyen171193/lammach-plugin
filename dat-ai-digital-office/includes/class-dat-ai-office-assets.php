@@ -34,6 +34,10 @@ class DAT_AI_Office_Assets {
 		// The preview contains the shortcode but is rendered after admin_head.
 		// Queue its public renderer here so both CSS and JavaScript are printed.
 		$current_page = sanitize_key( $_GET['page'] ?? '' );
+		if ( 'dat-ai-office-animation-library' === $current_page ) {
+			wp_enqueue_media();
+			wp_enqueue_script( 'dat-ai-office-animation-library', DAT_AI_OFFICE_URL . 'admin/js/animation-library.js', array( 'jquery', 'media-editor' ), DAT_AI_OFFICE_VERSION, true );
+		}
 		if ( in_array( $current_page, array( 'dat-ai-office-agents', 'dat-ai-office-supervisor-studio' ), true ) ) {
 			wp_enqueue_style( 'dat-ai-office-agent-sprites-admin', DAT_AI_OFFICE_URL . 'admin/css/agent-sprites.css', array( 'dat-ai-office-admin' ), DAT_AI_OFFICE_VERSION );
 			wp_enqueue_style( 'dat-ai-office-agent-rig', DAT_AI_OFFICE_URL . 'public/css/agent-rig.css', array( 'dat-ai-office-agent-sprites-admin' ), DAT_AI_OFFICE_VERSION );

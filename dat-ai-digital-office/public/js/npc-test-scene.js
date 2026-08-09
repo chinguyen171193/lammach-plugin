@@ -1,13 +1,6 @@
 (function (global) {
 	'use strict';
 
-	// Verified by parsing public/assets/characters/employee_001/animations.fbx.
-	// Keep this explicit so a changed source file fails visibly instead of silently
-	// selecting a similarly named action such as Idle_Gun_Shoot.
-	const ANIMATION_MAP = Object.freeze({
-		IDLE: 'CharacterArmature|Idle_Neutral',
-		WALKING: 'CharacterArmature|Walk'
-	});
 	const WORKSTATION_KEYWORDS = Object.freeze([ 'sit', 'sitting', 'sit down', 'stand up', 'typing', 'computer', 'desk', 'mouse', 'writing', 'talking', 'thinking' ]);
 
 	function versionedUrl(url, version) {
@@ -18,16 +11,10 @@
 		return clips.filter(clip => WORKSTATION_KEYWORDS.some(keyword => clip.name.toLowerCase().includes(keyword)));
 	}
 
-	function animationMapFrom(clips, workstationAnimations) {
-		const availableNames = new Set(clips.map(clip => clip.name));
+	function animationMapFrom(actions) {
 		return Object.freeze({
-			IDLE: availableNames.has(ANIMATION_MAP.IDLE) ? ANIMATION_MAP.IDLE : '',
-			WALKING: availableNames.has(ANIMATION_MAP.WALKING) ? ANIMATION_MAP.WALKING : '',
-			ALIGNING_TO_CHAIR: availableNames.has(ANIMATION_MAP.IDLE) ? ANIMATION_MAP.IDLE : '',
-			SITTING_DOWN: workstationAnimations.sitDown || workstationAnimations.sitIdle || '__procedural_sit__',
-			SITTING_IDLE: workstationAnimations.sitIdle || '__procedural_sit__',
-			WORKING: workstationAnimations.typing || workstationAnimations.sitIdle || '__procedural_sit__',
-			STANDING_UP: workstationAnimations.standUp || ANIMATION_MAP.IDLE
+			IDLE: actions.IDLE || '', WALKING: actions.WALKING || '', ALIGNING_TO_CHAIR: actions.IDLE || '', WAITING_AT_CHAIR: actions.IDLE || '',
+			SITTING_DOWN: actions.SIT_DOWN || '', SITTING_IDLE: actions.SITTING_IDLE || '', WORKING: actions.TYPING || '', STANDING_UP: actions.STAND_UP || ''
 		});
 	}
 
@@ -86,23 +73,6 @@
 		};
 	}
 
-	function proceduralSittingClip(skeleton) {
-		const THREE = global.THREE;
-		const tracks = [];
-		const sitOffsets = {
-			UpperLegL: [ 0, 0, 1.28 ],
-			UpperLegR: [ 0, 0, 1.28 ],
-			LowerLegL: [ 1.32, 0, 0 ],
-			LowerLegR: [ 1.32, 0, 0 ]
-		};
-		skeleton.bones.forEach(bone => {
-			const quaternion = bone.quaternion.clone();
-			const offset = sitOffsets[bone.name];
-			if (offset) quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(offset[0], offset[1], offset[2])));
-			tracks.push(new THREE.QuaternionKeyframeTrack(bone.uuid + '.quaternion', [ 0, 1 ], quaternion.toArray().concat(quaternion.toArray())));
-		});
-		return new THREE.AnimationClip('__procedural_sit__', 1, tracks);
-	}
 
 	class NPCOrbitCamera {
 		constructor(camera, element) {
@@ -339,37 +309,50 @@
 		async loadCharacter() {
 			try {
 				const modelUrl = this.root.dataset.npcModel;
-				const animationsUrl = this.root.dataset.npcAnimations;
 				const version = this.root.dataset.npcVersion;
-				const results = await Promise.all([this.loadFBX(versionedUrl(modelUrl, version)), this.loadFBX(versionedUrl(animationsUrl, version))]);
+				const configResponse = await fetch(versionedUrl(this.root.dataset.npcAnimationEndpoint, version), { credentials: 'same-origin' });
+				if (!configResponse.ok) throw new Error('Không đọc được cấu hình chuyển động.');
+				const config = await configResponse.json();
+				const assets = {};
+				await Promise.all(Object.keys(config).map(async action => {
+					const asset = Array.isArray(config[action]) ? config[action][0] : null;
+					if (!asset || asset.format !== 'fbx') return;
+					const source = await this.loadFBX(versionedUrl(asset.url, version));
+					const clip = asset.clip ? source.animations.find(item => item.name === asset.clip) : source.animations[0];
+					if (clip) assets[action] = { asset, clip };
+				}));
+				const results = await this.loadFBX(versionedUrl(modelUrl, version));
 				if (this.destroyed) return;
-				this.installCharacter(results[0], results[1].animations || []);
+				this.installCharacter(results, assets);
 			} catch (error) {
 				global.console.error('[DAT AI Office NPC] Không tải được FBX:', error);
 				this.showError('Không tải được employee_001 hoặc animations.fbx. Mở Console để xem lỗi chi tiết.');
 			}
 		}
 
-		installCharacter(model, clips) {
+		installCharacter(model, assets) {
 			const THREE = global.THREE;
-			if (!clips.length) throw new Error('animations.fbx không có animation clip nào.');
 			// FBXLoader exposes duplicate, chained skeletons for the Suit_* meshes.
 			// Driving all of them compounds bone transforms, most visibly in the legs.
 			// Bind every mesh to the valid Suit_Legs skeleton and animate it once.
 			const skeletonSource = bindMeshesToPrimarySkeleton(model);
-			const retargeted = retargetAnimationClipsToPrimarySkeleton(clips, skeletonSource.primaryMesh.skeleton);
-			const retargetedClips = retargeted.clips;
-			retargetedClips.push(proceduralSittingClip(skeletonSource.primaryMesh.skeleton));
-			const workstationMatches = workstationAnimationScan(clips);
-			const workstationAnimations = { sitDown: '', sitIdle: '', standUp: '', typing: '' };
+			const retargetedClips = [];
+			const resolvedActions = {};
+			Object.keys(assets).forEach(action => {
+				const retargeted = retargetAnimationClipsToPrimarySkeleton([assets[action].clip], skeletonSource.primaryMesh.skeleton).clips[0];
+				if (!retargeted || !retargeted.tracks.length) return;
+				retargeted.name = '__action__' + action;
+				retargetedClips.push(retargeted); resolvedActions[action] = retargeted.name;
+			});
+			if (!resolvedActions.IDLE || !resolvedActions.WALKING) throw new Error('Cấu hình phải có Chờ việc và Đi bộ hợp lệ.');
 			const clipTable = retargetedClips.map(clip => ({ name: clip.name, duration: Number(clip.duration.toFixed(3)), tracks: clip.tracks.length }));
-			global.console.groupCollapsed('[DAT AI Office NPC] animations.fbx clips (' + clips.length + ')');
+			global.console.groupCollapsed('[DAT AI Office NPC] animation library (' + retargetedClips.length + ')');
 			global.console.table(clipTable);
-			global.console.info('[DAT AI Office NPC] Bind ' + skeletonSource.meshCount + ' mesh vào skeleton ' + skeletonSource.primaryMesh.name + '; retarget ' + retargeted.targetBoneNames + ' bone names; bỏ ' + retargeted.skippedTracks + ' wrapper/unmatched tracks.');
+			global.console.info('[DAT AI Office NPC] Resolver đã load: ' + Object.keys(resolvedActions).join(', '));
 			global.console.groupEnd();
 			this.setClipList(clipTable);
-			this.setWorkstationAnimationScan(workstationMatches);
-			const animationMap = animationMapFrom(retargetedClips, workstationAnimations);
+			this.setWorkstationAnimationScan([]);
+			const animationMap = animationMapFrom(resolvedActions);
 			global.console.log('[DAT AI Office NPC] ANIMATION_MAP', animationMap);
 			if (!animationMap.IDLE || !animationMap.WALKING) throw new Error('Không tự map được Idle/Walk. Clips đã được liệt kê trong Console và panel debug.');
 
@@ -392,9 +375,9 @@
 			this.placeModelOnFloor();
 			this.mixer = new THREE.AnimationMixer(this.model);
 			this.animationController = new global.DAT_NPCAnimationController(this.mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
-			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(workstationAnimations.typing) });
+			this.characterController = new global.DAT_NPCCharacterController(this.character, this.animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING) });
 			this.animationController.setState(global.DAT_NPC_STATES.IDLE);
-			this.status = 'Sẵn sàng · thiếu Sit, Stand Up và Typing — dùng procedural seated pose';
+			this.status = 'Sẵn sàng · thư viện chuyển động đã tải';
 			this.start();
 		}
 
@@ -420,10 +403,10 @@
 				const workstation = this.workstations.get('desk_01');
 				if (action === 'IDLE') { this.characterController.stop(); this.characterController.currentInteraction = null; this.characterController.targetObject = null; this.status = 'Đã chuyển Idle'; return; }
 				if (action === 'GO_TO_DESK') { this.characterController.goToWorkstation(workstation); this.status = 'Đang đi tới chair_01.approachPoint'; return; }
-				if (action === 'SIT') { this.characterController.sit(workstation); this.status = 'Đang vào ghế · procedural seated pose'; return; }
+				if (action === 'SIT') { const sitting = this.characterController.sit(workstation); this.status = sitting ? 'Đang phát chuyển động: Ngồi xuống' : 'Chưa có chuyển động: Ngồi xuống'; return; }
 				if (action === 'WORK') { const typing = this.characterController.work(); this.status = typing ? 'Đang làm việc' : 'Typing animation không có · giữ Sitting Idle'; return; }
 				if (action === 'STOP_WORK') { this.characterController.stopWork(); this.status = 'Dừng làm việc · Sitting Idle'; return; }
-				if (action === 'STAND_UP') { this.characterController.standUp(workstation); this.status = 'Đứng lên và lùi về approach point'; }
+				if (action === 'STAND_UP') { const standing = this.characterController.standUp(workstation); this.status = standing ? 'Đang phát chuyển động: Đứng dậy' : 'Chưa có chuyển động: Đứng dậy'; }
 			}));
 		}
 

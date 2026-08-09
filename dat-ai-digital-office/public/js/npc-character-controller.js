@@ -58,6 +58,7 @@
 
 		sit(workstation) {
 			if (!workstation || !workstation.chair) return;
+			if (!this.animationController.hasAnimation(global.DAT_NPC_STATES.SITTING_DOWN)) { this.animationController.setState(global.DAT_NPC_STATES.WAITING_AT_CHAIR); return false; }
 			this.currentInteraction = workstation.id;
 			this.targetObject = workstation.chair.id;
 			this.character.rotation.y = workstation.chair.sitRotation;
@@ -66,11 +67,12 @@
 				speed: 0.72,
 				faceMovement: false,
 				onArrive: () => this.animationController.setState(global.DAT_NPC_STATES.SITTING_IDLE)
-			});
+			}); return true;
 		}
 
 		work() {
 			if (!this.currentInteraction) return false;
+			if (!this.typingAvailable) return false;
 			this.targetObject = 'computer_01';
 			this.animationController.setState(global.DAT_NPC_STATES.WORKING);
 			return this.typingAvailable;
@@ -83,7 +85,7 @@
 		}
 
 		standUp(workstation) {
-			if (!workstation || !workstation.chair) return;
+			if (!workstation || !workstation.chair || !this.animationController.hasAnimation(global.DAT_NPC_STATES.STANDING_UP)) return false;
 			this.targetObject = workstation.chair.id;
 			this.animationController.setState(global.DAT_NPC_STATES.STANDING_UP);
 			this.moveTo(workstation.chair.approachPoint, {
@@ -95,7 +97,7 @@
 					this.targetObject = null;
 					this.animationController.setState(global.DAT_NPC_STATES.IDLE);
 				}
-			});
+			}); return true;
 		}
 
 		update(delta) {

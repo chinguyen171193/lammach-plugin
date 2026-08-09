@@ -2,7 +2,7 @@
 /**
  * Plugin Name: LM AI Digital Office
  * Description: Văn phòng số 2.5D mô phỏng nhân viên và AI Agent phối hợp vận hành doanh nghiệp.
- * Version: 1.7.0
+ * Version: 1.7.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: DAT
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'DAT_AI_OFFICE_VERSION', '1.7.0' );
-define( 'DAT_AI_OFFICE_BUILD', '2026.08.08-npc-test-11' );
+define( 'DAT_AI_OFFICE_VERSION', '1.7.1' );
+define( 'DAT_AI_OFFICE_BUILD', '2026.08.09-animation-library-01' );
 define( 'DAT_AI_OFFICE_FILE', __FILE__ );
 define( 'DAT_AI_OFFICE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DAT_AI_OFFICE_URL', plugin_dir_url( __FILE__ ) );
@@ -23,6 +23,7 @@ define( 'DAT_AI_OFFICE_NONCE', 'dat_ai_office_admin' );
 
 require_once DAT_AI_OFFICE_DIR . 'includes/class-dat-ai-office.php';
 require_once DAT_AI_OFFICE_DIR . 'includes/class-dat-ai-office-assets.php';
+require_once DAT_AI_OFFICE_DIR . 'includes/class-dat-ai-office-animations.php';
 require_once DAT_AI_OFFICE_DIR . 'includes/class-dat-ai-office-shortcode.php';
 require_once DAT_AI_OFFICE_DIR . 'includes/class-dat-ai-office-api.php';
 require_once DAT_AI_OFFICE_DIR . 'includes/class-dat-ai-office-events.php';

@@ -16,6 +16,7 @@ final class DAT_AI_Office {
 	}
 
 	private function __construct() {
+		add_filter( 'upload_mimes', array( 'DAT_AI_Office_Animations', 'upload_mimes' ) );
 		new DAT_AI_Office_Assets();
 		new DAT_AI_Office_Shortcode();
 		new DAT_AI_Office_API();

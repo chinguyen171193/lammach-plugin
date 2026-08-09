@@ -1,0 +1,16 @@
+<?php if ( ! defined( 'ABSPATH' ) ) { exit; }
+$employee = DAT_AI_Office_Animations::EMPLOYEE; $actions = DAT_AI_Office_Animations::actions(); $assets = DAT_AI_Office_Animations::assets( $employee ); $notice = sanitize_text_field( wp_unslash( $_GET['animation_notice'] ?? '' ) );
+?>
+<div class="wrap dat-ai-office-admin dat-ai-office-animation-library"><h1>Thư viện chuyển động</h1>
+<?php if ( $notice ) : ?><div class="notice notice-info is-dismissible"><p><?php echo esc_html( $notice ); ?></p></div><?php endif; ?>
+<section class="dat-ai-office-panel"><label for="dat-ai-office-character"><strong>Nhân vật:</strong></label> <select id="dat-ai-office-character"><option value="employee_001">Employee 001</option></select><p>Chỉ nhận tệp FBX, GLB hoặc GLTF từ Media Library. Mỗi hành động có thể có nhiều biến thể.</p></section>
+<div class="dat-ai-office-animation-list">
+<?php foreach ( $actions as $key => $action ) : $variants = $assets[ $key ] ?? array(); ?>
+<article class="dat-ai-office-animation-card"><h2><?php echo esc_html( $action['label'] ); ?></h2><p><?php echo esc_html( $action['description'] ); ?></p>
+<p><strong>Trạng thái:</strong> <?php echo esc_html( $variants ? 'Sẵn sàng' : 'Chưa có chuyển động' ); ?></p>
+<?php if ( $variants ) : ?><ul><?php foreach ( $variants as $index => $asset ) : ?><li><strong><?php echo esc_html( $asset['label'] ?? 'Animation' ); ?></strong> · <?php echo esc_html( strtoupper( $asset['format'] ?? '' ) ); ?> · Chuyển xương: <?php echo esc_html( 'compatible' === ( $asset['retarget_status'] ?? '' ) ? 'Tương thích' : 'Chưa kiểm tra' ); ?>
+<a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=dat-ai-office-preview' ) ); ?>">Xem thử</a>
+<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="dat-ai-office-inline-form"><?php wp_nonce_field( 'dat_ai_office_animation_remove' ); ?><input type="hidden" name="action" value="dat_ai_office_animation_remove"><input type="hidden" name="employee" value="employee_001"><input type="hidden" name="action_key" value="<?php echo esc_attr( $key ); ?>"><input type="hidden" name="variant_index" value="<?php echo esc_attr( $index ); ?>"><button class="button button-small" type="submit">Xóa</button></form></li><?php endforeach; ?></ul><?php endif; ?>
+<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="dat-ai-office-animation-upload"><?php wp_nonce_field( 'dat_ai_office_animation_add' ); ?><input type="hidden" name="action" value="dat_ai_office_animation_add"><input type="hidden" name="employee" value="employee_001"><input type="hidden" name="action_key" value="<?php echo esc_attr( $key ); ?>"><input type="hidden" name="attachment_id" value="" data-animation-attachment><button type="button" class="button" data-animation-select><?php echo esc_html( $variants ? 'Thay thế / thêm tệp' : 'Tải tệp lên' ); ?></button> <span data-animation-file>Chưa chọn tệp</span> <button type="submit" class="button button-primary" disabled>Lưu</button></form>
+</article><?php endforeach; ?>
+</div></div>

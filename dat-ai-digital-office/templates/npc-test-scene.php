@@ -1,5 +1,5 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
-<section id="<?php echo esc_attr( $config['id'] ); ?>" class="dat-npc-test" data-dat-npc-test data-npc-model="<?php echo esc_url( $config['model_url'] ); ?>" data-npc-animations="<?php echo esc_url( $config['anims_url'] ); ?>" data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" style="--dat-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
+<section id="<?php echo esc_attr( $config['id'] ); ?>" class="dat-npc-test" data-dat-npc-test data-npc-model="<?php echo esc_url( $config['model_url'] ); ?>" data-npc-animation-endpoint="<?php echo esc_url( $config['animations_endpoint'] ); ?>" data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" style="--dat-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
 	<div class="dat-npc-test__canvas-wrap" data-npc-canvas></div>
 	<aside class="dat-npc-test__panel" data-npc-debug aria-label="NPC debug panel">
 		<h2>employee_001 · NPC Test</h2>
