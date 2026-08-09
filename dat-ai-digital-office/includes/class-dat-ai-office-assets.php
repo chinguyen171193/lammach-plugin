@@ -36,7 +36,11 @@ class DAT_AI_Office_Assets {
 		$current_page = sanitize_key( $_GET['page'] ?? '' );
 		if ( 'dat-ai-office-animation-library' === $current_page ) {
 			wp_enqueue_media();
-			wp_enqueue_script( 'dat-ai-office-animation-library', DAT_AI_OFFICE_URL . 'admin/js/animation-library.js', array( 'jquery', 'media-editor' ), DAT_AI_OFFICE_VERSION, true );
+			wp_enqueue_script( 'dat-ai-office-three', DAT_AI_OFFICE_URL . 'public/js/vendor/three.min.js', array(), '0.128.0', true );
+			wp_enqueue_script( 'dat-ai-office-fflate', DAT_AI_OFFICE_URL . 'public/js/vendor/fflate.min.js', array(), '0.6.10', true );
+			wp_enqueue_script( 'dat-ai-office-fbx-loader', DAT_AI_OFFICE_URL . 'public/js/vendor/FBXLoader.js', array( 'dat-ai-office-three', 'dat-ai-office-fflate' ), '0.128.0', true );
+			wp_enqueue_script( 'dat-ai-office-animation-library', DAT_AI_OFFICE_URL . 'admin/js/animation-library.js', array( 'jquery', 'media-editor', 'dat-ai-office-fbx-loader' ), DAT_AI_OFFICE_VERSION, true );
+			wp_localize_script( 'dat-ai-office-animation-library', 'DAT_AI_OFFICE_ANIMATION_PREVIEW', array( 'modelUrl' => DAT_AI_OFFICE_URL . 'public/assets/characters/employee_001/employee_001.fbx', 'version' => DAT_AI_OFFICE_BUILD ) );
 		}
 		if ( in_array( $current_page, array( 'dat-ai-office-agents', 'dat-ai-office-supervisor-studio' ), true ) ) {
 			wp_enqueue_style( 'dat-ai-office-agent-sprites-admin', DAT_AI_OFFICE_URL . 'admin/css/agent-sprites.css', array( 'dat-ai-office-admin' ), DAT_AI_OFFICE_VERSION );
