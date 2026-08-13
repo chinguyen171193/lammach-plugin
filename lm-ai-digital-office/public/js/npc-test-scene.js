@@ -516,42 +516,73 @@
 				getState() { return this.currentState; }, getAnimation() { return this.currentAnimation; }, destroy() {},
 				update(delta) {
 					this.elapsed += delta;
-					const swing = Math.sin(this.elapsed * 6) * 0.24;
-					if (character.userData.leftArm) character.userData.leftArm.rotation.x = -1.05 + swing;
-					if (character.userData.rightArm) character.userData.rightArm.rotation.x = -1.05 - swing;
+					const swing = Math.sin(this.elapsed * 6) * 0.16;
+					const nod = Math.sin(this.elapsed * 0.9) * 0.045;
+					if (character.userData.leftArm) character.userData.leftArm.rotation.x = character.userData.leftArm.userData.baseRotationX + swing;
+					if (character.userData.rightArm) character.userData.rightArm.rotation.x = character.userData.rightArm.userData.baseRotationX - swing;
+					if (character.userData.head) character.userData.head.rotation.y = nod;
 				}
 			};
 			const characterController = new global.LM_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, workstationResolver: id => this.workstations.get(id) });
-			const officeDefinition = Object.assign({}, definition, { retarget_mode: 'Retargeted', skeleton_status: 'Model làm việc ổn định' });
-			this.characters.set(definition.id, { id: definition.id, definition: officeDefinition, character, model: character, mixer: { stopAllAction() {} }, animationController, characterController, clips: [], primaryMesh: null, skeleton: { bones: [] }, skeletonMeshes: [], skeletonStatus: 'Avatar văn phòng ổn định', retargetStatus: 'Office avatar', sourceRig: null, skeletonHelper: null, isProcedural: true });
-			global.console.warn('[LM AI Office NPC] Employee 002 dùng avatar văn phòng độc lập vì tệp Worker gốc có skin bounds không hợp lệ.');
+			const officeDefinition = Object.assign({}, definition, { name: 'Nhân viên nữ 002', retarget_mode: 'Retargeted', skeleton_status: 'Nhân vật nữ văn phòng ổn định' });
+			this.characters.set(definition.id, { id: definition.id, definition: officeDefinition, character, model: character, mixer: { stopAllAction() {} }, animationController, characterController, clips: [], primaryMesh: null, skeleton: { bones: [] }, skeletonMeshes: [], skeletonStatus: 'Avatar nữ văn phòng ổn định', retargetStatus: 'Office female avatar', sourceRig: null, skeletonHelper: null, isProcedural: true });
+			global.console.warn('[LM AI Office NPC] Employee 002 dùng avatar nữ văn phòng độc lập vì tệp Worker gốc có skin bounds không hợp lệ.');
 		}
 
 		createOfficeEmployeeTwo() {
 			const THREE = global.THREE;
 			const avatar = new THREE.Group();
-			const skin = new THREE.MeshStandardMaterial({ color: 0xd69a76, roughness: 0.72 });
-			const hair = new THREE.MeshStandardMaterial({ color: 0x38251f, roughness: 0.86 });
-			const blouse = new THREE.MeshStandardMaterial({ color: 0x805ad5, roughness: 0.7 });
-			const skirt = new THREE.MeshStandardMaterial({ color: 0x26375a, roughness: 0.78 });
-			const shoes = new THREE.MeshStandardMaterial({ color: 0x1d2433, roughness: 0.8 });
-			const make = (geometry, material, x, y, z) => {
+			const skin = new THREE.MeshStandardMaterial({ color: 0xd99a78, roughness: 0.72 });
+			const hair = new THREE.MeshStandardMaterial({ color: 0x2d1d1a, roughness: 0.9, side: THREE.DoubleSide });
+			const blouse = new THREE.MeshStandardMaterial({ color: 0xe16f92, roughness: 0.66 });
+			const collar = new THREE.MeshStandardMaterial({ color: 0xfff2df, roughness: 0.62 });
+			const skirt = new THREE.MeshStandardMaterial({ color: 0x273756, roughness: 0.76 });
+			const shoes = new THREE.MeshStandardMaterial({ color: 0x151b26, roughness: 0.82 });
+			const eye = new THREE.MeshStandardMaterial({ color: 0x171923, roughness: 0.6 });
+			const lip = new THREE.MeshStandardMaterial({ color: 0xb83256, roughness: 0.55 });
+			const make = (geometry, material, x, y, z, parent) => {
 				const mesh = new THREE.Mesh(geometry, material);
-				mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; avatar.add(mesh); return mesh;
+				mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; (parent || avatar).add(mesh); return mesh;
 			};
-			make(new THREE.CylinderGeometry(0.26, 0.31, 0.58, 16), blouse, 0, 1.02, 0);
-			make(new THREE.SphereGeometry(0.25, 18, 14), skin, 0, 1.53, -0.02);
-			make(new THREE.SphereGeometry(0.27, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.58), hair, 0, 1.63, 0.02);
-			make(new THREE.BoxGeometry(0.48, 0.22, 0.38), skirt, 0, 0.66, 0.08);
-			const leftArm = make(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 12), skin, -0.31, 1.1, -0.18);
-			const rightArm = make(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 12), skin, 0.31, 1.1, -0.18);
-			leftArm.rotation.x = rightArm.rotation.x = -1.05;
-			make(new THREE.CylinderGeometry(0.09, 0.1, 0.44, 12), skin, -0.16, 0.32, 0.2).rotation.x = -Math.PI / 2;
-			make(new THREE.CylinderGeometry(0.09, 0.1, 0.44, 12), skin, 0.16, 0.32, 0.2).rotation.x = -Math.PI / 2;
-			make(new THREE.BoxGeometry(0.18, 0.1, 0.28), shoes, -0.16, 0.12, 0.4);
-			make(new THREE.BoxGeometry(0.18, 0.1, 0.28), shoes, 0.16, 0.12, 0.4);
+			const torso = make(new THREE.CylinderGeometry(0.2, 0.29, 0.56, 18), blouse, 0, 1.02, 0.04);
+			torso.scale.z = 0.72;
+			make(new THREE.CylinderGeometry(0.11, 0.12, 0.14, 14), skin, 0, 1.35, 0.03);
+			const head = make(new THREE.SphereGeometry(0.22, 22, 16), skin, 0, 1.57, 0.02);
+			const hairBack = make(new THREE.BoxGeometry(0.46, 0.64, 0.13), hair, 0, 1.36, -0.1);
+			hairBack.rotation.x = -0.05;
+			make(new THREE.SphereGeometry(0.235, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.68), hair, 0, 1.66, 0.02);
+			const bang = make(new THREE.BoxGeometry(0.32, 0.08, 0.08), hair, 0, 1.69, 0.19);
+			bang.rotation.x = 0.35;
+			make(new THREE.SphereGeometry(0.018, 10, 8), eye, -0.075, 1.58, 0.225);
+			make(new THREE.SphereGeometry(0.018, 10, 8), eye, 0.075, 1.58, 0.225);
+			make(new THREE.BoxGeometry(0.08, 0.012, 0.018), lip, 0, 1.48, 0.232);
+			make(new THREE.BoxGeometry(0.26, 0.045, 0.025), collar, 0, 1.29, 0.245);
+			make(new THREE.CylinderGeometry(0.28, 0.38, 0.36, 20), skirt, 0, 0.72, 0.08);
+			const leftUpperArm = make(new THREE.CylinderGeometry(0.055, 0.065, 0.34, 12), blouse, -0.27, 1.09, 0.11);
+			const rightUpperArm = make(new THREE.CylinderGeometry(0.055, 0.065, 0.34, 12), blouse, 0.27, 1.09, 0.11);
+			leftUpperArm.rotation.x = rightUpperArm.rotation.x = 0.5;
+			leftUpperArm.rotation.z = -0.18;
+			rightUpperArm.rotation.z = 0.18;
+			const leftArm = make(new THREE.CylinderGeometry(0.047, 0.052, 0.44, 12), skin, -0.24, 0.91, 0.35);
+			const rightArm = make(new THREE.CylinderGeometry(0.047, 0.052, 0.44, 12), skin, 0.24, 0.91, 0.35);
+			leftArm.rotation.x = rightArm.rotation.x = Math.PI / 2;
+			leftArm.userData.baseRotationX = Math.PI / 2;
+			rightArm.userData.baseRotationX = Math.PI / 2;
+			make(new THREE.SphereGeometry(0.055, 12, 8), skin, -0.24, 0.9, 0.58);
+			make(new THREE.SphereGeometry(0.055, 12, 8), skin, 0.24, 0.9, 0.58);
+			const leftThigh = make(new THREE.CylinderGeometry(0.075, 0.085, 0.46, 12), skirt, -0.14, 0.52, 0.28);
+			const rightThigh = make(new THREE.CylinderGeometry(0.075, 0.085, 0.46, 12), skirt, 0.14, 0.52, 0.28);
+			leftThigh.rotation.x = rightThigh.rotation.x = Math.PI / 2;
+			make(new THREE.CylinderGeometry(0.065, 0.072, 0.36, 12), skin, -0.14, 0.27, 0.5);
+			make(new THREE.CylinderGeometry(0.065, 0.072, 0.36, 12), skin, 0.14, 0.27, 0.5);
+			make(new THREE.BoxGeometry(0.17, 0.08, 0.28), shoes, -0.14, 0.08, 0.55);
+			make(new THREE.BoxGeometry(0.17, 0.08, 0.28), shoes, 0.14, 0.08, 0.55);
+			make(new THREE.BoxGeometry(0.22, 0.028, 0.11), collar, -0.18, 0.875, 0.63);
+			make(new THREE.BoxGeometry(0.22, 0.028, 0.11), collar, 0.18, 0.875, 0.63);
 			avatar.userData.leftArm = leftArm;
 			avatar.userData.rightArm = rightArm;
+			avatar.userData.head = head;
+			avatar.userData.safeHeight = 1.9;
 			return avatar;
 		}
 
@@ -607,7 +638,7 @@
 			}, []);
 			this.officeWorkElapsed = 0;
 			this.officeWorkers.forEach(worker => this.playOfficeWorkState(worker));
-			this.status = this.officeWorkers.length === 2 ? 'Employee 001 và Employee 002 đang làm việc.' : 'Đang chờ model nhân vật thứ hai.';
+			this.status = this.officeWorkers.length === 2 ? 'Employee 001 và Nhân viên nữ 002 đang làm việc.' : 'Đang chờ model nhân vật thứ hai.';
 		}
 
 		playOfficeWorkState(worker) {
