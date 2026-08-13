@@ -569,9 +569,8 @@
 
 		setSafeSeatedWorkPose(record) {
 			// The female model uses a different skeleton. Until a verified seated clip
-			// is supplied, preserve its intact bind pose and bend its arms toward the
-			// keyboard. This keeps the second employee visibly working instead of
-			// allowing an unverified retarget clip to collapse the mesh.
+			// is supplied, preserve its intact bind pose at the workstation instead of
+			// allowing an unverified retarget clip to collapse or distort the mesh.
 			record.mixer.stopAllAction();
 			const posed = new Set();
 			(record.skeletonMeshes || [ record.primaryMesh ]).forEach(mesh => {
@@ -580,10 +579,6 @@
 					posed.add(mesh.skeleton);
 				}
 			});
-			const bones = new Map(record.skeleton.bones.map(bone => [ bone.name, bone ]));
-			[ 'UpperArmL', 'UpperArmR' ].forEach(name => { const bone = bones.get(name); if (bone) bone.rotation.x = -0.82; });
-			[ 'LowerArmL', 'LowerArmR' ].forEach(name => { const bone = bones.get(name); if (bone) bone.rotation.x = -0.66; });
-			[ 'HandL', 'HandR', 'WristL', 'WristR' ].forEach(name => { const bone = bones.get(name); if (bone) bone.rotation.x = -0.18; });
 			record.model.updateMatrixWorld(true);
 			record.animationController.currentAction = null;
 			record.animationController.currentState = 'WORKING';
