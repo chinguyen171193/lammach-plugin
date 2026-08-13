@@ -1,0 +1,152 @@
+.lm-agent-sprite__surface.is-agent-3d {
+	background: none !important;
+	contain: strict;
+}
+
+.lm-agent-sprite.has-agent-3d .lm-agent-sprite__fallback {
+	display: none;
+}
+
+.lm-agent-3d__canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	outline: 0;
+	image-rendering: auto;
+	touch-action: none;
+}
+
+.lm-agent-3d-debug {
+	position: relative;
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	flex-wrap: wrap;
+	width: 100%;
+	box-sizing: border-box;
+	margin: 7px 0 0;
+	padding: 6px;
+	border: 1px solid rgba(91, 219, 255, .3);
+	border-radius: 8px;
+	color: #d9f7ff;
+	background: rgba(3, 14, 28, .88);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+	font-size: 9px;
+	line-height: 1.2;
+	backdrop-filter: blur(6px);
+}
+
+.lm-agent-3d-debug__select {
+	flex: 1 1 100%;
+	min-width: 0;
+	max-width: 100%;
+	height: 26px;
+	min-height: 26px;
+	padding: 2px 24px 2px 6px;
+	border: 1px solid rgba(91, 219, 255, .32);
+	border-radius: 5px;
+	color: #e9fbff;
+	background: #071c2c;
+	font-size: 10px;
+}
+
+.lm-agent-3d-debug label {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	margin: 0;
+	white-space: nowrap;
+}
+
+.lm-agent-3d-debug input[type="checkbox"] {
+	width: 13px;
+	height: 13px;
+	min-width: 13px;
+	margin: 0;
+}
+
+.lm-agent-3d-debug button {
+	min-height: 24px;
+	padding: 3px 6px;
+	border: 1px solid rgba(91, 219, 255, .3);
+	border-radius: 5px;
+	color: #dff9ff;
+	background: #0c2a40;
+	cursor: pointer;
+	font-size: 9px;
+}
+
+.lm-agent-3d-debug button:hover,
+.lm-agent-3d-debug button:focus-visible {
+	border-color: #52dcff;
+	background: #123a56;
+}
+
+.lm-agent-3d-debug small {
+	flex: 1 1 100%;
+	color: #ffcc7d;
+	font-size: 8px;
+}
+
+.lm-agent-3d-debug__face-status {
+	color: #83eaff !important;
+}
+
+.lm-agent-face-debug {
+	display: flex;
+	flex: 1 1 100%;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding-top: 5px;
+	border-top: 1px solid rgba(91, 219, 255, .18);
+}
+
+.lm-agent-face-debug[hidden] {
+	display: none !important;
+}
+
+.lm-agent-3d-debug.is-face-preview {
+	border-color: rgba(115, 235, 255, .58);
+	box-shadow: 0 0 20px rgba(58, 218, 255, .12);
+}
+
+.lm-agent-3d-debug.is-face-preview .lm-agent-3d-debug__face-button {
+	color: #031d29;
+	background: #63e5ff;
+}
+
+.lm-agent-sprite.has-agent-3d:not(.is-agent-3d-ready)::before {
+	content: 'Đang tải nhân vật 3D…';
+	position: absolute;
+	z-index: 2;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	padding: 18px;
+	color: #9edff0;
+	font-size: 11px;
+	letter-spacing: .04em;
+	text-align: center;
+	background: radial-gradient(circle, rgba(65, 216, 255, .12), transparent 58%);
+}
+
+.lm-agent-sprite.is-agent-3d-ready::before {
+	content: '';
+	position: absolute;
+	z-index: 2;
+	inset: 7% 4% 3%;
+	pointer-events: none;
+	border-radius: 44% 44% 18% 18%;
+	background: radial-gradient(circle at 50% 72%, rgba(38, 225, 180, .08), transparent 58%);
+}
+
+.lm-agent-sprite.is-agent-3d-error::before {
+	display: none;
+}
+
+@media (max-width: 640px) {
+	.lm-agent-3d__canvas {
+		max-width: 100%;
+	}
+}

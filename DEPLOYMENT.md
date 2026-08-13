@@ -12,8 +12,8 @@ Mỗi thư mục cấp một của repository là một plugin WordPress riêng.
 
 ```text
 public_html/wp-content/plugins/
-├── dat-pcb-image-tracer/
-│   └── dat-pcb-image-tracer.php
+├── lm-pcb-image-tracer/
+│   └── lm-pcb-image-tracer.php
 └── cty-1-nguoi/
     └── cty-1-nguoi.php
 ```

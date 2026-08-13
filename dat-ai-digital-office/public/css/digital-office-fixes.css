@@ -1,5 +1,0 @@
-/* Native hidden attributes must win over the modal layout rules. */
-.dat-ai-office__task-modal[hidden],
-.dat-ai-office__agent-card[hidden] {
-	display: none !important;
-}

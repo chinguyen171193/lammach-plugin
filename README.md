@@ -5,8 +5,8 @@ thư mục cấp một riêng, với một file PHP chính chứa WordPress plug
 
 ```text
 repository-root/
-├── dat-pcb-image-tracer/
-│   └── dat-pcb-image-tracer.php
+├── lm-pcb-image-tracer/
+│   └── lm-pcb-image-tracer.php
 ├── plugin-thu-hai/
 │   └── plugin-thu-hai.php
 └── plugin-thu-ba/
@@ -15,7 +15,7 @@ repository-root/
 
 Các plugin hiện có trong repository:
 
-- `dat-pcb-image-tracer/`: PCB Image Tracer.
+- `lm-pcb-image-tracer/`: PCB Image Tracer.
 - `cty-1-nguoi/`: CTY 1 Người; cấu hình tại **Cài đặt → CTY 1 Người** và dùng
   shortcode `[cty_mot_nguoi]`.
 

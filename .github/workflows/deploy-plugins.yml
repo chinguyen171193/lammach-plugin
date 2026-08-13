@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths:
-      - 'dat-pcb-image-tracer/**'
+      - 'lm-pcb-image-tracer/**'
       - 'cty-1-nguoi/**'
-      - 'dat-ai-digital-office/**'
+      - 'lm-ai-digital-office/**'
   workflow_dispatch:
     inputs:
       plugin:
@@ -17,9 +17,9 @@ on:
         type: choice
         options:
           - all
-          - dat-pcb-image-tracer
+          - lm-pcb-image-tracer
           - cty-1-nguoi
-          - dat-ai-digital-office
+          - lm-ai-digital-office
 
 permissions:
   contents: read
@@ -42,21 +42,21 @@ jobs:
         with:
           filters: |
             pcb:
-              - 'dat-pcb-image-tracer/**'
+              - 'lm-pcb-image-tracer/**'
             cty:
               - 'cty-1-nguoi/**'
             ai_office:
-              - 'dat-ai-digital-office/**'
+              - 'lm-ai-digital-office/**'
 
   deploy-pcb:
     needs: changes
-    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'dat-pcb-image-tracer')) || (github.event_name == 'push' && needs.changes.outputs.pcb == 'true') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'lm-pcb-image-tracer')) || (github.event_name == 'push' && needs.changes.outputs.pcb == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Lấy source code
         uses: actions/checkout@v6
 
-      - name: Upload DAT PCB Image Tracer
+      - name: Upload LM PCB Image Tracer
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -64,8 +64,8 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          local-dir: ./dat-pcb-image-tracer/
-          server-dir: /public_html/wp-content/plugins/dat-pcb-image-tracer/
+          local-dir: ./lm-pcb-image-tracer/
+          server-dir: /public_html/wp-content/plugins/lm-pcb-image-tracer/
           dangerous-clean-slate: false
 
   deploy-cty:
@@ -90,7 +90,7 @@ jobs:
 
   deploy-ai-office:
     needs: changes
-    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'dat-ai-digital-office')) || (github.event_name == 'push' && needs.changes.outputs.ai_office == 'true') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.plugin == 'all' || inputs.plugin == 'lm-ai-digital-office')) || (github.event_name == 'push' && needs.changes.outputs.ai_office == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Lấy source code
@@ -105,6 +105,6 @@ jobs:
           protocol: ftp
           port: 21
           timeout: 240000
-          local-dir: ./dat-ai-digital-office/
-          server-dir: /public_html/wp-content/plugins/dat-ai-digital-office/
+          local-dir: ./lm-ai-digital-office/
+          server-dir: /public_html/wp-content/plugins/lm-ai-digital-office/
           dangerous-clean-slate: false

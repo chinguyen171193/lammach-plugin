@@ -1,0 +1,17 @@
+.lm-ai-office__agent-card .lm-agent-sprite { --agent-accent: #56dfff; --agent-frame-ratio: 4 / 5; position: relative; overflow: hidden; width: min(176px, 50%); aspect-ratio: var(--agent-frame-ratio); float: right; margin: 0 0 8px 14px; border-radius: 13px; background: linear-gradient(155deg, rgba(50,132,175,.32), rgba(3,13,28,.56)); }
+.lm-ai-office__agent-card .lm-agent-sprite__surface { position: absolute; inset: 0; background-repeat: no-repeat; }
+.lm-ai-office__agent-card .lm-agent-sprite.is-stable-playback::before { content: ''; position: absolute; z-index: 2; inset: 9%; pointer-events: none; border-radius: 12px; opacity: 0; background: radial-gradient(circle at 58% 42%, rgba(74,224,255,.2), transparent 40%); }
+.lm-ai-office__agent-card[data-agent-state="working"] .lm-agent-sprite.is-stable-playback::before { opacity: .68; animation: lm-ai-office-stable-activity 2.4s ease-in-out infinite; }
+.lm-ai-office__agent-card[data-agent-state="reviewing"] .lm-agent-sprite.is-stable-playback::before { opacity: .44; background: linear-gradient(180deg, transparent 20%, rgba(76,224,255,.14) 52%, transparent 78%); animation: lm-ai-office-stable-review 3s ease-in-out infinite; }
+.lm-ai-office__agent-card .lm-agent-sprite__fallback { position: absolute; left: 50%; bottom: 9%; width: 45%; height: 68%; transform: translateX(-50%); border-radius: 36% 36% 14% 14%; background: linear-gradient(90deg, #e0aa86 0 17%, #142f51 18% 79%, #e0aa86 80% 100%); animation: lm-ai-office-sprite-idle 2.7s ease-in-out infinite; }
+.lm-ai-office__agent-card .lm-agent-sprite__fallback::before { content: ''; position: absolute; left: 22%; top: -21%; width: 55%; aspect-ratio: 1; border-radius: 50%; background: #f2c29e; box-shadow: inset 0 12px #152b47; }
+.lm-ai-office__agent-card .lm-agent-sprite.has-sprite-image.is-sprite-ready .lm-agent-sprite__fallback { display: none; }
+.lm-ai-office__agent-card[data-agent-state="working"] .lm-agent-sprite { box-shadow: 0 0 18px rgba(66,225,160,.24); }
+.lm-ai-office__agent-card[data-agent-state="reviewing"] .lm-agent-sprite { outline: 1px solid #56dfff; }
+.lm-ai-office__agent-card[data-agent-state="done"] .lm-agent-sprite::after { content: '✓'; position: absolute; z-index: 3; top: 7px; right: 7px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #52e59a; color: #032716; font-weight: 800; }
+.lm-ai-office__agent-progress { height: 7px; overflow: hidden; margin: 8px 0; border-radius: 999px; background: rgba(255,255,255,.12); }
+.lm-ai-office__agent-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #46dfff, #68f0af); transition: width .35s ease; }
+@keyframes lm-ai-office-sprite-idle { 50% { transform: translateX(-50%) translateY(-4px); } }
+@keyframes lm-ai-office-stable-activity { 0%, 100% { opacity: .22; } 50% { opacity: .68; } }
+@keyframes lm-ai-office-stable-review { 0%, 100% { opacity: .16; } 50% { opacity: .46; } }
+@media (max-width: 520px) { .lm-ai-office__agent-card .lm-agent-sprite { width: 138px; } }

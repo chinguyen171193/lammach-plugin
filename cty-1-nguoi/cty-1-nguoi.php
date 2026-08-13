@@ -3,7 +3,7 @@
  * Plugin Name: CTY 1 Người
  * Description: Hiển thị thông tin doanh nghiệp bằng shortcode [cty_mot_nguoi].
  * Version: 1.0.0
- * Author: DAT
+ * Author: LM
  * Text Domain: cty-1-nguoi
  */
 

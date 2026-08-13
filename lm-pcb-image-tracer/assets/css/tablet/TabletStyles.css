@@ -1,0 +1,2823 @@
+/* Tablet Mode styles are isolated behind the root tablet-mode class. */
+.lm-pcb-tracer-app {
+	position: relative;
+}
+
+.lm-tablet-mode-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--lm-text);
+}
+
+.lm-tablet-mode-toggle input {
+	width: auto;
+}
+ 
+.lm-tablet-context-menu,
+.lm-tablet-floating-toolbar,
+.lm-tablet-fab,
+.lm-tablet-ai-button,
+.lm-tablet-ai-panel {
+	box-sizing: border-box;
+	font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.lm-tablet-context-menu {
+	position: fixed;
+	z-index: 100004;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(88px, 1fr));
+	gap: 8px;
+	padding: 10px;
+	background: #17212c;
+	border: 1px solid #53677d;
+	box-shadow: 0 18px 48px rgba(0,0,0,.42);
+	border-radius: 8px;
+	transform: translate(-8px, -8px);
+}
+
+.lm-tablet-context-menu[hidden] {
+	display: none;
+}
+
+.lm-tablet-context-menu button {
+	min-width: 88px;
+	min-height: 56px;
+	background: #243241;
+	color: #eef4f7;
+	border: 1px solid #53677d;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.lm-tablet-floating-toolbar,
+.lm-tablet-fab,
+.lm-tablet-ai-button,
+.lm-tablet-ai-panel,
+.lm-tablet-ai-inputbar,
+.lm-tablet-palette,
+.lm-tablet-left-shell,
+.lm-tablet-language-switcher,
+.lm-tablet-overflow-button {
+	display: none;
+}
+
+.tablet-mode {
+	font-size: 16px;
+}
+
+.tablet-mode .lm-pcb-toolbar {
+	min-height: 76px;
+	gap: 10px;
+	padding: 12px;
+}
+
+.tablet-mode .lm-pcb-toolbar button,
+.tablet-mode .lm-upload-btn,
+.tablet-mode .lm-tablet-mode-toggle {
+	min-width: 56px;
+	min-height: 56px;
+	padding: 12px 14px;
+	font-size: 16px;
+}
+
+.tablet-mode .lm-pcb-toolbar button {
+	border-radius: 7px;
+}
+
+.tablet-mode .lm-pcb-main {
+	grid-template-columns: minmax(280px, 22%) minmax(520px, 1fr) minmax(320px, 26%);
+	height: min(74vh, 820px);
+}
+
+.lm-pcb-tracer-fullscreen.tablet-mode .lm-pcb-main {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+.tablet-mode .lm-pcb-layers,
+.tablet-mode .lm-pcb-properties {
+	-webkit-overflow-scrolling: touch;
+	scroll-behavior: smooth;
+	padding: 16px;
+}
+
+.tablet-mode .lm-pcb-layers label,
+.tablet-mode .lm-pcb-properties label {
+	margin: 12px 0;
+	font-size: 15px;
+}
+
+.tablet-mode .lm-pcb-layers input,
+.tablet-mode .lm-pcb-layers select,
+.tablet-mode .lm-pcb-properties input,
+.tablet-mode .lm-pcb-properties select,
+.tablet-mode .lm-pcb-properties textarea {
+	min-height: 48px;
+	padding: 10px;
+	font-size: 16px;
+}
+
+.tablet-mode .lm-pcb-layers input[type="checkbox"],
+.tablet-mode .lm-pcb-properties input[type="checkbox"] {
+	width: 26px;
+	min-height: 26px;
+}
+
+.tablet-mode #lm-pcb-tracer-canvas {
+	touch-action: none;
+}
+
+.tablet-mode .lm-tablet-palette {
+	display: block;
+	margin-bottom: 18px;
+}
+
+.tablet-mode .lm-tablet-palette details {
+	border-bottom: 1px solid rgba(255,255,255,.12);
+	padding: 8px 0;
+}
+
+.tablet-mode .lm-tablet-palette summary {
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+	color: var(--lm-text);
+	font-size: 17px;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-palette-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	padding: 8px 0 12px;
+}
+
+.tablet-mode .lm-tablet-palette-grid button {
+	min-height: 64px;
+	background: #273747;
+	color: var(--lm-text);
+	border: 1px solid #53677d;
+	border-radius: 7px;
+	font-size: 15px;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-floating-toolbar {
+	position: fixed;
+	z-index: 100003;
+	display: flex;
+	gap: 8px;
+	padding: 8px;
+	background: #17212c;
+	border: 1px solid #53677d;
+	border-radius: 8px;
+	box-shadow: 0 16px 42px rgba(0,0,0,.38);
+}
+
+.tablet-mode .lm-tablet-floating-toolbar[hidden] {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-floating-toolbar button,
+.tablet-mode .lm-tablet-fab button {
+	width: 56px;
+	height: 56px;
+	display: grid;
+	place-items: center;
+	background: #263646;
+	color: #eef4f7;
+	border: 1px solid #5a7086;
+	border-radius: 8px;
+	font-size: 24px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-fab {
+	position: fixed;
+	right: 24px;
+	bottom: 24px;
+	z-index: 100002;
+	display: grid;
+	grid-template-columns: repeat(2, 56px);
+	gap: 10px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .18s ease;
+}
+
+.tablet-mode .lm-tablet-fab.is-visible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.tablet-mode .lm-tablet-ai-button {
+	position: fixed;
+	right: 24px;
+	bottom: 220px;
+	z-index: 100002;
+	display: block;
+	min-width: 72px;
+	min-height: 56px;
+	background: #24513f;
+	color: #f4fff9;
+	border: 1px solid #5bb98e;
+	border-radius: 8px;
+	font-size: 18px;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-ai-panel {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 80px;
+	z-index: 100005;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 14px;
+	background: #151f29;
+	border-top: 1px solid #53677d;
+	box-shadow: 0 -18px 48px rgba(0,0,0,.38);
+	width: 100%;
+	min-height: 160px;
+	max-height: 60vh;
+}
+
+.tablet-mode .lm-tablet-ai-inputbar {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 100005;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 14px;
+	background: #151f29;
+	border-top: 1px solid #53677d;
+	box-shadow: 0 -12px 32px rgba(0,0,0,.38);
+}
+
+.tablet-mode .lm-tablet-ai-inputbar[hidden] {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-ai-panel[hidden] {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-ai-resize {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: -8px;
+	height: 16px;
+	cursor: ns-resize;
+}
+
+.tablet-mode .lm-tablet-ai-header {
+	min-height: 56px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	color: var(--lm-accent);
+	font-size: 20px;
+	font-weight: 600;
+}
+
+.tablet-mode .lm-tablet-ai-header button,
+.tablet-mode .lm-tablet-ai-panel button {
+	min-height: 56px;
+	background: #263646;
+	color: #eef4f7;
+	border: 1px solid #5a7086;
+	border-radius: 7px;
+	padding: 0 16px;
+	font-size: 16px;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-ai-thread {
+	flex: 1;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.tablet-mode .lm-tablet-ai-hint {
+	font-size: 12px;
+	color: #9fb1c0;
+	padding: 8px 10px;
+	border: 1px dashed rgba(255,255,255,.18);
+	border-radius: 8px;
+}
+
+.tablet-mode .lm-tablet-ai-bubble {
+	max-width: 88%;
+	border-radius: 10px;
+	padding: 8px 12px;
+	font-size: 14px;
+	line-height: 1.4;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-user {
+	align-self: flex-end;
+	background: var(--tablet-accent, #f3b23f);
+	color: #10151c;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-assistant {
+	align-self: flex-start;
+	background: #0f171f;
+	border: 1px solid rgba(255,255,255,.12);
+	color: #d8e6ee;
+}
+
+.tablet-mode .lm-tablet-ai-bubble.is-typing .lm-tablet-ai-bubble-text {
+	opacity: .6;
+	font-style: italic;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-error {
+	border-color: rgba(229, 57, 53, .6);
+	color: #ffb4b0;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-text {
+	white-space: pre-wrap;
+}
+
+.tablet-mode .lm-tablet-ai-command-summary {
+	margin-top: 6px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.tablet-mode .lm-tablet-ai-command-item {
+	font-size: 12px;
+	color: #ffe0a3;
+	background: rgba(243, 178, 63, .1);
+	border-radius: 6px;
+	padding: 4px 8px;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-actions [data-ai-apply] {
+	background: var(--tablet-good, #4cc38a);
+	color: #10151c;
+	font-weight: 700;
+	border: none;
+	border-radius: 7px;
+	padding: 8px 14px;
+	min-height: 40px;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-actions [data-ai-discard] {
+	background: transparent;
+	border: 1px solid rgba(255,255,255,.3);
+	color: #eef4f7;
+	border-radius: 7px;
+	padding: 8px 14px;
+	min-height: 40px;
+}
+
+.tablet-mode .lm-tablet-ai-bubble-status {
+	margin-top: 6px;
+	font-size: 12px;
+	color: #9fb1c0;
+}
+
+.tablet-mode .lm-tablet-ai-input-row {
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+}
+
+.tablet-mode .lm-tablet-ai-input-row textarea {
+	flex: 1;
+	min-height: 56px;
+	max-height: 140px;
+	resize: vertical;
+	background: #0f171f;
+	color: #eef4f7;
+	border: 1px solid #53677d;
+	border-radius: 7px;
+	padding: 10px 12px;
+	font-size: 16px;
+}
+
+.tablet-mode .lm-tablet-ai-input-row button {
+	min-height: 56px;
+	flex: 0 0 auto;
+}
+
+.tablet-mode .lm-tablet-ai-input-row [data-ai-attach] {
+	min-width: 44px;
+	padding: 0;
+	font-size: 18px;
+}
+
+.tablet-mode .lm-tablet-ai-attachment {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	background: rgba(243, 178, 63, .12);
+	border: 1px solid rgba(243, 178, 63, .4);
+	border-radius: 7px;
+	padding: 6px 10px;
+	font-size: 13px;
+	color: #ffe0a3;
+}
+
+.tablet-mode .lm-tablet-ai-attachment[hidden] {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-ai-attachment button {
+	min-height: 28px;
+	min-width: 28px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	color: #ffe0a3;
+	font-size: 16px;
+}
+
+.tablet-mode .lm-tablet-panel-flash {
+	outline: 2px solid var(--lm-accent);
+	outline-offset: -2px;
+}
+
+@media (orientation: portrait) {
+	.tablet-mode .lm-pcb-main {
+		grid-template-columns: 1fr;
+		height: auto;
+	}
+
+	.tablet-mode .lm-pcb-canvas-panel {
+		min-height: 64vh;
+	}
+}
+
+@media (max-width: 900px) {
+	.tablet-mode .lm-pcb-toolbar button,
+	.tablet-mode .lm-upload-btn,
+	.tablet-mode .lm-tablet-mode-toggle {
+		min-width: 56px;
+		min-height: 56px;
+	}
+}
+
+/* Professional tablet CAD shell. */
+.tablet-mode {
+	--tablet-surface: #171b1f;
+	--tablet-panel: #20262b;
+	--tablet-panel-2: #2a3238;
+	--tablet-control: #303a41;
+	--tablet-border: rgba(232, 238, 242, .14);
+	--tablet-text: #edf3f6;
+	--tablet-muted: #aab7bf;
+	--tablet-accent: #f3b23f;
+	--tablet-good: #4cc38a;
+	background: #111417;
+	letter-spacing: 0;
+}
+
+.tablet-mode .lm-pcb-toolbar {
+	min-height: 68px;
+	padding: 8px 14px;
+	gap: 8px;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+	background: rgba(17, 20, 23, .96);
+	border-bottom: 1px solid var(--tablet-border);
+	box-shadow: 0 10px 24px rgba(0,0,0,.22);
+}
+
+.tablet-mode .lm-pcb-toolbar::-webkit-scrollbar {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-toolbar button,
+.tablet-mode .lm-pcb-version-badge,
+.tablet-mode .lm-route-mode-switch,
+.tablet-mode .lm-pcb-file-menu {
+	flex: 0 0 auto;
+}
+
+.tablet-mode .lm-pcb-toolbar button,
+.tablet-mode .lm-upload-btn,
+.tablet-mode .lm-tablet-mode-toggle {
+	min-width: 58px;
+	min-height: 52px;
+	padding: 0 16px;
+	border-radius: 12px;
+	background: var(--tablet-control);
+	border: 1px solid var(--tablet-border);
+	box-shadow: none;
+	font-size: 15px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.tablet-mode .lm-pcb-toolbar [data-action="new"],
+.tablet-mode .lm-pcb-toolbar [data-action="open"],
+.tablet-mode .lm-pcb-toolbar [data-action="duplicate"],
+.tablet-mode .lm-pcb-toolbar [data-action="toggle-lock"],
+.tablet-mode .lm-pcb-toolbar [data-action="calibrate"],
+.tablet-mode .lm-pcb-toolbar [data-action="preview3d"],
+.tablet-mode .lm-pcb-toolbar [data-action="export"],
+.tablet-mode .lm-pcb-toolbar [data-tool="pad_rect"],
+.tablet-mode .lm-pcb-toolbar [data-tool="pad_oval"],
+.tablet-mode .lm-pcb-toolbar [data-tool="via"],
+.tablet-mode .lm-pcb-toolbar [data-tool="drill"],
+.tablet-mode .lm-pcb-toolbar [data-tool="outline"],
+.tablet-mode .lm-pcb-toolbar [data-tool="region"],
+.tablet-mode .lm-pcb-toolbar [data-tool="annotation"],
+.tablet-mode .lm-pcb-toolbar [data-tool="pad_roundrect"],
+.tablet-mode .lm-pcb-toolbar [data-tool="measure"],
+.tablet-mode .lm-pcb-toolbar [data-tool="zoom_window"],
+.tablet-mode .lm-pcb-toolbar [data-tool="pan"],
+.tablet-mode .lm-pcb-toolbar [data-action="align-menu"],
+.tablet-mode .lm-pcb-toolbar [data-action="array-menu"],
+.tablet-mode .lm-upload-btn {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-toolbar [data-action="save"],
+.tablet-mode .lm-pcb-toolbar [data-tool="select"],
+.tablet-mode .lm-pcb-toolbar [data-tool="track"] {
+	background: #35424a;
+}
+
+.tablet-mode .lm-tablet-mode-toggle {
+	margin-left: auto;
+	background: transparent;
+	border-color: transparent;
+	color: var(--tablet-muted);
+}
+
+.tablet-mode .lm-tablet-overflow-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.lm-tablet-overflow-menu {
+	position: fixed;
+	top: 76px;
+	right: 18px;
+	z-index: 100006;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(132px, 1fr));
+	gap: 8px;
+	padding: 10px;
+	background: var(--tablet-panel);
+	border: 1px solid var(--tablet-border);
+	border-radius: 16px;
+	box-shadow: 0 22px 54px rgba(0,0,0,.36);
+}
+
+.lm-tablet-overflow-menu[hidden] {
+	display: none;
+}
+
+.lm-tablet-overflow-menu button {
+	min-height: 52px;
+	border-radius: 12px;
+	background: var(--tablet-control);
+	color: var(--tablet-text);
+	border: 1px solid var(--tablet-border);
+}
+
+.tablet-mode .lm-pcb-main {
+	grid-template-columns: 304px minmax(420px, 1fr) 344px;
+	background: #111417;
+}
+
+.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+	grid-template-columns: 96px minmax(420px, 1fr) 344px;
+}
+
+.tablet-mode .lm-pcb-layers,
+.tablet-mode .lm-pcb-properties {
+	background: var(--tablet-panel);
+	border-color: var(--tablet-border);
+}
+
+.tablet-mode .lm-pcb-layers > h2,
+.tablet-mode .lm-pcb-layers > label,
+.tablet-mode .lm-pcb-layers > button {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-left-shell {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	height: 100%;
+	min-height: 0;
+}
+
+.tablet-mode .lm-tablet-panel-header,
+.tablet-mode .lm-tablet-section-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 44px;
+	color: var(--tablet-text);
+	font-size: 15px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.tablet-mode .lm-tablet-collapse {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	background: var(--tablet-control);
+	color: var(--tablet-text);
+	border: 1px solid var(--tablet-border);
+}
+
+.tablet-mode .lm-tablet-tool-group {
+	border: 1px solid var(--tablet-border);
+	border-radius: 16px;
+	background: rgba(255,255,255,.03);
+	overflow: hidden;
+}
+
+.tablet-mode .lm-tablet-tool-group summary {
+	min-height: 48px;
+	display: flex;
+	align-items: center;
+	padding: 0 14px;
+	color: var(--tablet-muted);
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-tool-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	padding: 10px;
+}
+
+.tablet-mode .lm-tablet-tool-grid button {
+	min-height: 72px;
+	display: grid;
+	grid-template-columns: 44px 1fr;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	text-align: left;
+	border-radius: 14px;
+	background: var(--tablet-control);
+	color: var(--tablet-text);
+	border: 1px solid var(--tablet-border);
+	box-shadow: 0 8px 18px rgba(0,0,0,.16);
+	cursor: grab;
+}
+
+.tablet-mode .lm-tablet-tool-icon {
+	width: 44px;
+	height: 44px;
+	display: grid;
+	place-items: center;
+	border-radius: 12px;
+	background: #111417;
+	color: var(--tablet-accent);
+	font-size: 12px;
+	font-weight: 800;
+}
+
+.tablet-mode .lm-tablet-tool-grid button span {
+	pointer-events: none;
+}
+
+.tablet-mode .lm-tablet-tool-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: 14px;
+	font-weight: 650;
+}
+
+.tablet-mode .lm-tablet-component-browser {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	padding-right: 2px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only {
+	width: 96px;
+	padding: 12px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-label,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only summary,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-section-title span {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-grid {
+	grid-template-columns: 1fr;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-grid button {
+	grid-template-columns: 1fr;
+	justify-items: center;
+	min-height: 64px;
+	padding: 8px;
+}
+
+.tablet-mode .lm-pcb-properties {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-width: 344px;
+	transition: transform .18s ease;
+	box-shadow: -14px 0 30px rgba(0,0,0,.2);
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed {
+	transform: translateX(calc(100% - 42px));
+}
+
+.tablet-mode .lm-tablet-right-tabs {
+	display: flex;
+	gap: 6px;
+	padding: 10px;
+	border-bottom: 1px solid var(--tablet-border);
+	overflow-x: auto;
+}
+
+.tablet-mode .lm-tablet-right-tabs button {
+	min-height: 48px;
+	padding: 0 12px;
+	border-radius: 12px;
+	background: transparent;
+	color: var(--tablet-muted);
+	border: 1px solid transparent;
+	font-weight: 700;
+}
+
+.tablet-mode .lm-tablet-right-tabs button.is-active {
+	background: var(--tablet-control);
+	color: var(--tablet-text);
+	border-color: var(--tablet-border);
+}
+
+.tablet-mode .lm-tablet-right-body {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	padding: 14px;
+}
+
+.tablet-mode .lm-tablet-tab-pane[hidden] {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-tab-pane h2 {
+	margin-top: 0;
+}
+
+.tablet-mode .lm-tablet-tab-data {
+	display: grid;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.tablet-mode .lm-tablet-tab-data div {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 12px;
+	border-radius: 12px;
+	background: rgba(255,255,255,.04);
+	color: var(--tablet-muted);
+}
+
+.tablet-mode .lm-tablet-tab-data strong {
+	color: var(--tablet-text);
+}
+
+.tablet-mode .lm-tablet-floating-toolbar {
+	gap: 8px;
+	padding: 8px;
+	border-radius: 18px;
+	background: rgba(32, 38, 43, .96);
+	border: 1px solid var(--tablet-border);
+	box-shadow: 0 18px 48px rgba(0,0,0,.34);
+	transform: translateY(8px) scale(.96);
+	opacity: 0;
+	transition: transform .14s ease, opacity .14s ease;
+}
+
+.tablet-mode .lm-tablet-floating-toolbar.is-visible {
+	transform: translateY(0) scale(1);
+	opacity: 1;
+}
+
+.tablet-mode .lm-tablet-floating-toolbar button {
+	width: 52px;
+	height: 52px;
+	border-radius: 14px;
+	font-size: 13px;
+	font-weight: 800;
+}
+
+.lm-tablet-pie-menu {
+	width: 1px;
+	height: 1px;
+	display: block;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	transform: none;
+}
+
+.lm-tablet-pie-menu button {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 86px;
+	height: 86px;
+	min-width: 86px;
+	min-height: 86px;
+	display: grid;
+	place-items: center;
+	gap: 2px;
+	border-radius: 999px;
+	background: rgba(32, 38, 43, .97);
+	border: 1px solid var(--tablet-border);
+	box-shadow: 0 14px 36px rgba(0,0,0,.32);
+	color: var(--tablet-text);
+	opacity: 0;
+	transform: translate(-43px, -43px) scale(.7);
+	transition: transform .16s ease, opacity .16s ease;
+}
+
+.lm-tablet-pie-menu button span {
+	color: var(--tablet-accent);
+	font-size: 13px;
+	font-weight: 900;
+}
+
+.lm-tablet-pie-menu button small {
+	font-size: 11px;
+	color: var(--tablet-muted);
+}
+
+.lm-tablet-pie-menu.is-open button {
+	opacity: 1;
+	transform:
+		rotate(calc(360deg / var(--item-count) * var(--item-index)))
+		translate(118px)
+		rotate(calc(-360deg / var(--item-count) * var(--item-index)))
+		translate(-43px, -43px)
+		scale(1);
+}
+
+.tablet-mode .lm-tablet-fab {
+	left: 50%;
+	right: auto;
+	bottom: 22px;
+	grid-template-columns: repeat(7, 58px);
+	gap: 8px;
+	padding: 8px;
+	border-radius: 20px;
+	background: rgba(32, 38, 43, .94);
+	border: 1px solid var(--tablet-border);
+	box-shadow: 0 18px 48px rgba(0,0,0,.36);
+	transform: translateX(-50%) translateY(10px);
+	transition: opacity .18s ease, transform .18s ease;
+}
+
+.tablet-mode .lm-tablet-fab.is-visible {
+	transform: translateX(-50%) translateY(0);
+}
+
+.tablet-mode .lm-tablet-fab button {
+	width: 58px;
+	height: 58px;
+	border-radius: 15px;
+	font-size: 14px;
+	font-weight: 900;
+	background: var(--tablet-control);
+}
+
+.tablet-mode .lm-tablet-ai-button {
+	right: 24px;
+	bottom: 108px;
+	border-radius: 16px;
+	background: #244b39;
+	box-shadow: 0 14px 34px rgba(0,0,0,.28);
+}
+
+.tablet-mode .lm-tablet-ai-panel {
+	border-radius: 18px 18px 0 0;
+	background: var(--tablet-panel);
+	transition: transform .18s ease, opacity .18s ease;
+}
+
+.tablet-mode .lm-pcb-canvas-panel {
+	background-color: #0d1013;
+	background-image:
+		linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+	background-size: 24px 24px;
+}
+
+@media (orientation: portrait) {
+	.tablet-mode .lm-pcb-main {
+		grid-template-columns: 96px minmax(0, 1fr);
+		grid-template-rows: minmax(54vh, 1fr) auto;
+	}
+
+	.tablet-mode .lm-pcb-properties {
+		grid-column: 1 / -1;
+		min-width: 0;
+		max-height: 38vh;
+	}
+}
+
+/* Focused left-sidebar redesign for tablet-first tool access. */
+.tablet-mode .lm-pcb-layers {
+	overflow: hidden;
+	padding: 12px;
+}
+
+.tablet-mode .lm-tablet-left-shell {
+	gap: 10px;
+	overflow: hidden;
+}
+
+.tablet-mode .lm-tablet-panel-header {
+	flex: 0 0 auto;
+	min-height: 44px;
+	padding: 0 2px;
+}
+
+.tablet-mode .lm-tablet-tool-search {
+	flex: 0 0 auto;
+	display: block;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+.tablet-mode .lm-tablet-tool-search input {
+	width: 100%;
+	min-height: 52px;
+	box-sizing: border-box;
+	padding: 0 16px;
+	border-radius: 16px;
+	background: #12171b;
+	color: var(--tablet-text);
+	border: 1px solid var(--tablet-border);
+	font-size: 15px;
+	outline: 0;
+}
+
+.tablet-mode .lm-tablet-tool-search input:focus {
+	border-color: rgba(243,178,63,.72);
+	box-shadow: 0 0 0 3px rgba(243,178,63,.16);
+}
+
+.tablet-mode .lm-tablet-left-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	-webkit-overflow-scrolling: touch;
+	scroll-behavior: smooth;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 2px 4px 18px 0;
+}
+
+.tablet-mode .lm-tablet-left-body::-webkit-scrollbar {
+	width: 12px;
+}
+
+.tablet-mode .lm-tablet-left-body::-webkit-scrollbar-thumb {
+	background: rgba(237,243,246,.28);
+	border-radius: 999px;
+	border: 3px solid var(--tablet-panel);
+}
+
+.tablet-mode .lm-tablet-tool-group {
+	border-radius: 16px;
+	background: rgba(255,255,255,.035);
+	border: 1px solid var(--tablet-border);
+	box-shadow: 0 8px 18px rgba(0,0,0,.12);
+	transition: background .16s ease, border-color .16s ease;
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open {
+	background: rgba(255,255,255,.055);
+	border-color: rgba(243,178,63,.28);
+}
+
+.tablet-mode .lm-tablet-category-button {
+	width: 100%;
+	min-height: 54px;
+	display: grid;
+	grid-template-columns: 44px 1fr auto;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 10px;
+	background: transparent;
+	border: 0;
+	color: var(--tablet-text);
+	text-align: left;
+	cursor: pointer;
+}
+
+.tablet-mode .lm-tablet-category-icon {
+	width: 40px;
+	height: 40px;
+	display: grid;
+	place-items: center;
+	border-radius: 12px;
+	background: #111417;
+	color: var(--tablet-accent);
+	font-size: 11px;
+	font-weight: 900;
+}
+
+.tablet-mode .lm-tablet-category-label {
+	font-size: 14px;
+	font-weight: 800;
+}
+
+.tablet-mode .lm-tablet-category-count {
+	min-width: 28px;
+	height: 28px;
+	display: grid;
+	place-items: center;
+	border-radius: 999px;
+	background: rgba(255,255,255,.08);
+	color: var(--tablet-muted);
+	font-size: 12px;
+	font-weight: 800;
+}
+
+.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid {
+	max-height: 0;
+	overflow: hidden;
+	padding: 0 10px;
+	opacity: 0;
+	transform: translateY(-4px);
+	transition: max-height .18s ease, opacity .14s ease, transform .14s ease, padding .14s ease;
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+	max-height: 560px;
+	padding: 0 10px 10px;
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.tablet-mode .lm-tablet-tool-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.tablet-mode .lm-tablet-tool-card {
+	position: relative;
+	min-width: 0;
+	min-height: 78px;
+	aspect-ratio: 1 / .92;
+	display: grid;
+	grid-template-areas:
+		"icon fav"
+		"label label"
+		"shortcut shortcut";
+	grid-template-columns: 1fr 28px;
+	align-content: center;
+	gap: 4px;
+	padding: 10px;
+	border-radius: 16px;
+	background: #2b343b;
+	color: var(--tablet-text);
+	border: 1px solid rgba(237,243,246,.11);
+	box-shadow: 0 8px 18px rgba(0,0,0,.16);
+	cursor: pointer;
+	transition: transform .14s ease, background .14s ease, border-color .14s ease, box-shadow .14s ease;
+}
+
+.tablet-mode .lm-tablet-tool-card:hover {
+	transform: translateY(-2px);
+	background: #33404a;
+	border-color: rgba(243,178,63,.32);
+}
+
+.tablet-mode .lm-tablet-tool-card:active {
+	transform: scale(.97);
+}
+
+.tablet-mode .lm-tablet-tool-card.is-selected {
+	background: #3b3324;
+	border-color: rgba(243,178,63,.88);
+	box-shadow: 0 0 0 3px rgba(243,178,63,.18), 0 12px 24px rgba(0,0,0,.24);
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon {
+	grid-area: icon;
+	width: 42px;
+	height: 42px;
+	border-radius: 14px;
+	background: #111417;
+	color: var(--tablet-accent);
+	font-size: 11px;
+	font-weight: 900;
+}
+
+.tablet-mode .lm-tablet-empty-tools {
+	grid-column: 1 / -1;
+	min-height: 64px;
+	display: grid;
+	place-items: center;
+	border-radius: 14px;
+	border: 1px dashed rgba(237,243,246,.18);
+	color: var(--tablet-muted);
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-label {
+	grid-area: label;
+	font-size: 13px;
+	font-weight: 800;
+	line-height: 1.15;
+	color: var(--tablet-text);
+}
+
+.tablet-mode .lm-tablet-tool-shortcut {
+	grid-area: shortcut;
+	color: var(--tablet-muted);
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.tablet-mode .lm-tablet-favorite-toggle {
+	grid-area: fav;
+	width: 28px;
+	height: 28px;
+	min-width: 28px;
+	min-height: 28px;
+	padding: 0;
+	border-radius: 999px;
+	background: rgba(255,255,255,.07);
+	color: rgba(237,243,246,.42);
+	border: 1px solid transparent;
+	font-size: 13px;
+	line-height: 1;
+}
+
+.tablet-mode .lm-tablet-favorite-toggle.is-active {
+	background: rgba(243,178,63,.18);
+	color: var(--tablet-accent);
+	border-color: rgba(243,178,63,.3);
+}
+
+@media (min-width: 1280px) {
+	.tablet-mode .lm-pcb-main {
+		grid-template-columns: 372px minmax(420px, 1fr) 344px;
+	}
+
+	.tablet-mode .lm-tablet-tool-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+		grid-template-columns: 96px minmax(420px, 1fr) 344px;
+	}
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-search {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-panel-header span,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-label,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-count,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-label,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-shortcut,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-favorite-toggle {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-button {
+	grid-template-columns: 1fr;
+	justify-items: center;
+	padding: 6px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-grid {
+	grid-template-columns: 1fr;
+	gap: 8px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-card {
+	min-height: 64px;
+	aspect-ratio: 1 / 1;
+	grid-template-areas: "icon";
+	grid-template-columns: 1fr;
+	place-items: center;
+	padding: 8px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-card .lm-tablet-tool-icon {
+	width: 44px;
+	height: 44px;
+}
+
+/* Tablet toolbox v2: grouped, icon-led, finger friendly. */
+.tablet-mode {
+	--tablet-toolbox-bg: #171c21;
+	--tablet-toolbox-row: rgba(255,255,255,.035);
+	--tablet-toolbox-row-hover: rgba(255,255,255,.065);
+	--tablet-toolbox-card: #252f36;
+	--tablet-toolbox-card-hover: #2e3a42;
+	--tablet-toolbox-card-selected: #3b3223;
+}
+
+.tablet-mode .lm-pcb-main {
+	grid-template-columns: 328px minmax(420px, 1fr) 344px;
+	transition: grid-template-columns .18s ease;
+}
+
+.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+	grid-template-columns: 88px minmax(420px, 1fr) 344px;
+}
+
+.tablet-mode .lm-pcb-layers {
+	background: var(--tablet-toolbox-bg);
+	padding: 12px 10px;
+}
+
+.tablet-mode .lm-tablet-left-shell {
+	gap: 10px;
+}
+
+.tablet-mode .lm-tablet-panel-header {
+	min-height: 46px;
+	padding: 0 2px 2px;
+	color: var(--tablet-text);
+	font-size: 14px;
+	font-weight: 800;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+.tablet-mode .lm-tablet-collapse {
+	width: 44px;
+	height: 44px;
+	display: grid;
+	place-items: center;
+	border-radius: 8px;
+	background: #202930;
+	color: var(--tablet-muted);
+	border: 1px solid rgba(237,243,246,.1);
+	transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.tablet-mode .lm-tablet-collapse:active {
+	transform: scale(.96);
+}
+
+.tablet-mode .lm-tablet-collapse:hover {
+	background: #26333b;
+	color: var(--tablet-text);
+	border-color: rgba(243,178,63,.25);
+}
+
+.tablet-mode .lm-tablet-lucide {
+	width: 20px;
+	height: 20px;
+	display: block;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.9;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	pointer-events: none;
+}
+
+.tablet-mode .lm-tablet-tool-search {
+	position: relative;
+}
+
+.tablet-mode .lm-tablet-search-icon {
+	position: absolute;
+	left: 14px;
+	top: 50%;
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	color: var(--tablet-muted);
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+
+.tablet-mode .lm-tablet-tool-search input {
+	min-height: 50px;
+	padding: 0 14px 0 44px;
+	border-radius: 8px;
+	background: #10161b;
+	border: 1px solid rgba(237,243,246,.11);
+	color: var(--tablet-text);
+	transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+.tablet-mode .lm-tablet-tool-search input::placeholder {
+	color: rgba(170,183,191,.84);
+}
+
+.tablet-mode .lm-tablet-tool-search input:focus {
+	background: #121a20;
+	border-color: rgba(243,178,63,.62);
+	box-shadow: 0 0 0 3px rgba(243,178,63,.13);
+}
+
+.tablet-mode .lm-tablet-left-body {
+	gap: 7px;
+	padding: 2px 4px 18px 0;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(237,243,246,.28) transparent;
+}
+
+.tablet-mode .lm-tablet-tool-group {
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	box-shadow: none;
+	overflow: hidden;
+	transition: background .18s ease;
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open {
+	background: rgba(255,255,255,.045);
+	border-color: transparent;
+}
+
+.tablet-mode .lm-tablet-category-button {
+	min-height: 58px;
+	grid-template-columns: 44px 1fr 30px;
+	gap: 11px;
+	padding: 7px 8px;
+	border-radius: 10px;
+	background: var(--tablet-toolbox-row);
+	color: var(--tablet-text);
+	transition: background .16s ease, transform .16s ease, color .16s ease;
+}
+
+.tablet-mode .lm-tablet-category-button:hover {
+	background: var(--tablet-toolbox-row-hover);
+}
+
+.tablet-mode .lm-tablet-category-button:active {
+	transform: scale(.985);
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open .lm-tablet-category-button {
+	background: rgba(243,178,63,.1);
+	color: #fff6de;
+}
+
+.tablet-mode .lm-tablet-category-icon,
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon {
+	width: 42px;
+	height: 42px;
+	display: grid;
+	place-items: center;
+	border-radius: 8px;
+	background: #10161b;
+	color: var(--tablet-accent);
+	font-size: 0;
+}
+
+.tablet-mode .lm-tablet-category-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 15px;
+	font-weight: 760;
+	letter-spacing: 0;
+}
+
+.tablet-mode .lm-tablet-category-count {
+	width: 30px;
+	min-width: 30px;
+	height: 30px;
+	border-radius: 999px;
+	background: rgba(237,243,246,.075);
+	color: var(--tablet-muted);
+	font-size: 12px;
+	font-weight: 800;
+}
+
+.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid {
+	max-height: 0;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-auto-rows: 84px;
+	gap: 9px;
+	padding: 0 8px;
+	opacity: 0;
+	transform: translateY(-5px);
+	transition: max-height .18s ease, opacity .16s ease, transform .16s ease, padding .16s ease;
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+	max-height: 580px;
+	padding: 9px 8px 10px;
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.tablet-mode .lm-tablet-tool-card {
+	min-height: 0;
+	height: 84px;
+	aspect-ratio: auto;
+	grid-template-areas:
+		"icon fav"
+		"label label";
+	grid-template-columns: 1fr 28px;
+	grid-template-rows: 44px 1fr;
+	align-content: stretch;
+	gap: 4px;
+	padding: 8px;
+	border-radius: 8px;
+	background: var(--tablet-toolbox-card);
+	border: 1px solid rgba(237,243,246,.09);
+	box-shadow: none;
+	transition: transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.tablet-mode .lm-tablet-tool-card:hover {
+	transform: translateY(-1px);
+	background: var(--tablet-toolbox-card-hover);
+	border-color: rgba(243,178,63,.32);
+}
+
+.tablet-mode .lm-tablet-tool-card:active {
+	transform: scale(.97);
+}
+
+.tablet-mode .lm-tablet-tool-card.is-selected {
+	background: var(--tablet-toolbox-card-selected);
+	border-color: rgba(243,178,63,.86);
+	box-shadow: inset 0 0 0 1px rgba(243,178,63,.36), 0 0 0 3px rgba(243,178,63,.14);
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon {
+	justify-self: start;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-label {
+	align-self: end;
+	overflow: hidden;
+	font-size: 12px;
+	font-weight: 760;
+	line-height: 1.12;
+	max-height: 2.24em;
+	letter-spacing: 0;
+	text-overflow: ellipsis;
+}
+
+.tablet-mode .lm-tablet-tool-shortcut {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-favorite-toggle {
+	width: 28px;
+	height: 28px;
+	min-width: 28px;
+	min-height: 28px;
+	display: grid;
+	place-items: center;
+	border-radius: 999px;
+	background: rgba(255,255,255,.065);
+	color: rgba(237,243,246,.44);
+	border: 1px solid transparent;
+	transition: background .16s ease, color .16s ease, transform .16s ease, border-color .16s ease;
+}
+
+.tablet-mode .lm-tablet-favorite-toggle .lm-tablet-lucide {
+	width: 15px;
+	height: 15px;
+}
+
+.tablet-mode .lm-tablet-favorite-toggle:active {
+	transform: scale(.9);
+}
+
+.tablet-mode .lm-tablet-favorite-toggle.is-active {
+	background: rgba(243,178,63,.18);
+	color: var(--tablet-accent);
+	border-color: rgba(243,178,63,.28);
+}
+
+.tablet-mode .lm-tablet-favorite-toggle.is-active .lm-tablet-lucide {
+	fill: currentColor;
+}
+
+.tablet-mode .lm-tablet-empty-tools {
+	min-height: 78px;
+	border-radius: 8px;
+	background: rgba(255,255,255,.025);
+}
+
+@media (min-width: 1280px) {
+	.tablet-mode .lm-pcb-main {
+		grid-template-columns: 396px minmax(420px, 1fr) 344px;
+	}
+
+	.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+		grid-template-columns: 88px minmax(420px, 1fr) 344px;
+	}
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only {
+	width: auto;
+	padding: 12px 8px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-left-shell {
+	align-items: center;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-panel-header {
+	width: 100%;
+	justify-content: center;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-panel-header span,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-search,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-label,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-count,
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-grid {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-left-body {
+	width: 100%;
+	align-items: center;
+	padding: 0;
+	overflow: hidden auto;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-group {
+	width: 58px;
+	border-radius: 10px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-group.is-open {
+	background: transparent;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-button {
+	width: 58px;
+	min-height: 58px;
+	grid-template-columns: 1fr;
+	justify-items: center;
+	padding: 7px;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-group.is-open .lm-tablet-category-button {
+	background: rgba(243,178,63,.12);
+}
+
+/* Remove per-card favorite stars from the tablet toolbox. */
+.tablet-mode .lm-tablet-tool-card {
+	overflow: hidden;
+	grid-template-areas:
+		"icon"
+		"label";
+	grid-template-columns: 1fr;
+}
+
+.tablet-mode .lm-tablet-favorite-toggle {
+	display: none !important;
+}
+
+/* Compact expanded tool cards so rows do not cover the next group. */
+.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid {
+	grid-auto-rows: 58px;
+	gap: 6px;
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+	max-height: none;
+	overflow: visible;
+	padding: 6px 8px 8px;
+}
+
+.tablet-mode .lm-tablet-tool-group.is-open {
+	overflow: visible;
+}
+
+.tablet-mode .lm-tablet-tool-card {
+	height: 58px;
+	min-height: 58px;
+	grid-template-rows: 26px 1fr;
+	gap: 2px;
+	padding: 5px;
+	border-radius: 7px;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon {
+	width: 26px;
+	height: 26px;
+	border-radius: 7px;
+	justify-self: start;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon .lm-tablet-lucide {
+	width: 15px;
+	height: 15px;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-label {
+	align-self: end;
+	min-height: 20px;
+	font-size: 9.5px;
+	font-weight: 750;
+	line-height: 1.05;
+	max-height: 2.1em;
+	word-break: normal;
+	overflow-wrap: anywhere;
+}
+
+.tablet-mode .lm-tablet-language-switcher {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-height: 44px;
+	padding: 0 9px 0 12px;
+	border-radius: 8px;
+	background: #202930;
+	border: 1px solid rgba(237,243,246,.1);
+	color: var(--tablet-muted);
+	font-size: 12px;
+	font-weight: 750;
+	white-space: nowrap;
+}
+
+.tablet-mode .lm-tablet-language-switcher select {
+	width: auto;
+	min-width: 58px;
+	min-height: 34px;
+	margin: 0;
+	padding: 0 8px;
+	border-radius: 7px;
+	background: #10161b;
+	border: 1px solid rgba(237,243,246,.14);
+	color: var(--tablet-text);
+	font-size: 13px;
+	font-weight: 800;
+	outline: 0;
+}
+
+.tablet-mode .lm-tablet-language-switcher select:focus {
+	border-color: rgba(243,178,63,.62);
+	box-shadow: 0 0 0 3px rgba(243,178,63,.13);
+}
+
+/* Narrow tablet toolbox with vertical tool lists. */
+.tablet-mode .lm-pcb-main {
+	grid-template-columns: 264px minmax(420px, 1fr) 344px;
+}
+
+.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+	grid-template-columns: 76px minmax(420px, 1fr) 344px;
+}
+
+@media (min-width: 1280px) {
+	.tablet-mode .lm-pcb-main {
+		grid-template-columns: 264px minmax(420px, 1fr) 344px;
+	}
+
+	.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+		grid-template-columns: 76px minmax(420px, 1fr) 344px;
+	}
+}
+
+.tablet-mode .lm-pcb-layers {
+	padding: 10px 8px;
+}
+
+.tablet-mode .lm-tablet-panel-header {
+	min-height: 42px;
+}
+
+.tablet-mode .lm-tablet-tool-search input {
+	min-height: 46px;
+}
+
+.tablet-mode .lm-tablet-category-button {
+	min-height: 52px;
+	grid-template-columns: 40px 1fr 28px;
+	gap: 8px;
+	padding: 6px 7px;
+}
+
+.tablet-mode .lm-tablet-category-icon {
+	width: 38px;
+	height: 38px;
+}
+
+.tablet-mode .lm-tablet-category-label {
+	font-size: 13px;
+}
+
+.tablet-mode .lm-tablet-category-count {
+	width: 28px;
+	min-width: 28px;
+	height: 28px;
+}
+
+.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid,
+.tablet-mode .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+	grid-template-columns: 1fr;
+	grid-auto-rows: 44px;
+	gap: 6px;
+}
+
+@media (min-width: 1280px) {
+	.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.tablet-mode .lm-tablet-tool-card {
+	height: 44px;
+	min-height: 44px;
+	display: grid;
+	grid-template-areas: "icon label";
+	grid-template-columns: 30px 1fr;
+	grid-template-rows: 1fr;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 8px;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon {
+	width: 28px;
+	height: 28px;
+	justify-self: start;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-label {
+	align-self: center;
+	min-height: 0;
+	display: block;
+	font-size: 11px;
+	line-height: 1.1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Final compact side panels: left fits labels/counts, right has an explicit collapse control. */
+.tablet-mode .lm-pcb-main {
+	grid-template-columns: 220px minmax(420px, 1fr) 344px;
+}
+
+.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+	grid-template-columns: 68px minmax(420px, 1fr) 344px;
+}
+
+@media (min-width: 1280px) {
+	.tablet-mode .lm-pcb-main {
+		grid-template-columns: 220px minmax(420px, 1fr) 344px;
+	}
+
+	.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+		grid-template-columns: 68px minmax(420px, 1fr) 344px;
+	}
+}
+
+.tablet-mode .lm-pcb-layers {
+	padding: 8px 6px;
+}
+
+.tablet-mode .lm-tablet-left-shell {
+	gap: 7px;
+}
+
+.tablet-mode .lm-tablet-panel-header {
+	min-height: 38px;
+	font-size: 12px;
+}
+
+.tablet-mode .lm-tablet-collapse {
+	width: 36px;
+	height: 36px;
+	border-radius: 7px;
+}
+
+.tablet-mode .lm-tablet-tool-search input {
+	min-height: 42px;
+	padding-left: 38px;
+	font-size: 12px;
+}
+
+.tablet-mode .lm-tablet-search-icon {
+	left: 11px;
+}
+
+.tablet-mode .lm-tablet-left-body {
+	gap: 6px;
+}
+
+.tablet-mode .lm-tablet-category-button {
+	min-height: 46px;
+	grid-template-columns: 34px 1fr 24px;
+	gap: 7px;
+	padding: 5px 6px;
+	border-radius: 8px;
+}
+
+.tablet-mode .lm-tablet-category-icon {
+	width: 34px;
+	height: 34px;
+	border-radius: 7px;
+}
+
+.tablet-mode .lm-tablet-category-icon .lm-tablet-lucide {
+	width: 17px;
+	height: 17px;
+}
+
+.tablet-mode .lm-tablet-category-label {
+	font-size: 12px;
+	font-weight: 760;
+}
+
+.tablet-mode .lm-tablet-category-count {
+	width: 24px;
+	min-width: 24px;
+	height: 24px;
+	font-size: 11px;
+}
+
+.tablet-mode .lm-tablet-tool-group .lm-tablet-tool-grid,
+.tablet-mode .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+	grid-auto-rows: 38px;
+	padding: 5px 6px 7px;
+}
+
+.tablet-mode .lm-tablet-tool-card {
+	height: 38px;
+	min-height: 38px;
+	grid-template-columns: 26px 1fr;
+	gap: 7px;
+	padding: 4px 6px;
+	border-radius: 7px;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon {
+	width: 24px;
+	height: 24px;
+	border-radius: 6px;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-icon .lm-tablet-lucide {
+	width: 14px;
+	height: 14px;
+}
+
+.tablet-mode .lm-tablet-tool-card .lm-tablet-tool-label {
+	font-size: 10.5px;
+}
+
+.tablet-mode .lm-tablet-tool-card.is-action .lm-tablet-tool-icon {
+	color: #d6ecff;
+	background: rgba(99,160,210,.16);
+}
+
+.tablet-mode .lm-tablet-tool-card.is-future {
+	opacity: .72;
+}
+
+.tablet-mode .lm-tablet-tool-card.is-future .lm-tablet-tool-icon {
+	color: #9eb0bd;
+	background: rgba(158,176,189,.12);
+}
+
+.tablet-mode .lm-tablet-right-tabs {
+	align-items: center;
+}
+
+.tablet-mode .lm-tablet-right-collapse {
+	flex: 0 0 auto;
+	width: 42px;
+	min-width: 42px;
+	height: 42px;
+	min-height: 42px;
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border-radius: 10px;
+	background: #202930;
+	color: var(--tablet-muted);
+	border: 1px solid rgba(237,243,246,.12);
+}
+
+.tablet-mode .lm-tablet-right-collapse:hover {
+	color: var(--tablet-text);
+	border-color: rgba(243,178,63,.3);
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-collapse {
+	background: rgba(243,178,63,.12);
+	color: var(--tablet-accent);
+}
+
+.tablet-mode .lm-tablet-tool-settings {
+	flex: 0 0 auto;
+	display: grid;
+	gap: 6px;
+	padding: 8px;
+	border-radius: 9px;
+	background: rgba(255,255,255,.04);
+	border: 1px solid rgba(237,243,246,.1);
+	box-shadow: 0 -8px 18px rgba(0,0,0,.12);
+}
+
+.tablet-mode .lm-tablet-tool-settings-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	color: var(--tablet-muted);
+	font-size: 10.5px;
+	font-weight: 800;
+}
+
+.tablet-mode .lm-tablet-tool-settings-title strong {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--tablet-accent);
+	font-size: 10.5px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tablet-mode .lm-tablet-tool-settings-body {
+	display: grid;
+	gap: 6px;
+}
+
+.tablet-mode .lm-tablet-tool-setting-row {
+	display: grid;
+	grid-template-columns: minmax(74px, 1fr) 82px;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	color: var(--tablet-text);
+	font-size: 10.5px;
+	font-weight: 700;
+}
+
+.tablet-mode .lm-tablet-tool-setting-row input,
+.tablet-mode .lm-tablet-tool-setting-row select {
+	width: 100%;
+	min-height: 30px;
+	margin: 0;
+	padding: 3px 6px;
+	border-radius: 7px;
+	background: #10161b;
+	border: 1px solid rgba(237,243,246,.14);
+	color: var(--tablet-text);
+	font-size: 12px;
+}
+
+.tablet-mode .lm-tablet-tool-settings-empty {
+	color: var(--tablet-muted);
+	font-size: 10.5px;
+	font-weight: 700;
+}
+
+.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-settings {
+	display: none;
+}
+
+/* Right panel collapse should release layout space instead of leaving a dark column. */
+.tablet-mode.lm-tablet-right-collapsed .lm-pcb-main {
+	grid-template-columns: 220px minmax(420px, 1fr) 48px;
+}
+
+.tablet-mode.lm-tablet-left-collapsed.lm-tablet-right-collapsed .lm-pcb-main {
+	grid-template-columns: 68px minmax(420px, 1fr) 48px;
+}
+
+@media (min-width: 1280px) {
+	.tablet-mode.lm-tablet-right-collapsed .lm-pcb-main {
+		grid-template-columns: 220px minmax(420px, 1fr) 48px;
+	}
+
+	.tablet-mode.lm-tablet-left-collapsed.lm-tablet-right-collapsed .lm-pcb-main {
+		grid-template-columns: 68px minmax(420px, 1fr) 48px;
+	}
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed {
+	min-width: 48px;
+	padding: 4px;
+	transform: none;
+	background: transparent;
+	border-left: 1px solid rgba(237,243,246,.08);
+	box-shadow: none;
+	overflow: visible;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-tabs {
+	padding: 4px 2px;
+	border-bottom: 0;
+	overflow: visible;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-tabs button:not(.lm-tablet-right-collapse),
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-body {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-collapse {
+	width: 40px;
+	min-width: 40px;
+	height: 40px;
+	min-height: 40px;
+}
+
+/* Keep the tool list in its own scroll area so tool settings never overlap it. */
+.tablet-mode .lm-pcb-layers {
+	display: flex;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.tablet-mode .lm-tablet-left-shell {
+	display: grid;
+	grid-template-rows: auto auto minmax(0, 1fr) auto;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.tablet-mode .lm-tablet-left-body {
+	min-height: 0;
+	overflow: auto;
+	padding-bottom: 8px;
+}
+
+.tablet-mode .lm-tablet-tool-settings {
+	margin-top: 0;
+	position: relative;
+	z-index: 1;
+}
+
+/* Responsive tablet layout: 768-1024px only. Keeps desktop rules untouched. */
+@media (min-width: 768px) and (max-width: 1024px) {
+	.tablet-mode.lm-pcb-tracer-app {
+		overflow: hidden;
+	}
+
+	.tablet-mode .lm-pcb-toolbar {
+		min-height: 64px;
+		max-height: 72px;
+		flex-wrap: nowrap !important;
+		overflow-x: auto;
+		overflow-y: hidden;
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: none;
+		padding: 7px 10px;
+		gap: 8px;
+	}
+
+	.tablet-mode .lm-pcb-toolbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.tablet-mode .lm-pcb-toolbar button,
+	.tablet-mode .lm-upload-btn,
+	.tablet-mode .lm-tablet-mode-toggle,
+	.tablet-mode .lm-tablet-overflow-button,
+	.tablet-mode .lm-tablet-language-switcher {
+		flex: 0 0 auto;
+		min-width: 44px;
+		min-height: 48px;
+		white-space: nowrap;
+	}
+
+	.tablet-mode .lm-pcb-main,
+	.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main,
+	.tablet-mode.lm-tablet-right-collapsed .lm-pcb-main,
+	.tablet-mode.lm-tablet-left-collapsed.lm-tablet-right-collapsed .lm-pcb-main {
+		position: relative;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) !important;
+		grid-template-rows: minmax(0, 1fr) 168px !important;
+		height: calc(100vh - 132px);
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.lm-pcb-tracer-fullscreen.tablet-mode .lm-pcb-main,
+	.lm-pcb-tracer-fullscreen.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main,
+	.lm-pcb-tracer-fullscreen.tablet-mode.lm-tablet-right-collapsed .lm-pcb-main {
+		height: auto;
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+
+	.tablet-mode .lm-pcb-canvas-panel {
+		grid-column: 1;
+		grid-row: 1;
+		width: 100%;
+		min-width: 0;
+		min-height: 0;
+		z-index: 1;
+	}
+
+	.tablet-mode .lm-pcb-layers {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 168px;
+		z-index: 100020;
+		width: 56px;
+		min-width: 56px;
+		max-width: 56px;
+		padding: 6px;
+		background: rgba(23, 28, 33, .96);
+		border-right: 1px solid rgba(237,243,246,.12);
+		box-shadow: 10px 0 26px rgba(0,0,0,.24);
+		overflow: visible;
+		transition: width .2s ease, max-width .2s ease, box-shadow .2s ease;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers {
+		width: min(320px, 82vw);
+		min-width: min(320px, 82vw);
+		max-width: min(320px, 82vw);
+		box-shadow: 20px 0 46px rgba(0,0,0,.42);
+	}
+
+	.tablet-mode .lm-pcb-layers .lm-tablet-left-shell {
+		width: 100%;
+		height: 100%;
+	}
+
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-left-shell {
+		align-items: center;
+	}
+
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-search,
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-settings,
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-label,
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-count,
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-tool-grid,
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-panel-header span {
+		display: none !important;
+	}
+
+	.tablet-mode .lm-tablet-collapse,
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-button {
+		width: 44px;
+		min-width: 44px;
+		height: 44px;
+		min-height: 44px;
+		padding: 0;
+	}
+
+	.tablet-mode .lm-pcb-layers.lm-tablet-icon-only .lm-tablet-category-button {
+		grid-template-columns: 1fr;
+		justify-items: center;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers .lm-tablet-tool-search {
+		display: block;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers .lm-tablet-tool-settings {
+		display: grid;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers .lm-tablet-category-label,
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers .lm-tablet-category-count {
+		display: block;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.tablet-mode .lm-pcb-properties,
+	.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed {
+		grid-column: 1;
+		grid-row: 2;
+		position: relative;
+		z-index: 20;
+		width: 100%;
+		min-width: 0;
+		height: 168px;
+		min-height: 150px;
+		max-height: 180px;
+		padding: 0;
+		transform: none;
+		background: rgba(32, 38, 43, .98);
+		border-top: 1px solid rgba(237,243,246,.12);
+		border-left: 0;
+		box-shadow: 0 -12px 30px rgba(0,0,0,.3);
+		overflow: hidden;
+		transition: height .2s ease, max-height .2s ease, min-height .2s ease;
+	}
+
+	.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed {
+		height: 46px;
+		min-height: 46px;
+		max-height: 46px;
+	}
+
+	.tablet-mode .lm-tablet-right-tabs {
+		min-height: 46px;
+		padding: 4px 8px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.tablet-mode .lm-tablet-right-tabs::-webkit-scrollbar {
+		display: none;
+	}
+
+	.tablet-mode .lm-tablet-right-tabs button {
+		min-width: 44px;
+		min-height: 38px;
+		flex: 0 0 auto;
+	}
+
+	.tablet-mode .lm-tablet-right-body {
+		height: 120px;
+		max-height: 128px;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		padding: 8px 12px 12px;
+	}
+
+	.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-body,
+	.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-tabs button:not(.lm-tablet-right-collapse) {
+		display: none;
+	}
+
+	.tablet-mode .lm-tablet-fab,
+	.tablet-mode .lm-tablet-ai-button,
+	.tablet-mode .lm-tablet-floating-toolbar,
+	.tablet-mode .lm-tablet-context-menu,
+	.tablet-mode .lm-tablet-ai-panel,
+	.tablet-mode .lm-tablet-ai-inputbar,
+	.tablet-mode .lm-tablet-overflow-menu {
+		z-index: 2147483001 !important;
+	}
+
+	.tablet-mode .lm-tablet-fab {
+		bottom: 188px;
+		max-width: calc(100vw - 24px);
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.tablet-mode .lm-tablet-fab::-webkit-scrollbar {
+		display: none;
+	}
+
+	.tablet-mode .lm-tablet-ai-button {
+		right: 14px;
+		bottom: 252px;
+	}
+
+	.tablet-mode button,
+	.tablet-mode input,
+	.tablet-mode select,
+	.tablet-mode textarea,
+	.tablet-mode [role="button"] {
+		min-height: 44px;
+	}
+}
+
+/* Prevent expanded left tool lists from painting over each other on short tablets. */
+@media (min-width: 768px) and (max-width: 1024px) {
+	.tablet-mode.lm-tablet-left-overlay-open .lm-pcb-layers {
+		overflow: hidden;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-left-shell {
+		display: grid;
+		grid-template-rows: auto auto minmax(0, 1fr) auto;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-left-body {
+		min-height: 0;
+		overflow-y: auto;
+		overflow-x: hidden;
+		-webkit-overflow-scrolling: touch;
+		overscroll-behavior: contain;
+		padding-bottom: 10px;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-group {
+		overflow: hidden;
+		flex: 0 0 auto;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-group .lm-tablet-tool-grid {
+		overflow: hidden;
+		max-height: 0;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+		display: grid;
+		max-height: clamp(150px, calc(100vh - 390px), 360px);
+		overflow-y: auto;
+		overflow-x: hidden;
+		-webkit-overflow-scrolling: touch;
+		overscroll-behavior: contain;
+		padding: 6px 8px 8px;
+		scrollbar-width: thin;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-group.is-open .lm-tablet-tool-grid::-webkit-scrollbar {
+		width: 10px;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-group.is-open .lm-tablet-tool-grid::-webkit-scrollbar-thumb {
+		background: rgba(237,243,246,.28);
+		border-radius: 999px;
+		border: 3px solid rgba(23,28,33,.96);
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-card {
+		flex: 0 0 auto;
+	}
+}
+
+@media (min-width: 768px) and (max-width: 1024px) and (max-height: 760px) {
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-settings {
+		display: none;
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-left-shell {
+		grid-template-rows: auto auto minmax(0, 1fr);
+	}
+
+	.tablet-mode.lm-tablet-left-overlay-open .lm-tablet-tool-group.is-open .lm-tablet-tool-grid {
+		max-height: clamp(180px, calc(100vh - 250px), 460px);
+	}
+}
+
+/* Floating tablet toolbox layout: collapsed side panels must not reserve canvas space. */
+.tablet-mode .lm-pcb-main,
+.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+	grid-template-columns: minmax(0, 1fr) minmax(300px, 344px) !important;
+	position: relative;
+}
+
+.tablet-mode.lm-tablet-right-collapsed .lm-pcb-main,
+.tablet-mode.lm-tablet-left-collapsed.lm-tablet-right-collapsed .lm-pcb-main {
+	grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.tablet-mode .lm-pcb-layers {
+	position: absolute;
+	left: 12px;
+	top: 86px;
+	z-index: 100020;
+	width: auto;
+	min-width: 0;
+	max-width: none;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.tablet-mode .lm-pcb-layers .lm-tablet-left-shell {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-canvas-panel {
+	grid-column: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.tablet-mode .lm-pcb-properties {
+	grid-column: 2;
+	width: 100%;
+	min-width: 300px;
+	max-width: 344px;
+	transform: none;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-tabs button:not(.lm-tablet-right-collapse) {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-body {
+	display: none;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed {
+	position: absolute;
+	grid-column: 1;
+	grid-row: 1;
+	top: 0;
+	right: 0;
+	z-index: 30;
+	width: 48px;
+	min-width: 48px;
+	max-width: 48px;
+	height: auto;
+	min-height: 0;
+	max-height: none;
+	padding: 4px;
+	background: transparent;
+	border-left: 0;
+	box-shadow: none;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-tabs,
+.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed .lm-tablet-right-collapse {
+	pointer-events: auto;
+}
+
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+	.tablet-mode .lm-pcb-main,
+	.tablet-mode.lm-tablet-left-collapsed .lm-pcb-main {
+		grid-template-columns: minmax(0, 1fr) !important;
+		grid-template-rows: minmax(0, 1fr) 168px !important;
+	}
+
+	.tablet-mode.lm-tablet-right-collapsed .lm-pcb-main,
+	.tablet-mode.lm-tablet-left-collapsed.lm-tablet-right-collapsed .lm-pcb-main {
+		grid-template-columns: minmax(0, 1fr) !important;
+		grid-template-rows: minmax(0, 1fr) 46px !important;
+	}
+
+	.tablet-mode .lm-pcb-properties {
+		grid-column: 1;
+		grid-row: 2;
+		min-width: 0;
+		max-width: none;
+	}
+
+	.tablet-mode .lm-pcb-properties.lm-tablet-panel-collapsed {
+		position: relative;
+		grid-column: 1;
+		grid-row: 2;
+		width: 100%;
+		min-width: 0;
+		max-width: none;
+		height: 46px;
+		min-height: 46px;
+		max-height: 46px;
+		pointer-events: auto;
+	}
+}
+
+.tablet-mode .lm-tablet-compact-palette {
+	position: fixed;
+	left: 356px;
+	top: 88px;
+	z-index: 2147483000;
+	width: min(384px, calc(100vw - 24px));
+	max-height: 180px;
+	padding: 6px;
+	border: 1px solid rgba(148, 163, 184, .34);
+	border-radius: 8px;
+	background: rgba(30, 37, 42, .98);
+	box-shadow: 0 18px 44px rgba(0,0,0,.42);
+	color: #edf3f6;
+	overflow: hidden;
+	touch-action: none;
+}
+
+.tablet-mode .lm-tablet-palette-handle {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) 34px 34px;
+	align-items: center;
+	gap: 6px;
+	min-height: 28px;
+	margin-bottom: 6px;
+	cursor: grab;
+	user-select: none;
+}
+
+.tablet-mode .lm-tablet-palette-handle strong {
+	font-size: 13px;
+	line-height: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.tablet-mode .lm-tablet-palette-grip {
+	color: #aeb9c2;
+	font-size: 19px;
+	line-height: 1;
+}
+
+.tablet-mode .lm-tablet-palette-toggle,
+.tablet-mode .lm-tablet-palette-settings-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 30px;
+	min-width: 34px;
+	min-height: 30px;
+	padding: 0;
+	border: 1px solid rgba(148, 163, 184, .24);
+	border-radius: 7px;
+	background: rgba(12, 17, 22, .62);
+	color: #edf3f6;
+}
+
+.tablet-mode .lm-tablet-palette-toggle svg,
+.tablet-mode .lm-tablet-palette-settings-button svg {
+	width: 18px;
+	height: 18px;
+}
+
+.tablet-mode .lm-tablet-compact-palette.is-expanded .lm-tablet-palette-toggle {
+	transform: rotate(180deg);
+}
+
+.tablet-mode .lm-tablet-compact-tools {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 5px;
+	max-height: 46px;
+	overflow: hidden;
+	transition: max-height .18s ease;
+}
+
+.tablet-mode .lm-tablet-compact-palette.is-expanded .lm-tablet-compact-tools,
+.tablet-mode .lm-tablet-compact-palette.is-configuring .lm-tablet-compact-tools {
+	max-height: 97px;
+	overflow-y: auto;
+	padding-right: 2px;
+}
+
+.tablet-mode .lm-tablet-compact-tools button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 46px;
+	min-width: 0;
+	min-height: 46px;
+	padding: 0;
+	border: 1px solid rgba(148, 163, 184, .18);
+	border-radius: 7px;
+	background: rgba(13, 18, 23, .74);
+	color: #edf3f6;
+	box-shadow: none;
+}
+
+.tablet-mode .lm-tablet-compact-tools button.is-selected {
+	border-color: rgba(255, 193, 7, .78);
+	background: rgba(255, 193, 7, .16);
+	color: #ffc107;
+}
+
+.tablet-mode .lm-tablet-compact-tools button svg {
+	width: 22px;
+	height: 22px;
+	stroke-width: 2.2;
+}
+
+.tablet-mode .lm-tablet-palette-config {
+	margin-top: 8px;
+	max-height: 158px;
+	overflow-y: auto;
+	padding: 8px;
+	border: 1px solid rgba(148, 163, 184, .2);
+	border-radius: 8px;
+	background: rgba(12, 17, 22, .88);
+}
+
+.tablet-mode .lm-tablet-palette-config[hidden] {
+	display: none;
+}
+
+.tablet-mode .lm-tablet-palette-config-title {
+	margin-bottom: 8px;
+	font-size: 12px;
+	font-weight: 750;
+	color: #ffc107;
+}
+
+.tablet-mode .lm-tablet-palette-config label {
+	display: grid;
+	grid-template-columns: 22px minmax(0, 1fr);
+	align-items: center;
+	gap: 8px;
+	min-height: 34px;
+	font-size: 12px;
+	color: #dfe7ec;
+}
+
+@media (max-width: 900px) {
+	.tablet-mode .lm-tablet-compact-palette {
+		left: 12px;
+		top: 86px;
+		width: min(360px, calc(100vw - 24px));
+	}
+
+	.tablet-mode .lm-tablet-compact-tools {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+}
+
+/* Compact top command strip so the floating toolbox has more room above the canvas. */
+.tablet-mode .lm-pcb-toolbar {
+	min-height: 50px;
+	max-height: 58px;
+	padding: 5px 8px;
+	gap: 6px;
+}
+
+.tablet-mode .lm-pcb-toolbar button,
+.tablet-mode .lm-upload-btn,
+.tablet-mode .lm-tablet-mode-toggle,
+.tablet-mode .lm-tablet-overflow-button {
+	min-width: 46px;
+	min-height: 40px;
+	padding: 0 12px;
+	border-radius: 8px;
+	font-size: 13px;
+	line-height: 1.1;
+}
+
+.tablet-mode .lm-tablet-mode-toggle {
+	min-width: auto;
+	padding: 0 8px;
+	gap: 6px;
+}
+
+.tablet-mode .lm-tablet-language-switcher {
+	min-height: 40px;
+	padding: 0 7px 0 9px;
+	gap: 6px;
+	border-radius: 8px;
+	font-size: 11.5px;
+}
+
+.tablet-mode .lm-tablet-language-switcher select {
+	min-width: 50px;
+	min-height: 30px;
+	padding: 0 6px;
+	font-size: 12px;
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+	.tablet-mode .lm-pcb-toolbar {
+		min-height: 48px;
+		max-height: 56px;
+		padding: 4px 7px;
+		gap: 5px;
+	}
+
+	.tablet-mode .lm-pcb-toolbar button,
+	.tablet-mode .lm-upload-btn,
+	.tablet-mode .lm-tablet-mode-toggle,
+	.tablet-mode .lm-tablet-overflow-button,
+	.tablet-mode .lm-tablet-language-switcher {
+		min-height: 38px;
+	}
+}
+
+.tablet-mode .lm-route-mode-switch {
+	grid-template-columns: repeat(4, 48px);
+	gap: 5px;
+	padding: 4px;
+	border-radius: 8px;
+}
+
+.tablet-mode .lm-route-mode-switch button,
+.tablet-mode .lm-tablet-route-mode button,
+.tablet-mode .lm-tablet-compact-tools button {
+	width: 48px;
+	height: 48px;
+	min-width: 48px;
+	min-height: 48px;
+	padding: 0;
+	border-radius: 8px;
+	touch-action: manipulation;
+}
+
+.tablet-mode .lm-pcb-toolbar button,
+.tablet-mode .lm-upload-btn,
+.tablet-mode .lm-tablet-mode-toggle,
+.tablet-mode .lm-tablet-overflow-button {
+	min-width: 48px;
+	min-height: 48px;
+}
+
+.tablet-mode .lm-tablet-route-mode-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 8px;
+	align-items: stretch;
+}
+
+.tablet-mode .lm-tablet-route-mode {
+	display: grid;
+	grid-template-columns: repeat(4, 48px);
+	gap: 6px;
+}
+
+.tablet-mode .lm-tablet-route-mode button,
+.tablet-mode .lm-route-mode-switch button {
+	border: 1px solid rgba(148, 163, 184, .22);
+	background: rgba(13, 18, 23, .74);
+	color: #edf3f6;
+	font-weight: 750;
+}
+
+.tablet-mode .lm-tablet-route-mode button.is-active,
+.tablet-mode .lm-route-mode-switch button.is-active {
+	border-color: rgba(255, 193, 7, .82);
+	background: rgba(255, 193, 7, .18);
+	color: #ffc107;
+}
+
+.tablet-mode .lm-view-side-switch {
+	grid-template-columns: repeat(2, 56px);
+	gap: 5px;
+	padding: 4px;
+	border-radius: 8px;
+}
+
+.tablet-mode .lm-view-side-switch button {
+	width: 56px;
+	height: 48px;
+	min-width: 56px;
+	min-height: 48px;
+	padding: 0;
+	border-radius: 8px;
+	border: 1px solid rgba(148, 163, 184, .22);
+	background: rgba(13, 18, 23, .74);
+	color: #edf3f6;
+	font-weight: 750;
+	touch-action: manipulation;
+}
+
+.tablet-mode .lm-view-side-switch button.is-active {
+	border-color: rgba(72, 224, 164, .82);
+	background: rgba(72, 224, 164, .18);
+	color: #48e0a4;
+}

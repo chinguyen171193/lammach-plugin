@@ -1,2 +1,0 @@
-<?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
-<div class="wrap dat-ai-office-admin"><h1>Workflow demo</h1><div class="dat-ai-office-grid"><?php foreach ( $data['workflows'] as $workflow ) : ?><article><b><?php echo esc_html( $workflow['name'] ); ?></b><p><?php echo esc_html( $workflow['description'] ); ?></p><ol><?php foreach ( $workflow['steps'] as $step ) : ?><li><?php echo esc_html( $step[1] ); ?> <small>(<?php echo esc_html( $step[2] ); ?>s)</small></li><?php endforeach; ?></ol></article><?php endforeach; ?></div></div>
