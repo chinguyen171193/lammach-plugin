@@ -480,8 +480,11 @@
 				if (!object.isMesh) return;
 				object.castShadow = true;
 				object.receiveShadow = true;
+				// Retargeted meshes can otherwise keep a stale bounding box and disappear
+				// from view even while their label remains visible.
+				object.frustumCulled = false;
 				const materials = Array.isArray(object.material) ? object.material : [object.material];
-				materials.forEach(material => { if (material) material.side = THREE.FrontSide; });
+				materials.forEach(material => { if (material) material.side = retargetMode === 'Retargeted' ? THREE.DoubleSide : THREE.FrontSide; });
 			});
 			character.add(model);
 			this.scene.add(character);
@@ -553,11 +556,38 @@
 
 		playOfficeWorkState(worker) {
 			const states = global.LM_NPC_STATES;
+			if (worker.record.definition.retarget_mode === 'Retargeted') {
+				this.setSafeSeatedWorkPose(worker.record);
+				return;
+			}
 			const preferred = [ states.TYPING, states.USING_MOUSE, states.READING, states.THINKING, states.SITTING_IDLE, states.IDLE ];
 			const offset = worker.phase % preferred.length;
 			const state = preferred.slice(offset).concat(preferred.slice(0, offset)).find(candidate => worker.record.animationController.hasAnimation(candidate)) || states.IDLE;
 			worker.record.animationController.setState(state);
 			worker.phase = (worker.phase + 1) % preferred.length;
+		}
+
+		setSafeSeatedWorkPose(record) {
+			// The female model uses a different skeleton. Until a verified seated clip
+			// is supplied, preserve its intact bind pose and bend its arms toward the
+			// keyboard. This keeps the second employee visibly working instead of
+			// allowing an unverified retarget clip to collapse the mesh.
+			record.mixer.stopAllAction();
+			const posed = new Set();
+			(record.skeletonMeshes || [ record.primaryMesh ]).forEach(mesh => {
+				if (!posed.has(mesh.skeleton)) {
+					mesh.skeleton.pose();
+					posed.add(mesh.skeleton);
+				}
+			});
+			const bones = new Map(record.skeleton.bones.map(bone => [ bone.name, bone ]));
+			[ 'UpperArmL', 'UpperArmR' ].forEach(name => { const bone = bones.get(name); if (bone) bone.rotation.x = -0.82; });
+			[ 'LowerArmL', 'LowerArmR' ].forEach(name => { const bone = bones.get(name); if (bone) bone.rotation.x = -0.66; });
+			[ 'HandL', 'HandR', 'WristL', 'WristR' ].forEach(name => { const bone = bones.get(name); if (bone) bone.rotation.x = -0.18; });
+			record.model.updateMatrixWorld(true);
+			record.animationController.currentAction = null;
+			record.animationController.currentState = 'WORKING';
+			record.animationController.currentAnimation = 'Tư thế làm việc tại bàn';
 		}
 
 		updateOfficeWork(delta) {
