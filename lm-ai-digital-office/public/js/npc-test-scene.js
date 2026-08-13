@@ -426,7 +426,9 @@
 				const available = this.characterDefinitions.filter(definition => definition.model && definition.model.available);
 				const install = async definition => { try { const [model, assets] = await Promise.all([this.loadModel(definition), this.loadAnimationAssets(definition)]); if (!this.destroyed) this.installCharacter(definition, model, assets); } catch (error) { global.console.error('[LM AI Office NPC] Không tải được ' + definition.id + ':', error); } };
 				const reference = available.find(definition => definition.id === 'employee_001'); if (reference) await install(reference);
-				await Promise.all(available.filter(definition => definition.id !== 'employee_001').map(install));
+				const secondEmployee = available.find(definition => definition.id === 'employee_002');
+				if (this.officeMode && secondEmployee && this.characters.has('employee_001')) this.installOfficeSurrogate(secondEmployee);
+				await Promise.all(available.filter(definition => definition.id !== 'employee_001' && !(this.officeMode && definition.id === 'employee_002')).map(install));
 				if (!this.characters.size) throw new Error('Không có model nhân vật khả dụng.');
 				this.evaluateSkeletonCompatibility();
 			this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value);
@@ -497,6 +499,41 @@
 			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null };
 			this.characters.set(definition.id, record);
 			this.logSkeleton(record);
+		}
+
+		installOfficeSurrogate(definition) {
+			const THREE = global.THREE;
+			const reference = this.characters.get('employee_001');
+			if (!reference || !THREE.SkeletonUtils) return;
+			const model = THREE.SkeletonUtils.clone(reference.model);
+			model.traverse(object => {
+				if (!object.isMesh) return;
+				object.castShadow = true;
+				object.receiveShadow = true;
+				object.frustumCulled = false;
+				const materials = (Array.isArray(object.material) ? object.material : [ object.material ]).map(material => {
+					if (!material) return material;
+					const variant = material.clone();
+					if (variant.color) variant.color.offsetHSL(0.56, -0.12, 0.05);
+					return variant;
+				});
+				object.material = Array.isArray(object.material) ? materials : materials[0];
+			});
+			const character = new THREE.Group();
+			character.name = definition.id;
+			character.add(model);
+			this.scene.add(character);
+			this.addCharacterLabel(character, definition);
+			const skeletonSource = prepareModelSkeletons(model, true);
+			const bindClip = new THREE.AnimationClip('__office_bind_pose__', 0, []);
+			const animationMap = Object.keys(global.LM_NPC_STATES).reduce((map, state) => { map[state] = bindClip.name; return map; }, {});
+			const mixer = new THREE.AnimationMixer(model);
+			const animationController = new global.LM_NPCAnimationController(mixer, [ bindClip ], animationMap, { fadeDuration: 0.1 });
+			const characterController = new global.LM_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, workstationResolver: id => this.workstations.get(id) });
+			animationController.setState(global.LM_NPC_STATES.IDLE);
+			const officeDefinition = Object.assign({}, definition, { retarget_mode: 'Retargeted', skeleton_status: 'Model làm việc ổn định' });
+			this.characters.set(definition.id, { id: definition.id, definition: officeDefinition, character, model, mixer, animationController, characterController, clips: [], primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: 'Model làm việc ổn định', retargetStatus: 'Office surrogate', sourceRig: null, skeletonHelper: null });
+			global.console.warn('[LM AI Office NPC] Employee 002 dùng model 3D ổn định trong văn phòng vì tệp Worker gốc có skin bounds không hợp lệ.');
 		}
 
 		placeModelOnFloor(model) {
