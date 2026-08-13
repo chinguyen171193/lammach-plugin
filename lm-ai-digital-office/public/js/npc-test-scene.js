@@ -503,37 +503,56 @@
 
 		installOfficeSurrogate(definition) {
 			const THREE = global.THREE;
-			const reference = this.characters.get('employee_001');
-			if (!reference || !THREE.SkeletonUtils) return;
-			const model = THREE.SkeletonUtils.clone(reference.model);
-			model.traverse(object => {
-				if (!object.isMesh) return;
-				object.castShadow = true;
-				object.receiveShadow = true;
-				object.frustumCulled = false;
-				const materials = (Array.isArray(object.material) ? object.material : [ object.material ]).map(material => {
-					if (!material) return material;
-					const variant = material.clone();
-					if (variant.color) variant.color.offsetHSL(0.56, -0.12, 0.05);
-					return variant;
-				});
-				object.material = Array.isArray(object.material) ? materials : materials[0];
-			});
-			const character = new THREE.Group();
+			// The supplied Worker asset has invalid skin bounds in WebGL and has twice
+			// rendered as giant geometry. Use a self-contained office avatar here: its
+			// size is expressed only in scene units and cannot inherit that bad rig.
+			const character = this.createOfficeEmployeeTwo();
 			character.name = definition.id;
-			character.add(model);
 			this.scene.add(character);
 			this.addCharacterLabel(character, definition);
-			const skeletonSource = prepareModelSkeletons(model, true);
-			const bindClip = new THREE.AnimationClip('__office_bind_pose__', 0, []);
-			const animationMap = Object.keys(global.LM_NPC_STATES).reduce((map, state) => { map[state] = bindClip.name; return map; }, {});
-			const mixer = new THREE.AnimationMixer(model);
-			const animationController = new global.LM_NPCAnimationController(mixer, [ bindClip ], animationMap, { fadeDuration: 0.1 });
+			const animationController = {
+				currentAction: null, currentState: 'WORKING', currentAnimation: 'Gõ bàn phím', elapsed: 0,
+				setState(state) { this.currentState = state; }, hasAnimation() { return false; },
+				getState() { return this.currentState; }, getAnimation() { return this.currentAnimation; }, destroy() {},
+				update(delta) {
+					this.elapsed += delta;
+					const swing = Math.sin(this.elapsed * 6) * 0.24;
+					if (character.userData.leftArm) character.userData.leftArm.rotation.x = -1.05 + swing;
+					if (character.userData.rightArm) character.userData.rightArm.rotation.x = -1.05 - swing;
+				}
+			};
 			const characterController = new global.LM_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, workstationResolver: id => this.workstations.get(id) });
-			animationController.setState(global.LM_NPC_STATES.IDLE);
 			const officeDefinition = Object.assign({}, definition, { retarget_mode: 'Retargeted', skeleton_status: 'Model làm việc ổn định' });
-			this.characters.set(definition.id, { id: definition.id, definition: officeDefinition, character, model, mixer, animationController, characterController, clips: [], primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: 'Model làm việc ổn định', retargetStatus: 'Office surrogate', sourceRig: null, skeletonHelper: null });
-			global.console.warn('[LM AI Office NPC] Employee 002 dùng model 3D ổn định trong văn phòng vì tệp Worker gốc có skin bounds không hợp lệ.');
+			this.characters.set(definition.id, { id: definition.id, definition: officeDefinition, character, model: character, mixer: { stopAllAction() {} }, animationController, characterController, clips: [], primaryMesh: null, skeleton: { bones: [] }, skeletonMeshes: [], skeletonStatus: 'Avatar văn phòng ổn định', retargetStatus: 'Office avatar', sourceRig: null, skeletonHelper: null, isProcedural: true });
+			global.console.warn('[LM AI Office NPC] Employee 002 dùng avatar văn phòng độc lập vì tệp Worker gốc có skin bounds không hợp lệ.');
+		}
+
+		createOfficeEmployeeTwo() {
+			const THREE = global.THREE;
+			const avatar = new THREE.Group();
+			const skin = new THREE.MeshStandardMaterial({ color: 0xd69a76, roughness: 0.72 });
+			const hair = new THREE.MeshStandardMaterial({ color: 0x38251f, roughness: 0.86 });
+			const blouse = new THREE.MeshStandardMaterial({ color: 0x805ad5, roughness: 0.7 });
+			const skirt = new THREE.MeshStandardMaterial({ color: 0x26375a, roughness: 0.78 });
+			const shoes = new THREE.MeshStandardMaterial({ color: 0x1d2433, roughness: 0.8 });
+			const make = (geometry, material, x, y, z) => {
+				const mesh = new THREE.Mesh(geometry, material);
+				mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; avatar.add(mesh); return mesh;
+			};
+			make(new THREE.CylinderGeometry(0.26, 0.31, 0.58, 16), blouse, 0, 1.02, 0);
+			make(new THREE.SphereGeometry(0.25, 18, 14), skin, 0, 1.53, -0.02);
+			make(new THREE.SphereGeometry(0.27, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.58), hair, 0, 1.63, 0.02);
+			make(new THREE.BoxGeometry(0.48, 0.22, 0.38), skirt, 0, 0.66, 0.08);
+			const leftArm = make(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 12), skin, -0.31, 1.1, -0.18);
+			const rightArm = make(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 12), skin, 0.31, 1.1, -0.18);
+			leftArm.rotation.x = rightArm.rotation.x = -1.05;
+			make(new THREE.CylinderGeometry(0.09, 0.1, 0.44, 12), skin, -0.16, 0.32, 0.2).rotation.x = -Math.PI / 2;
+			make(new THREE.CylinderGeometry(0.09, 0.1, 0.44, 12), skin, 0.16, 0.32, 0.2).rotation.x = -Math.PI / 2;
+			make(new THREE.BoxGeometry(0.18, 0.1, 0.28), shoes, -0.16, 0.12, 0.4);
+			make(new THREE.BoxGeometry(0.18, 0.1, 0.28), shoes, 0.16, 0.12, 0.4);
+			avatar.userData.leftArm = leftArm;
+			avatar.userData.rightArm = rightArm;
+			return avatar;
 		}
 
 		placeModelOnFloor(model) {
@@ -593,6 +612,7 @@
 
 		playOfficeWorkState(worker) {
 			const states = global.LM_NPC_STATES;
+			if (worker.record.isProcedural) return;
 			if (worker.record.definition.retarget_mode === 'Retargeted') {
 				this.setSafeSeatedWorkPose(worker.record);
 				return;
@@ -605,6 +625,7 @@
 		}
 
 		setSafeSeatedWorkPose(record) {
+			if (record.isProcedural) return;
 			// The female model uses a different skeleton. Until a verified seated clip
 			// is supplied, preserve its intact bind pose at the workstation instead of
 			// allowing an unverified retarget clip to collapse or distort the mesh.
