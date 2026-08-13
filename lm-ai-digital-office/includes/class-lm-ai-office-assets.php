@@ -56,7 +56,7 @@ class LM_AI_Office_Assets {
 			wp_enqueue_script( 'lm-ai-office-agent-sprites-admin', LM_AI_OFFICE_URL . 'admin/js/agent-sprites-admin.js', array( 'lm-ai-office-admin', 'lm-ai-office-agent-sprite-player' ), LM_AI_OFFICE_VERSION, true );
 		}
 		if ( 'lm-ai-office-preview' === $current_page || false !== strpos( (string) $hook, 'preview' ) ) {
-			$this->public_assets( false );
+			$this->npc_test_assets( false );
 		}
 	}
 

@@ -197,6 +197,7 @@
 			this.root = root;
 			this.canvasHost = root.querySelector('[data-npc-canvas]');
 			this.panel = root.querySelector('[data-npc-debug]');
+			this.officeMode = root.dataset.npcMode === 'office';
 			this.destroyed = false;
 			this.previousTime = 0;
 			this.animationFrame = 0;
@@ -247,6 +248,7 @@
 			floor.receiveShadow = true;
 			this.scene.add(floor);
 			this.scene.add(new THREE.GridHelper(18, 18, 0x35596d, 0x244250));
+			if (this.officeMode) this.addOfficeDecor();
 			this.markers = {
 				A: new THREE.Vector3(-2.3, 0, -1.4),
 				B: new THREE.Vector3(2.5, 0, -0.75),
@@ -258,7 +260,40 @@
 			this.addWorkstation('desk_02', new THREE.Vector3(-2.7, 0, 1.5));
 		}
 
+		addOfficeDecor() {
+			const THREE = global.THREE;
+			const wall = new THREE.MeshStandardMaterial({ color: 0x15364a, roughness: 0.85 });
+			const trim = new THREE.MeshStandardMaterial({ color: 0x2a637c, roughness: 0.62, metalness: 0.15 });
+			const glass = new THREE.MeshStandardMaterial({ color: 0x79d7ef, emissive: 0x16485c, emissiveIntensity: 0.55, roughness: 0.18, metalness: 0.32 });
+			const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 4.8, 0.18), wall);
+			backWall.position.set(0, 2.4, -4.6);
+			backWall.receiveShadow = true;
+			this.scene.add(backWall);
+			[ -3.4, 0, 3.4 ].forEach(x => {
+				const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(2.35, 1.5, 0.12), trim);
+				windowFrame.position.set(x, 2.65, -4.48);
+				const pane = new THREE.Mesh(new THREE.BoxGeometry(2.12, 1.28, 0.04), glass);
+				pane.position.set(x, 2.65, -4.38);
+				this.scene.add(windowFrame, pane);
+			});
+			const rug = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 6.2), new THREE.MeshStandardMaterial({ color: 0x10283a, roughness: 0.96 }));
+			rug.rotation.x = -Math.PI / 2;
+			rug.position.y = 0.011;
+			rug.position.z = 0.35;
+			rug.receiveShadow = true;
+			this.scene.add(rug);
+			[ -4.7, 4.7 ].forEach(x => {
+				const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.42, 16), new THREE.MeshStandardMaterial({ color: 0x8b5635, roughness: 0.8 }));
+				pot.position.set(x, 0.21, -3.6);
+				const plant = new THREE.Mesh(new THREE.SphereGeometry(0.52, 16, 12), new THREE.MeshStandardMaterial({ color: 0x2f9a78, roughness: 0.74 }));
+				plant.scale.y = 1.35;
+				plant.position.set(x, 0.85, -3.6);
+				this.scene.add(pot, plant);
+			});
+		}
+
 		addMarker(name, position, color) {
+			if (this.officeMode) return;
 			const THREE = global.THREE;
 			const markerColor = color || 0x45d9ff;
 			const marker = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.04, 24), new THREE.MeshStandardMaterial({ color: markerColor, emissive: markerColor, emissiveIntensity: 0.28 }));
@@ -394,7 +429,9 @@
 				await Promise.all(available.filter(definition => definition.id !== 'employee_001').map(install));
 				if (!this.characters.size) throw new Error('Không có model nhân vật khả dụng.');
 				this.evaluateSkeletonCompatibility();
-				this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value); this.start();
+			this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value);
+			if (this.officeMode) this.startOfficeWork();
+			this.start();
 			} catch (error) {
 				global.console.error('[LM AI Office NPC] Không tải được Character Registry:', error);
 				this.showError('Không tải được Character Registry hoặc model NPC. Mở Console để xem lỗi chi tiết.');
@@ -490,6 +527,45 @@
 			this.scenario = null; this.activeCharacterId = employeeId; this.character = record.character; this.model = record.model; this.mixer = record.mixer; this.animationController = record.animationController; this.characterController = record.characterController; this.status = record.definition.name + ' · Skeleton: ' + record.skeletonStatus;
 			const select = this.root.querySelector('[data-npc-character-select]'); if (select) select.value = employeeId;
 			this.setClipList(record.clips); this.setWorkstationAnimationScan([]); this.setBoneMap(record);
+		}
+
+		startOfficeWork() {
+			const assignments = [
+				{ id: 'employee_001', desk: 'desk_01' },
+				{ id: 'employee_002', desk: 'desk_02' }
+			];
+			this.officeWorkers = assignments.reduce((workers, assignment) => {
+				const record = this.characters.get(assignment.id);
+				const workstation = this.workstations.get(assignment.desk);
+				if (!record || !workstation) return workers;
+				record.character.position.copy(workstation.chair.sitPoint);
+				record.character.rotation.y = workstation.chair.sitRotation;
+				record.characterController.target = null;
+				record.characterController.currentInteraction = workstation.id;
+				record.characterController.targetObject = workstation.computer.id;
+				workers.push({ record, workstation, phase: workers.length });
+				return workers;
+			}, []);
+			this.officeWorkElapsed = 0;
+			this.officeWorkers.forEach(worker => this.playOfficeWorkState(worker));
+			this.status = this.officeWorkers.length === 2 ? 'Employee 001 và Employee 002 đang làm việc.' : 'Đang chờ model nhân vật thứ hai.';
+		}
+
+		playOfficeWorkState(worker) {
+			const states = global.LM_NPC_STATES;
+			const preferred = [ states.TYPING, states.USING_MOUSE, states.READING, states.THINKING, states.SITTING_IDLE, states.IDLE ];
+			const offset = worker.phase % preferred.length;
+			const state = preferred.slice(offset).concat(preferred.slice(0, offset)).find(candidate => worker.record.animationController.hasAnimation(candidate)) || states.IDLE;
+			worker.record.animationController.setState(state);
+			worker.phase = (worker.phase + 1) % preferred.length;
+		}
+
+		updateOfficeWork(delta) {
+			if (!this.officeWorkers || !this.officeWorkers.length) return;
+			this.officeWorkElapsed += delta;
+			if (this.officeWorkElapsed < 6) return;
+			this.officeWorkElapsed = 0;
+			this.officeWorkers.forEach(worker => this.playOfficeWorkState(worker));
 		}
 
 		evaluateSkeletonCompatibility() {
@@ -664,6 +740,7 @@
 			const delta = Math.min(0.05, this.previousTime ? (time - this.previousTime) / 1000 : 0);
 			this.previousTime = time;
 			if (this.characters) this.characters.forEach(record => { record.animationController.update(delta); record.characterController.update(delta); });
+			if (this.officeMode) this.updateOfficeWork(delta);
 			this.updateScenario(delta);
 			this.updatePanel();
 			this.renderer.render(this.scene, this.camera);

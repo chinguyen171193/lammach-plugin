@@ -1,6 +1,9 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
-<section id="<?php echo esc_attr( $config['id'] ); ?>" class="lm-npc-test" data-lm-npc-test data-npc-characters-endpoint="<?php echo esc_url( $config['characters_endpoint'] ); ?>" data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" style="--lm-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
+<section id="<?php echo esc_attr( $config['id'] ); ?>" class="lm-npc-test<?php echo $config['office_mode'] ? ' lm-npc-test--office' : ''; ?>" data-lm-npc-test data-npc-mode="<?php echo $config['office_mode'] ? 'office' : 'test'; ?>" data-npc-characters-endpoint="<?php echo esc_url( $config['characters_endpoint'] ); ?>" data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" style="--lm-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
 	<div class="lm-npc-test__canvas-wrap" data-npc-canvas></div>
+	<?php if ( $config['office_mode'] ) : ?>
+		<div class="lm-npc-test__office-title"><span>LM AI DIGITAL OFFICE</span><strong>2 nhân vật 3D đang làm việc</strong></div>
+	<?php endif; ?>
 	<aside class="lm-npc-test__panel" data-npc-debug aria-label="NPC debug panel">
 		<h2>NPC Test</h2>
 		<label for="lm-npc-character-select">Nhân vật đang điều khiển</label>

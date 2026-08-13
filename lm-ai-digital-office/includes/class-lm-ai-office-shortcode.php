@@ -5,6 +5,7 @@ class LM_AI_Office_Shortcode {
 	public function __construct() {
 		add_shortcode( 'lm_ai_office', array( $this, 'render' ) );
 		add_shortcode( 'lm_ai_office_npc_test', array( $this, 'render_npc_test' ) );
+		add_shortcode( 'lm_ai_office_3d', array( $this, 'render_3d_office' ) );
 	}
 
 	public function render( $atts ) {
@@ -32,17 +33,24 @@ class LM_AI_Office_Shortcode {
 	 * 2.5D office renderer until the movement model is ready to be shared.
 	 */
 	public function render_npc_test( $atts ) {
-		$atts = shortcode_atts( array( 'height' => '620' ), $atts, 'lm_ai_office_npc_test' );
+		$atts = shortcode_atts( array( 'height' => '620', 'office' => 'no' ), $atts, 'lm_ai_office_npc_test' );
 		$config = array(
 			'id'         => 'lm-ai-office-npc-' . wp_generate_uuid4(),
 			'height'     => min( 1000, max( 380, absint( $atts['height'] ) ) ),
 			'characters_endpoint' => rest_url( 'lm-ai-office/v1/characters' ),
 			'version'    => LM_AI_OFFICE_BUILD,
+			'office_mode' => 'yes' === $atts['office'],
 		);
 		$assets = new LM_AI_Office_Assets();
 		$assets->npc_test_assets();
 		ob_start();
 		include LM_AI_OFFICE_DIR . 'templates/npc-test-scene.php';
 		return ob_get_clean();
+	}
+
+	/** Renders the two registered 3D employees working at their desks. */
+	public function render_3d_office( $atts ) {
+		$atts['office'] = 'yes';
+		return $this->render_npc_test( $atts );
 	}
 }
