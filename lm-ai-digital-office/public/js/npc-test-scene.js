@@ -11,10 +11,15 @@
 		return clips.filter(clip => WORKSTATION_KEYWORDS.some(keyword => clip.name.toLowerCase().includes(keyword)));
 	}
 
+	function debugEmployeeAnimationEnabled(root) {
+		const params = new URLSearchParams(global.location && global.location.search ? global.location.search : '');
+		return global.DEBUG_EMPLOYEE_ANIMATION === true || params.get('debugEmployeeAnimation') === '1' || (root && root.dataset && root.dataset.npcDebugEmployeeAnimation === 'true');
+	}
+
 	function animationMapFrom(actions) {
 		return Object.freeze({
 			IDLE: actions.IDLE || '', WALKING: actions.WALKING || '', ALIGNING_TO_CHAIR: actions.IDLE || '', WAITING_AT_CHAIR: actions.IDLE || '',
-			SITTING_DOWN: actions.SIT_DOWN || '', SITTING_IDLE: actions.SITTING_IDLE || '', WORKING: actions.TYPING || '', TYPING: actions.TYPING || '',
+			SITTING_DOWN: actions.SIT_DOWN || '', SITTING_IDLE: actions.SITTING_IDLE || '', WORKING: actions.WORKING || actions.TYPING || '', TYPING: actions.TYPING || '',
 			USING_MOUSE: actions.USING_MOUSE || '', THINKING: actions.THINKING || '', READING: actions.READING || '', WRITING: actions.WRITING || '', TALKING: actions.TALKING || '', PHONE_CALL: actions.PHONE_CALL || '', STANDING_UP: actions.STAND_UP || ''
 		});
 	}
@@ -48,7 +53,7 @@
 		return { matchingNames, referenceBones: reference.bones.length, coverage, hierarchy, compatible: coverage >= .9 && hierarchy >= .85 };
 	}
 
-	function sourceRigFromAnimationFBX(source) {
+	function sourceRigFromAnimationObject(source) {
 		const bones = [];
 		source.traverse(object => { if (object.isBone) bones.push(object); });
 		if (!bones.length) return null;
@@ -61,7 +66,7 @@
 	}
 
 	function normalizeBoneName(name) {
-		return String(name || '').replace(/^.*:/, '').replace(/^mixamorig/i, '').replace(/[\s._-]/g, '').toLowerCase();
+		return String(name || '').replace(/^.*:/, '').replace(/^mixamorig/i, '').replace(/^DEF[-_]?/i, '').replace(/[\s._-]/g, '').toLowerCase();
 	}
 
 	function isFootBoneName(name) {
@@ -74,25 +79,25 @@
 		skeleton.bones.forEach(bone => { const key = normalizeBoneName(bone.name); if (key && !normalized.has(key)) normalized.set(key, bone.name); });
 		const pick = (...choices) => choices.find(name => names.has(name)) || choices.map(normalizeBoneName).map(name => normalized.get(name)).find(Boolean) || '';
 		return {
-			hips: pick('Hips', 'Pelvis', 'mixamorigHips', 'mixamorig:Hips', 'Bip001 Pelvis'),
-			spine: pick('Abdomen', 'Spine', 'mixamorigSpine', 'mixamorig:Spine', 'Bip001 Spine'),
-			chest: pick('Chest', 'Torso', 'Spine1', 'Spine2', 'mixamorigSpine1', 'mixamorigSpine2', 'mixamorig:Spine1', 'mixamorig:Spine2', 'Bip001 Spine1', 'Bip001 Spine2'),
-			neck: pick('Neck', 'mixamorigNeck', 'mixamorig:Neck', 'Bip001 Neck'),
-			head: pick('Head', 'mixamorigHead', 'mixamorig:Head', 'Bip001 Head'),
-			leftShoulder: pick('ShoulderL', 'Shoulder.L', 'LeftShoulder', 'mixamorigLeftShoulder', 'mixamorig:LeftShoulder', 'Bip001 L Clavicle'),
-			leftUpperArm: pick('UpperArmL', 'UpperArm.L', 'LeftArm', 'LeftUpperArm', 'mixamorigLeftArm', 'mixamorig:LeftArm', 'Bip001 L UpperArm'),
-			leftLowerArm: pick('LowerArmL', 'LowerArm.L', 'LeftForeArm', 'LeftLowerArm', 'mixamorigLeftForeArm', 'mixamorig:LeftForeArm', 'Bip001 L Forearm'),
-			leftHand: pick('HandL', 'Hand.L', 'WristL', 'Wrist.L', 'LeftHand', 'mixamorigLeftHand', 'mixamorig:LeftHand', 'Bip001 L Hand'),
-			rightShoulder: pick('ShoulderR', 'Shoulder.R', 'RightShoulder', 'mixamorigRightShoulder', 'mixamorig:RightShoulder', 'Bip001 R Clavicle'),
-			rightUpperArm: pick('UpperArmR', 'UpperArm.R', 'RightArm', 'RightUpperArm', 'mixamorigRightArm', 'mixamorig:RightArm', 'Bip001 R UpperArm'),
-			rightLowerArm: pick('LowerArmR', 'LowerArm.R', 'RightForeArm', 'RightLowerArm', 'mixamorigRightForeArm', 'mixamorig:RightForeArm', 'Bip001 R Forearm'),
-			rightHand: pick('HandR', 'Hand.R', 'WristR', 'Wrist.R', 'RightHand', 'mixamorigRightHand', 'mixamorig:RightHand', 'Bip001 R Hand'),
-			leftUpperLeg: pick('UpperLegL', 'UpperLeg.L', 'LeftUpLeg', 'LeftUpperLeg', 'LeftThigh', 'mixamorigLeftUpLeg', 'mixamorig:LeftUpLeg', 'Bip001 L Thigh'),
-			leftLowerLeg: pick('LowerLegL', 'LowerLeg.L', 'LeftLeg', 'LeftLowerLeg', 'LeftShin', 'mixamorigLeftLeg', 'mixamorig:LeftLeg', 'Bip001 L Calf'),
-			leftFoot: pick('FootL', 'Foot.L', 'LeftFoot', 'mixamorigLeftFoot', 'mixamorig:LeftFoot', 'Bip001 L Foot'),
-			rightUpperLeg: pick('UpperLegR', 'UpperLeg.R', 'RightUpLeg', 'RightUpperLeg', 'RightThigh', 'mixamorigRightUpLeg', 'mixamorig:RightUpLeg', 'Bip001 R Thigh'),
-			rightLowerLeg: pick('LowerLegR', 'LowerLeg.R', 'RightLeg', 'RightLowerLeg', 'RightShin', 'mixamorigRightLeg', 'mixamorig:RightLeg', 'Bip001 R Calf'),
-			rightFoot: pick('FootR', 'Foot.R', 'RightFoot', 'mixamorigRightFoot', 'mixamorig:RightFoot', 'Bip001 R Foot')
+			hips: pick('Hips', 'hips', 'hip', 'Pelvis', 'DEF-hips', 'mixamorigHips', 'mixamorig:Hips', 'Bip001 Pelvis'),
+			spine: pick('Abdomen', 'Spine', 'spine_01', 'DEF-spine.001', 'mixamorigSpine', 'mixamorig:Spine', 'Bip001 Spine'),
+			chest: pick('Chest', 'Torso', 'Spine1', 'Spine2', 'spine_02', 'spine_03', 'DEF-spine.002', 'DEF-spine.003', 'mixamorigSpine1', 'mixamorigSpine2', 'mixamorig:Spine1', 'mixamorig:Spine2', 'Bip001 Spine1', 'Bip001 Spine2'),
+			neck: pick('Neck', 'neck', 'DEF-neck', 'mixamorigNeck', 'mixamorig:Neck', 'Bip001 Neck'),
+			head: pick('Head', 'head', 'DEF-head', 'mixamorigHead', 'mixamorig:Head', 'Bip001 Head'),
+			leftShoulder: pick('ShoulderL', 'Shoulder.L', 'shoulder_l', 'DEF-shoulder.L', 'LeftShoulder', 'mixamorigLeftShoulder', 'mixamorig:LeftShoulder', 'Bip001 L Clavicle'),
+			leftUpperArm: pick('UpperArmL', 'UpperArm.L', 'upperarm_l', 'DEF-upper_arm.L', 'LeftArm', 'LeftUpperArm', 'mixamorigLeftArm', 'mixamorig:LeftArm', 'Bip001 L UpperArm'),
+			leftLowerArm: pick('LowerArmL', 'LowerArm.L', 'ForeArm.L', 'Forearm.L', 'lowerarm_l', 'DEF-forearm.L', 'LeftForeArm', 'LeftLowerArm', 'mixamorigLeftForeArm', 'mixamorig:LeftForeArm', 'Bip001 L Forearm'),
+			leftHand: pick('HandL', 'Hand.L', 'WristL', 'Wrist.L', 'hand_l', 'DEF-hand.L', 'LeftHand', 'mixamorigLeftHand', 'mixamorig:LeftHand', 'Bip001 L Hand'),
+			rightShoulder: pick('ShoulderR', 'Shoulder.R', 'shoulder_r', 'DEF-shoulder.R', 'RightShoulder', 'mixamorigRightShoulder', 'mixamorig:RightShoulder', 'Bip001 R Clavicle'),
+			rightUpperArm: pick('UpperArmR', 'UpperArm.R', 'upperarm_r', 'DEF-upper_arm.R', 'RightArm', 'RightUpperArm', 'mixamorigRightArm', 'mixamorig:RightArm', 'Bip001 R UpperArm'),
+			rightLowerArm: pick('LowerArmR', 'LowerArm.R', 'ForeArm.R', 'Forearm.R', 'lowerarm_r', 'DEF-forearm.R', 'RightForeArm', 'RightLowerArm', 'mixamorigRightForeArm', 'mixamorig:RightForeArm', 'Bip001 R Forearm'),
+			rightHand: pick('HandR', 'Hand.R', 'WristR', 'Wrist.R', 'hand_r', 'DEF-hand.R', 'RightHand', 'mixamorigRightHand', 'mixamorig:RightHand', 'Bip001 R Hand'),
+			leftUpperLeg: pick('UpperLegL', 'UpperLeg.L', 'upperleg_l', 'DEF-thigh.L', 'LeftUpLeg', 'LeftUpperLeg', 'LeftThigh', 'mixamorigLeftUpLeg', 'mixamorig:LeftUpLeg', 'Bip001 L Thigh'),
+			leftLowerLeg: pick('LowerLegL', 'LowerLeg.L', 'lowerleg_l', 'DEF-shin.L', 'LeftLeg', 'LeftLowerLeg', 'LeftShin', 'mixamorigLeftLeg', 'mixamorig:LeftLeg', 'Bip001 L Calf'),
+			leftFoot: pick('FootL', 'Foot.L', 'foot_l', 'DEF-foot.L', 'LeftFoot', 'mixamorigLeftFoot', 'mixamorig:LeftFoot', 'Bip001 L Foot'),
+			rightUpperLeg: pick('UpperLegR', 'UpperLeg.R', 'upperleg_r', 'DEF-thigh.R', 'RightUpLeg', 'RightUpperLeg', 'RightThigh', 'mixamorigRightUpLeg', 'mixamorig:RightUpLeg', 'Bip001 R Thigh'),
+			rightLowerLeg: pick('LowerLegR', 'LowerLeg.R', 'lowerleg_r', 'DEF-shin.R', 'RightLeg', 'RightLowerLeg', 'RightShin', 'mixamorigRightLeg', 'mixamorig:RightLeg', 'Bip001 R Calf'),
+			rightFoot: pick('FootR', 'Foot.R', 'foot_r', 'DEF-foot.R', 'RightFoot', 'mixamorigRightFoot', 'mixamorig:RightFoot', 'Bip001 R Foot')
 		};
 	}
 
@@ -105,7 +110,8 @@
 	function retargetWorldSpaceClip(clip, targetMesh, sourceRig) {
 		const THREE = global.THREE; const targetByName = new Map(targetMesh.skeleton.bones.map(bone => [bone.name, bone]));
 		sourceRig.skeleton.pose(); sourceRig.updateMatrixWorld(true); targetMesh.skeleton.pose(); targetMesh.updateMatrixWorld(true);
-		const converted = THREE.SkeletonUtils.retargetClip(targetMesh, sourceRig, clip, { hip: 'Hips', names: retargetNameMap(targetMesh.skeleton, sourceRig.skeleton), preservePosition: true, preserveHipPosition: true, useFirstFramePosition: true, fps: 30 });
+		const sourceMap = humanoidBoneMap(sourceRig.skeleton);
+		const converted = THREE.SkeletonUtils.retargetClip(targetMesh, sourceRig, clip, { hip: sourceMap.hips || 'Hips', names: retargetNameMap(targetMesh.skeleton, sourceRig.skeleton), preservePosition: true, preserveHipPosition: true, useFirstFramePosition: true, fps: 30 });
 		targetMesh.skeleton.pose(); targetMesh.updateMatrixWorld(true);
 		const tracks = converted.tracks.reduce((out, track) => {
 			const match = track.name.match(/^\.bones\[(.+)]\.quaternion$/); const target = match && targetByName.get(match[1]);
@@ -224,6 +230,7 @@
 			this.canvasHost = root.querySelector('[data-npc-canvas]');
 			this.panel = root.querySelector('[data-npc-debug]');
 			this.officeMode = root.dataset.npcMode === 'office';
+			this.debugEmployeeAnimation = debugEmployeeAnimationEnabled(root);
 			this.destroyed = false;
 			this.previousTime = 0;
 			this.animationFrame = 0;
@@ -232,7 +239,7 @@
 		}
 
 		init() {
-			if (!global.THREE || !global.THREE.FBXLoader || !global.LM_NPCAnimationController || !global.LM_NPCCharacterController) return this.showError('Không tải được Three.js hoặc FBXLoader.');
+			if (!global.THREE || !global.THREE.FBXLoader || !global.THREE.GLTFLoader || !global.THREE.SkeletonUtils || !global.LM_NPCAnimationController || !global.LM_NPCCharacterController) return this.showError('Không tải được Three.js hoặc animation loader.');
 			this.scene = new global.THREE.Scene();
 			this.scene.background = new global.THREE.Color(0x07121c);
 			this.camera = new global.THREE.PerspectiveCamera(42, 1, 0.01, 100);
@@ -418,11 +425,26 @@
 			return new Promise((resolve, reject) => new global.THREE.FBXLoader().load(url, resolve, undefined, reject));
 		}
 
+		loadGLTF(url) {
+			return new Promise((resolve, reject) => new global.THREE.GLTFLoader().load(url, resolve, undefined, reject));
+		}
+
 		loadModel(definition) {
 			const url = versionedUrl(definition.model.url, this.root.dataset.npcVersion);
 			if (definition.model.format === 'fbx') return this.loadFBX(url);
-			if (definition.model.format === 'glb' || definition.model.format === 'gltf') return new Promise((resolve, reject) => new global.THREE.GLTFLoader().load(url, result => resolve(result.scene), undefined, reject));
+			if (definition.model.format === 'glb' || definition.model.format === 'gltf') return this.loadGLTF(url).then(result => result.scene);
 			return Promise.reject(new Error('Định dạng model chưa được hỗ trợ.'));
+		}
+
+		loadAnimationSource(asset) {
+			this.animationSourceCache = this.animationSourceCache || new Map();
+			const format = String(asset.format || '').toLowerCase();
+			const url = versionedUrl(asset.url, this.root.dataset.npcVersion);
+			const key = format + ':' + url;
+			if (this.animationSourceCache.has(key)) return this.animationSourceCache.get(key);
+			const request = (format === 'fbx' ? this.loadFBX(url).then(source => ({ source, animations: source.animations || [] })) : (format === 'glb' || format === 'gltf') ? this.loadGLTF(url).then(result => ({ source: result.scene, animations: result.animations || [] })) : Promise.reject(new Error('Định dạng animation chưa được hỗ trợ: ' + format)));
+			this.animationSourceCache.set(key, request);
+			return request;
 		}
 
 		loadAnimationAssets(definition) {
@@ -435,10 +457,10 @@
 				const config = await response.json(); const assets = {};
 				await Promise.all(Object.keys(config).map(async action => {
 					const asset = Array.isArray(config[action]) ? config[action][0] : null;
-					if (!asset || asset.format !== 'fbx') return;
-					const source = await this.loadFBX(versionedUrl(asset.url, this.root.dataset.npcVersion));
-					const clip = asset.clip ? source.animations.find(item => item.name === asset.clip) : source.animations[0];
-					if (clip) assets[action] = { asset, clip, sourceRig: sourceRigFromAnimationFBX(source) };
+					if (!asset) return;
+					const loaded = await this.loadAnimationSource(asset);
+					const clip = asset.clip ? loaded.animations.find(item => item.name === asset.clip) : loaded.animations[0];
+					if (clip) assets[action] = { asset, clip, sourceRig: sourceRigFromAnimationObject(loaded.source) };
 				})); return assets;
 			});
 			this.animationAssetCache.set(profile, request); return request;
@@ -457,6 +479,7 @@
 				this.evaluateSkeletonCompatibility();
 			this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value);
 			if (this.officeMode) this.startOfficeWork();
+			this.installEmployeeAnimationDebugPanel();
 			this.start();
 			} catch (error) {
 				global.console.error('[LM AI Office NPC] Không tải được Character Registry:', error);
@@ -520,7 +543,9 @@
 			const characterController = new global.LM_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING), workstationResolver: id => this.workstations.get(id) });
 			animationController.setState(global.LM_NPC_STATES.IDLE);
 			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null, officeBaseModelScale: model.scale.clone() };
+			record.playAnimation = name => animationController.playAnimation(name);
 			this.characters.set(definition.id, record);
+			global.LM_SET_EMPLOYEE_STATE = (employeeId, state) => this.setEmployeeState(employeeId, state);
 			this.logSkeleton(record);
 		}
 
@@ -908,6 +933,79 @@
 			const record = this.characters.get(this.activeCharacterId); if (!record) return;
 			if (!record.skeletonHelper) { record.skeletonHelper = new global.THREE.SkeletonHelper(record.model); record.skeletonHelper.material.linewidth = 2; this.scene.add(record.skeletonHelper); }
 			record.skeletonHelper.visible = !record.skeletonHelper.visible; this.status = record.skeletonHelper.visible ? 'Đang hiển thị bộ xương.' : 'Đã ẩn bộ xương.';
+		}
+
+		debugAnimationItems() {
+			const states = global.LM_NPC_STATES;
+			return [
+				{ label: 'Idle', key: 'idle', state: states.IDLE },
+				{ label: 'Sitting', key: 'sitting', state: states.SITTING_IDLE },
+				{ label: 'Typing', key: 'typing', state: states.TYPING },
+				{ label: 'Mouse', key: 'mouse', state: states.USING_MOUSE },
+				{ label: 'Working', key: 'working', state: states.WORKING },
+				{ label: 'Talking', key: 'talking', state: states.TALKING },
+				{ label: 'Walk', key: 'walking', state: states.WALKING }
+			];
+		}
+
+		workstationForRecord(record) {
+			if (!record) return null;
+			const worker = (this.officeWorkers || []).find(item => item.record === record);
+			if (worker) return worker.workstation;
+			return this.workstations.get(record.id === 'employee_002' ? 'desk_02' : 'desk_01') || this.workstations.values().next().value || null;
+		}
+
+		setEmployeeState(employeeId, state) {
+			const record = this.characters && this.characters.get(employeeId);
+			if (!record || !record.animationController) return false;
+			const normalized = String(state || '').replace(/[\s-]/g, '').toLowerCase();
+			const seated = [ 'sitting', 'sittingidle', 'typing', 'mouse', 'usingmouse', 'using_mouse', 'working', 'talking' ].indexOf(normalized) !== -1;
+			if (seated) {
+				const workstation = this.workstationForRecord(record);
+				if (workstation) {
+					this.alignSeatedWorkerToDesk(record, workstation);
+					this.lowerModelIntoSeat(record);
+					record.characterController.currentInteraction = workstation.id;
+					record.characterController.targetObject = workstation.computer.id;
+				}
+			}
+			if (normalized === 'walking' || normalized === 'walk') {
+				const target = record.character.position.clone().add(new global.THREE.Vector3(record.id === 'employee_002' ? 0.9 : -0.9, 0, -0.75));
+				record.characterController.moveTo(target, { state: global.LM_NPC_STATES.WALKING, onArrive: () => record.animationController.setState(global.LM_NPC_STATES.IDLE) });
+				this.status = record.definition.name + ' đang đi tới waypoint test.';
+				return true;
+			}
+			const ok = record.playAnimation ? record.playAnimation(state) : record.animationController.playAnimation(state);
+			this.status = ok ? record.definition.name + ' → ' + state : 'Chưa có clip animation thật cho ' + record.definition.name + ': ' + state;
+			return ok;
+		}
+
+		installEmployeeAnimationDebugPanel() {
+			if (!this.debugEmployeeAnimation || this.employeeAnimationDebugPanel || !this.characters) return;
+			const record = this.characters.get('employee_002') || this.characters.get(this.activeCharacterId);
+			if (!record || !record.animationController) return;
+			const panel = document.createElement('div');
+			panel.className = 'lm-npc-animation-debug';
+			const title = document.createElement('h3');
+			title.textContent = record.definition.name || 'Claudia 002';
+			const note = document.createElement('p');
+			note.textContent = 'Skeleton animation debug';
+			const actions = document.createElement('div');
+			actions.className = 'lm-npc-animation-debug__actions';
+			this.debugAnimationItems().forEach(item => {
+				const button = document.createElement('button');
+				button.type = 'button';
+				button.textContent = item.label;
+				button.disabled = !record.animationController.hasAnimation(item.state);
+				if (button.disabled) button.title = 'Chưa có clip skeleton thật cho ' + item.label;
+				button.addEventListener('click', () => this.setEmployeeState(record.id, item.key));
+				actions.appendChild(button);
+			});
+			const missing = document.createElement('small');
+			missing.textContent = 'Typing / Mouse / Working sẽ bật khi có clip thật được gán trong thư viện animation.';
+			panel.append(title, note, actions, missing);
+			this.root.appendChild(panel);
+			this.employeeAnimationDebugPanel = panel;
 		}
 
 		bindPanel() {

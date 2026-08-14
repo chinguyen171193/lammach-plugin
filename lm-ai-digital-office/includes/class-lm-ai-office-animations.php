@@ -18,16 +18,29 @@ final class LM_AI_Office_Animations {
 	}
 	public static function upload_mimes( $mimes ) { $mimes['fbx'] = 'application/octet-stream'; $mimes['glb'] = 'model/gltf-binary'; $mimes['gltf'] = 'model/gltf+json'; return $mimes; }
 	public static function default_library() {
-		$base = LM_AI_OFFICE_URL . 'public/assets/characters/employee_001/animations.fbx'; $female_base = LM_AI_OFFICE_URL . 'public/assets/characters/employee_002/animations.fbx';
+		$base = LM_AI_OFFICE_URL . 'public/assets/characters/employee_001/animations.fbx'; $female_base = LM_AI_OFFICE_URL . 'public/assets/characters/employee_002/animations.fbx'; $claudia_office_base = LM_AI_OFFICE_URL . 'public/assets/characters/employee_002/office-animations/quaternius-ual-standard.glb';
 		return array( self::EMPLOYEE => array(
 			'IDLE' => array( array( 'attachment_id' => 0, 'url' => $base, 'format' => 'fbx', 'label' => 'Idle 01', 'clip' => 'CharacterArmature|Idle_Neutral', 'source' => 'bundled', 'retarget_status' => 'compatible' ) ),
 			'WALKING' => array( array( 'attachment_id' => 0, 'url' => $base, 'format' => 'fbx', 'label' => 'Walk 01', 'clip' => 'CharacterArmature|Walk', 'source' => 'bundled', 'retarget_status' => 'compatible' ) ),
 		), 'employee_002' => array(
-			'IDLE' => array( array( 'attachment_id' => 0, 'url' => $female_base, 'format' => 'fbx', 'label' => 'Female Idle 01', 'clip' => 'Idle_Neutral', 'source' => 'bundled', 'retarget_status' => 'retargeted' ) ),
-			'WALKING' => array( array( 'attachment_id' => 0, 'url' => $female_base, 'format' => 'fbx', 'label' => 'Female Walk 01', 'clip' => 'Walk', 'source' => 'bundled', 'retarget_status' => 'retargeted' ) ),
+			'IDLE' => array( array( 'attachment_id' => 0, 'url' => $claudia_office_base, 'format' => 'glb', 'label' => 'Claudia Office Idle · Quaternius UAL', 'clip' => 'Idle_Loop', 'source' => 'bundled:quaternius-ual-cc0', 'retarget_status' => 'retargeted' ), array( 'attachment_id' => 0, 'url' => $female_base, 'format' => 'fbx', 'label' => 'Female Idle 01', 'clip' => 'Idle_Neutral', 'source' => 'bundled', 'retarget_status' => 'retargeted' ) ),
+			'WALKING' => array( array( 'attachment_id' => 0, 'url' => $claudia_office_base, 'format' => 'glb', 'label' => 'Claudia Formal Walk · Quaternius UAL', 'clip' => 'Walk_Formal_Loop', 'source' => 'bundled:quaternius-ual-cc0', 'retarget_status' => 'retargeted' ), array( 'attachment_id' => 0, 'url' => $female_base, 'format' => 'fbx', 'label' => 'Female Walk 01', 'clip' => 'Walk', 'source' => 'bundled', 'retarget_status' => 'retargeted' ) ),
+			'SIT_DOWN' => array( array( 'attachment_id' => 0, 'url' => $claudia_office_base, 'format' => 'glb', 'label' => 'Claudia Sit Down · Quaternius UAL', 'clip' => 'Sitting_Enter', 'source' => 'bundled:quaternius-ual-cc0', 'retarget_status' => 'retargeted' ) ),
+			'SITTING_IDLE' => array( array( 'attachment_id' => 0, 'url' => $claudia_office_base, 'format' => 'glb', 'label' => 'Claudia Sitting Idle · Quaternius UAL', 'clip' => 'Sitting_Idle_Loop', 'source' => 'bundled:quaternius-ual-cc0', 'retarget_status' => 'retargeted' ) ),
+			'STAND_UP' => array( array( 'attachment_id' => 0, 'url' => $claudia_office_base, 'format' => 'glb', 'label' => 'Claudia Stand Up · Quaternius UAL', 'clip' => 'Sitting_Exit', 'source' => 'bundled:quaternius-ual-cc0', 'retarget_status' => 'retargeted' ) ),
+			'TALKING' => array( array( 'attachment_id' => 0, 'url' => $claudia_office_base, 'format' => 'glb', 'label' => 'Claudia Sitting Talking · Quaternius UAL', 'clip' => 'Sitting_Talking_Loop', 'source' => 'bundled:quaternius-ual-cc0', 'retarget_status' => 'retargeted' ) ),
 		) );
 	}
-	public static function library() { return wp_parse_args( get_option( self::OPTION, array() ), self::default_library() ); }
+	public static function library() {
+		$library = get_option( self::OPTION, array() ); $library = is_array( $library ) ? $library : array(); $defaults = self::default_library();
+		foreach ( $defaults as $employee => $actions ) {
+			if ( ! isset( $library[ $employee ] ) || ! is_array( $library[ $employee ] ) ) { $library[ $employee ] = array(); }
+			foreach ( $actions as $action => $variants ) {
+				if ( empty( $library[ $employee ][ $action ] ) || ! is_array( $library[ $employee ][ $action ] ) ) { $library[ $employee ][ $action ] = $variants; }
+			}
+		}
+		return $library;
+	}
 	public static function assets( $employee = self::EMPLOYEE ) {
 		$library = self::library(); $owner = LM_AI_Office_Characters::animation_owner( $employee );
 		$assets = is_array( $library[ $owner ] ?? null ) ? $library[ $owner ] : array();

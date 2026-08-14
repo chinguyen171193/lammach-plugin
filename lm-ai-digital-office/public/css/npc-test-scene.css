@@ -62,9 +62,19 @@
 .lm-npc-test__error { position: absolute; z-index: 3; right: 16px; bottom: 16px; left: 16px; margin: 0; padding: 10px 12px; border: 1px solid rgba(255, 152, 99, .65); border-radius: 8px; color: #ffe4d5; background: rgba(91, 28, 10, .92); font: 13px/1.4 system-ui, sans-serif; }
 .lm-npc-test__error[hidden] { display: none; }
 
+.lm-npc-animation-debug { position: absolute; z-index: 4; top: 16px; right: 16px; width: min(210px, calc(100% - 32px)); box-sizing: border-box; padding: 12px; border: 1px solid rgba(112, 232, 255, .42); border-radius: 12px; color: #edfbff; background: rgba(4, 18, 31, .88); box-shadow: 0 12px 30px rgba(0, 0, 0, .34); font: 12px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; backdrop-filter: blur(10px); }
+.lm-npc-animation-debug h3 { margin: 0 0 3px; color: #7feaff; font-size: 14px; }
+.lm-npc-animation-debug p { margin: 0 0 9px; color: #a8d7e4; font-size: 11px; }
+.lm-npc-animation-debug__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.lm-npc-animation-debug button { min-height: 30px; border: 1px solid rgba(105, 225, 255, .45); border-radius: 7px; color: #eafbff; background: rgba(21, 64, 84, .96); cursor: pointer; font: inherit; }
+.lm-npc-animation-debug button:not(:disabled):hover, .lm-npc-animation-debug button:not(:disabled):focus-visible { color: #06202d; background: #78eaff; outline: none; }
+.lm-npc-animation-debug button:disabled { opacity: .44; cursor: not-allowed; }
+.lm-npc-animation-debug small { display: block; margin-top: 8px; color: #ffd58a; font-size: 10px; }
+
 @media (max-width: 640px) {
 	.lm-npc-test__panel { top: auto; bottom: 10px; left: 10px; width: calc(100% - 20px); max-height: 55%; overflow: auto; padding: 10px; }
 	.lm-npc-test__panel dl > div { grid-template-columns: 112px 1fr; }
 	.lm-npc-test__clips { display: none; }
 	.lm-npc-test__hint { display: none; }
+	.lm-npc-animation-debug { top: 10px; right: 10px; width: min(210px, calc(100% - 20px)); }
 }

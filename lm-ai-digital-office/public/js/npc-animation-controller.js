@@ -19,6 +19,31 @@
 		STANDING_UP: 'STANDING_UP'
 	});
 
+	const EMPLOYEE_ANIMATION_STATE = Object.freeze({
+		idle: 'Idle',
+		walking: 'Walk',
+		sitting: 'SittingIdle',
+		typing: 'Typing',
+		using_mouse: 'Mouse',
+		working: 'Working',
+		talking: 'Talking'
+	});
+
+	const PLAY_ANIMATION_ALIASES = Object.freeze({
+		idle: STATES.IDLE,
+		walk: STATES.WALKING,
+		walking: STATES.WALKING,
+		sit: STATES.SITTING_IDLE,
+		sitting: STATES.SITTING_IDLE,
+		sittingidle: STATES.SITTING_IDLE,
+		typing: STATES.TYPING,
+		mouse: STATES.USING_MOUSE,
+		usingmouse: STATES.USING_MOUSE,
+		using_mouse: STATES.USING_MOUSE,
+		working: STATES.WORKING,
+		talking: STATES.TALKING
+	});
+
 	/** Keeps AnimationMixer state transitions separate from character movement. */
 	class NPCAnimationController {
 		constructor(mixer, clips, animationMap, options) {
@@ -38,10 +63,11 @@
 			return this.actions.get(clipName);
 		}
 
-		setState(state) {
+		setState(state, options) {
 			if (!STATES[state]) throw new Error('NPC state không hợp lệ: ' + state);
-			if (state === this.currentState) return;
-			const clipName = this.animationMap[state] || this.animationMap.IDLE;
+			if (state === this.currentState) return true;
+			const allowFallback = !options || options.allowFallback !== false;
+			const clipName = this.animationMap[state] || (allowFallback ? this.animationMap.IDLE : '');
 			if (!clipName) throw new Error('Chưa map animation cho ' + state);
 			const next = this.action(clipName);
 			next.reset();
@@ -54,9 +80,21 @@
 			this.currentAction = next;
 			this.currentState = state;
 			this.currentAnimation = clipName + (this.animationMap[state] ? '' : ' (fallback Idle)');
+			return true;
 		}
 
 		hasAnimation(state) { return Boolean(this.animationMap[state]); }
+
+		stateFromAnimationName(name) {
+			const key = String(name || '').replace(/[\s-]/g, '').toLowerCase();
+			return PLAY_ANIMATION_ALIASES[key] || PLAY_ANIMATION_ALIASES[String(name || '').toLowerCase()] || '';
+		}
+
+		playAnimation(name) {
+			const state = this.stateFromAnimationName(name);
+			if (!state || !this.hasAnimation(state)) return false;
+			return this.setState(state, { allowFallback: false });
+		}
 
 		update(delta) { this.mixer.update(delta); }
 		getState() { return this.currentState || STATES.IDLE; }
@@ -66,4 +104,5 @@
 
 	global.LM_NPCAnimationController = NPCAnimationController;
 	global.LM_NPC_STATES = STATES;
+	global.LM_EMPLOYEE_ANIMATION_STATE = EMPLOYEE_ANIMATION_STATE;
 })(window);

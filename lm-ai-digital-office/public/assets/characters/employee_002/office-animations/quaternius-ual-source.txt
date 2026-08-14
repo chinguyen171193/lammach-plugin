@@ -1,0 +1,20 @@
+Asset: Universal Animation Library [Standard]
+Author: Quaternius
+Source: https://opengameart.org/content/universal-animation-library
+Original project page: https://quaternius.com/packs/universalanimationlibrary.html
+Downloaded file: universal_animation_librarystandard.zip
+Integrated file: Godot/AnimationLibrary_Godot_Standard.glb
+License: CC0 1.0 Universal / Public Domain Dedication
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+Clips used for Claudia 002:
+- Idle_Loop
+- Walk_Formal_Loop
+- Sitting_Enter
+- Sitting_Idle_Loop
+- Sitting_Exit
+- Sitting_Talking_Loop
+
+Notes:
+- This pack does not include real office Typing, Mouse, or combined desk Working clips.
+- Do not map placeholder/fake hand motion to Typing/Mouse; add real skeleton clips when available.
