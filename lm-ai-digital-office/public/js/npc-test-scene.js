@@ -665,6 +665,9 @@
 				record.officeBaseCharacterPosition = seatPosition.clone();
 				record.officeBaseCharacterRotationY = workstation.chair.sitRotation;
 				record.officeTargetHeight = record.id === 'employee_002' ? 1.38 : 1.45;
+				record.officeDisplayScale = record.id === 'employee_002' ? 0.78 : 0.64;
+				record.officeVisibleWork = true;
+				record.character.scale.setScalar(record.officeDisplayScale);
 				record.characterController.target = null;
 				record.characterController.currentInteraction = workstation.id;
 				record.characterController.targetObject = workstation.computer.id;
@@ -743,6 +746,7 @@
 			record.character.rotation.y = workstation.chair.sitRotation;
 			record.officeBaseCharacterPosition = seatPosition.clone();
 			record.officeBaseCharacterRotationY = workstation.chair.sitRotation;
+			if (record.officeDisplayScale) record.character.scale.setScalar(record.officeDisplayScale);
 		}
 
 		lowerModelIntoSeat(record) {
@@ -761,6 +765,7 @@
 		enforceOfficeCharacterScale(record, workstation) {
 			if (!record || !record.model || record.isProcedural) return;
 			const THREE = global.THREE;
+			if (record.officeDisplayScale) record.character.scale.setScalar(record.officeDisplayScale);
 			record.officeScaleGuardElapsed = (record.officeScaleGuardElapsed || 0) + 1;
 			if (record.officeScaleGuardElapsed % 12 !== 1) return;
 			record.model.updateMatrixWorld(true);
@@ -777,6 +782,27 @@
 				this.lowerModelIntoSeat(record);
 			}
 			global.console.info('[LM AI Office NPC] Scale guard applied', record.id, { height: Number(height.toFixed(3)), factor: Number(factor.toFixed(4)) });
+		}
+
+		updateOfficeVisibleWorkMotion(delta) {
+			if (!this.officeWorkers || !this.officeWorkers.length) return;
+			this.officeWorkers.forEach(worker => {
+				const record = worker.record;
+				if (!record || !record.officeVisibleWork || !record.officeBaseCharacterPosition) return;
+				record.officeVisibleElapsed = (record.officeVisibleElapsed || 0) + delta;
+				const t = record.officeVisibleElapsed + (record.officeFallbackSeed || 0);
+				const side = record.id === 'employee_002' ? -1 : 1;
+				record.character.position.set(
+					record.officeBaseCharacterPosition.x + Math.sin(t * 2.6) * 0.035 * side,
+					record.officeBaseCharacterPosition.y + Math.sin(t * 3.8) * 0.055,
+					record.officeBaseCharacterPosition.z + Math.sin(t * 2.1) * 0.028
+				);
+				record.character.rotation.y = (record.officeBaseCharacterRotationY || 0) + Math.sin(t * 2.15) * 0.09 * side;
+				if (record.officeDisplayScale) {
+					const pulse = 1 + Math.sin(t * 5.4) * 0.018;
+					record.character.scale.setScalar(record.officeDisplayScale * pulse);
+				}
+			});
 		}
 
 		officeMotionTargets(record) {
@@ -813,12 +839,7 @@
 					record.model.position.y = record.officeBaseModelPosition.y - offset;
 				}
 				if (record.officeBaseCharacterPosition) {
-					record.character.position.set(
-						record.officeBaseCharacterPosition.x + Math.sin(t * 1.45) * 0.012,
-						record.officeBaseCharacterPosition.y + Math.sin(t * 2.25) * 0.026,
-						record.officeBaseCharacterPosition.z + Math.sin(t * 1.15) * 0.014
-					);
-					record.character.rotation.y = (record.officeBaseCharacterRotationY || 0) + Math.sin(t * 1.35) * 0.032;
+					if (record.officeDisplayScale) record.character.scale.setScalar(record.officeDisplayScale);
 				}
 				this.officeMotionTargets(record).forEach(target => {
 					target.skeleton.pose();
@@ -839,6 +860,7 @@
 		updateOfficeWork(delta) {
 			if (!this.officeWorkers || !this.officeWorkers.length) return;
 			this.officeWorkers.forEach(worker => this.enforceOfficeCharacterScale(worker.record, worker.workstation));
+			this.updateOfficeVisibleWorkMotion(delta);
 			this.updateOfficeFallbackWork(delta);
 			this.officeWorkElapsed += delta;
 			if (this.officeWorkElapsed < 6) return;
