@@ -1,5 +1,10 @@
 # Employee 002
 
-`employee_002_worker.fbx` is the **Worker.fbx** model used by Employee 002 from Quaternius Ultimate Modular Women Pack → Humanoid Rigs → Individual Characters. The original pack is CC0. The Formal model remains bundled as an alternative but is not used in the 3D office because its skin layout is not stable with the current runtime.
+The active bundled model is `claudia/rp_claudia_rigged_002_yup_a.fbx`, **Claudia Rigged 002 - 3D Business Woman** by Renderpeople.
+
+It is a realistic full-body office woman with textures and a rigged skeleton. The model was selected for the 3D office preview to replace the previous procedural/cartoon office avatar.
+
+Source: Renderpeople / CGTrader / FlippedNormals.
+License: Commercial License Free / Royalty Free License, as provided with the downloaded model source. Keep attribution with redistributed plugin assets.
 
 An administrator can replace it through **AI Office → Nhân vật**. The Media Library option is preferred because it survives plugin updates.

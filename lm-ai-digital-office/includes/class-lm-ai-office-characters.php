@@ -17,7 +17,7 @@ final class LM_AI_Office_Characters {
 	public static function definitions() {
 		return array(
 			'employee_001' => self::definition( 'employee_001', 'Employee 001', 'Sale', 'public/assets/characters/employee_001/employee_001.fbx', 'Tương thích trực tiếp', array( 'x' => 0.75, 'y' => 0, 'z' => 0 ), self::DEFAULT_PROFILE ),
-			'employee_002' => self::definition( 'employee_002', 'Nhân viên nữ 002', 'Chăm sóc khách hàng', 'public/assets/characters/employee_002/employee_002_worker.fbx', 'Tư thế làm việc ổn định', array( 'x' => -1.8, 'y' => 0, 'z' => 0 ), self::FEMALE_PROFILE ),
+			'employee_002' => self::definition( 'employee_002', 'Claudia 002', 'Chăm sóc khách hàng', 'public/assets/characters/employee_002/claudia/rp_claudia_rigged_002_yup_a.fbx', 'Renderpeople rigged skeleton', array( 'x' => -1.8, 'y' => 0, 'z' => 0 ), self::FEMALE_PROFILE ),
 		);
 	}
 

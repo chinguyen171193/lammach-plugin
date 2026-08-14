@@ -426,9 +426,7 @@
 				const available = this.characterDefinitions.filter(definition => definition.model && definition.model.available);
 				const install = async definition => { try { const [model, assets] = await Promise.all([this.loadModel(definition), this.loadAnimationAssets(definition)]); if (!this.destroyed) this.installCharacter(definition, model, assets); } catch (error) { global.console.error('[LM AI Office NPC] Không tải được ' + definition.id + ':', error); } };
 				const reference = available.find(definition => definition.id === 'employee_001'); if (reference) await install(reference);
-				const secondEmployee = available.find(definition => definition.id === 'employee_002');
-				if (this.officeMode && secondEmployee && this.characters.has('employee_001')) this.installOfficeSurrogate(secondEmployee);
-				await Promise.all(available.filter(definition => definition.id !== 'employee_001' && !(this.officeMode && definition.id === 'employee_002')).map(install));
+				await Promise.all(available.filter(definition => definition.id !== 'employee_001').map(install));
 				if (!this.characters.size) throw new Error('Không có model nhân vật khả dụng.');
 				this.evaluateSkeletonCompatibility();
 			this.populateCharacterSelector(); this.setActiveCharacter(this.characters.has('employee_001') ? 'employee_001' : this.characters.keys().next().value);
@@ -442,10 +440,9 @@
 
 		installCharacter(definition, model, assets) {
 			const THREE = global.THREE;
-			// Employee 001 exports compatible duplicate rig data and can share one
-			// skeleton. Formal.fbx instead has four separately-bound body meshes;
-			// rebinding them to the head mesh corrupts skin matrices. Keep each female
-			// mesh skeleton and emit retarget tracks for every one.
+			// Direct rigs can share one skeleton. Retargeted commercial characters
+			// may have separately-bound body meshes, so keep every mesh skeleton and
+			// emit tracks for each one.
 			const retargetMode = definition.retarget_mode || 'Direct';
 			const skeletonSource = prepareModelSkeletons(model, retargetMode === 'Direct');
 			const retargetedClips = [];
@@ -638,7 +635,7 @@
 			}, []);
 			this.officeWorkElapsed = 0;
 			this.officeWorkers.forEach(worker => this.playOfficeWorkState(worker));
-			this.status = this.officeWorkers.length === 2 ? 'Employee 001 và Nhân viên nữ 002 đang làm việc.' : 'Đang chờ model nhân vật thứ hai.';
+			this.status = this.officeWorkers.length === 2 ? 'Employee 001 và Claudia 002 đang làm việc.' : 'Đang chờ model nhân vật thứ hai.';
 		}
 
 		playOfficeWorkState(worker) {
