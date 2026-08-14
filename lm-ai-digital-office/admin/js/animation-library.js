@@ -16,7 +16,30 @@
 	function versioned(url) { const version = window.LM_AI_OFFICE_ANIMATION_PREVIEW.version; return url + (url.indexOf('?') === -1 ? '?' : '&') + 'ver=' + encodeURIComponent(version); }
 	function loadFBX(url) { return new Promise((resolve, reject) => new window.THREE.FBXLoader().load(versioned(url), resolve, undefined, reject)); }
 	function primaryMesh(model) { let selected = null; model.traverse(object => { if (object.isSkinnedMesh && object.skeleton && (!selected || object.name === 'Suit_Legs')) selected = object; }); return selected; }
-	function retarget(clip, skeleton) { const targets = new Map(skeleton.bones.map(bone => [bone.name, bone])); const tracks = []; clip.tracks.forEach(track => { const match = track.name.match(/^(.+)\.(quaternion)$/); if (!match || [ 'CharacterArmature', 'FootL', 'FootR' ].indexOf(match[1]) !== -1 || !targets.has(match[1])) return; const next = track.clone(); next.name = targets.get(match[1]).uuid + '.quaternion'; tracks.push(next); }); return new window.THREE.AnimationClip('preview', clip.duration, tracks); }
+	function normalizeBoneName(name) { return String(name || '').replace(/^.*:/, '').replace(/^mixamorig/i, '').replace(/[\s._-]/g, '').toLowerCase(); }
+	function isFootBoneName(name) { const normalized = normalizeBoneName(name); return [ 'footl', 'leftfoot', 'footr', 'rightfoot' ].indexOf(normalized) !== -1; }
+	function humanoidBoneMap(skeleton) {
+		const names = new Set(skeleton.bones.map(bone => bone.name)); const normalized = new Map();
+		skeleton.bones.forEach(bone => { const key = normalizeBoneName(bone.name); if (key && !normalized.has(key)) normalized.set(key, bone.name); });
+		const pick = (...choices) => choices.find(name => names.has(name)) || choices.map(normalizeBoneName).map(name => normalized.get(name)).find(Boolean) || '';
+		return {
+			hips: pick('Hips', 'Pelvis', 'mixamorigHips', 'mixamorig:Hips', 'Bip001 Pelvis'), spine: pick('Abdomen', 'Spine', 'mixamorigSpine', 'mixamorig:Spine', 'Bip001 Spine'), chest: pick('Chest', 'Torso', 'Spine1', 'Spine2', 'mixamorigSpine1', 'mixamorigSpine2', 'mixamorig:Spine1', 'mixamorig:Spine2', 'Bip001 Spine1', 'Bip001 Spine2'),
+			neck: pick('Neck', 'mixamorigNeck', 'mixamorig:Neck', 'Bip001 Neck'), head: pick('Head', 'mixamorigHead', 'mixamorig:Head', 'Bip001 Head'),
+			leftUpperArm: pick('UpperArmL', 'UpperArm.L', 'LeftArm', 'LeftUpperArm', 'mixamorigLeftArm', 'mixamorig:LeftArm', 'Bip001 L UpperArm'), leftLowerArm: pick('LowerArmL', 'LowerArm.L', 'LeftForeArm', 'LeftLowerArm', 'mixamorigLeftForeArm', 'mixamorig:LeftForeArm', 'Bip001 L Forearm'), leftHand: pick('HandL', 'Hand.L', 'WristL', 'Wrist.L', 'LeftHand', 'mixamorigLeftHand', 'mixamorig:LeftHand', 'Bip001 L Hand'),
+			rightUpperArm: pick('UpperArmR', 'UpperArm.R', 'RightArm', 'RightUpperArm', 'mixamorigRightArm', 'mixamorig:RightArm', 'Bip001 R UpperArm'), rightLowerArm: pick('LowerArmR', 'LowerArm.R', 'RightForeArm', 'RightLowerArm', 'mixamorigRightForeArm', 'mixamorig:RightForeArm', 'Bip001 R Forearm'), rightHand: pick('HandR', 'Hand.R', 'WristR', 'Wrist.R', 'RightHand', 'mixamorigRightHand', 'mixamorig:RightHand', 'Bip001 R Hand'),
+			leftUpperLeg: pick('UpperLegL', 'UpperLeg.L', 'LeftUpLeg', 'LeftUpperLeg', 'LeftThigh', 'mixamorigLeftUpLeg', 'mixamorig:LeftUpLeg', 'Bip001 L Thigh'), leftLowerLeg: pick('LowerLegL', 'LowerLeg.L', 'LeftLeg', 'LeftLowerLeg', 'LeftShin', 'mixamorigLeftLeg', 'mixamorig:LeftLeg', 'Bip001 L Calf'), leftFoot: pick('FootL', 'Foot.L', 'LeftFoot', 'mixamorigLeftFoot', 'mixamorig:LeftFoot', 'Bip001 L Foot'),
+			rightUpperLeg: pick('UpperLegR', 'UpperLeg.R', 'RightUpLeg', 'RightUpperLeg', 'RightThigh', 'mixamorigRightUpLeg', 'mixamorig:RightUpLeg', 'Bip001 R Thigh'), rightLowerLeg: pick('LowerLegR', 'LowerLeg.R', 'RightLeg', 'RightLowerLeg', 'RightShin', 'mixamorigRightLeg', 'mixamorig:RightLeg', 'Bip001 R Calf'), rightFoot: pick('FootR', 'Foot.R', 'RightFoot', 'mixamorigRightFoot', 'mixamorig:RightFoot', 'Bip001 R Foot')
+		};
+	}
+	function sourceSkeleton(source) { const bones = []; source.traverse(object => { if (object.isBone) bones.push(object); }); return bones.length ? new window.THREE.Skeleton(bones) : null; }
+	function retarget(clip, skeleton, source) {
+		const targets = new Map(skeleton.bones.map(bone => [bone.name, bone])); const sourceRig = sourceSkeleton(source); const mappedTargets = new Map();
+		if (sourceRig) {
+			const sourceMap = humanoidBoneMap(sourceRig); const targetMap = humanoidBoneMap(skeleton);
+			Object.keys(sourceMap).forEach(key => { if (sourceMap[key] && targetMap[key] && targets.has(targetMap[key])) mappedTargets.set(sourceMap[key], targets.get(targetMap[key])); });
+		}
+		const tracks = []; clip.tracks.forEach(track => { const match = track.name.match(/^(.+)\.(quaternion)$/); if (!match || match[1] === 'CharacterArmature' || isFootBoneName(match[1])) return; const target = targets.get(match[1]) || mappedTargets.get(match[1]); if (!target) return; const next = track.clone(); next.name = target.uuid + '.quaternion'; tracks.push(next); }); return new window.THREE.AnimationClip('preview', clip.duration, tracks);
+	}
 	class PreviewOrbitCamera {
 		constructor(camera, element) { this.camera = camera; this.element = element; this.target = new window.THREE.Vector3(0, .82, 0); this.radius = 5.8; this.theta = .68; this.phi = 1.12; this.pointer = null; this.bind(); this.update(); }
 		bind() { this.down = event => { event.preventDefault(); this.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY }; if (this.element.setPointerCapture) this.element.setPointerCapture(event.pointerId); }; this.move = event => { if (!this.pointer || this.pointer.id !== event.pointerId) return; event.preventDefault(); this.rotate(-(event.clientX - this.pointer.x) * .008, (event.clientY - this.pointer.y) * .008); this.pointer.x = event.clientX; this.pointer.y = event.clientY; }; this.up = event => { if (this.pointer && this.pointer.id === event.pointerId) this.pointer = null; }; this.wheel = event => { event.preventDefault(); this.zoom(event.deltaY * .008); }; this.element.addEventListener('pointerdown', this.down); this.element.addEventListener('pointermove', this.move); this.element.addEventListener('pointerup', this.up); this.element.addEventListener('pointercancel', this.up); this.element.addEventListener('wheel', this.wheel, { passive: false }); }
@@ -39,7 +62,7 @@
 			const mesh = primaryMesh(model); if (!mesh) throw new Error('Model không có skeleton hợp lệ.');
 			model.traverse(item => { if (item.isSkinnedMesh && item !== mesh) item.bind(mesh.skeleton, item.bindMatrix); if (item.isMesh) { item.castShadow = true; } });
 			const sourceClip = button.dataset.animationClip ? source.animations.find(item => item.name === button.dataset.animationClip) : source.animations[0];
-			if (!sourceClip) throw new Error('Tệp không có animation clip.'); const clip = retarget(sourceClip, mesh.skeleton); if (!clip.tracks.length) throw new Error('Cần chuyển xương: không tìm thấy xương tương thích.');
+			if (!sourceClip) throw new Error('Tệp không có animation clip.'); const clip = retarget(sourceClip, mesh.skeleton, source); if (!clip.tracks.length) throw new Error('Cần chuyển xương: không tìm thấy xương tương thích.');
 			const THREE = window.THREE, scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(42, 1, .01, 100), renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.outputEncoding = THREE.sRGBEncoding; host.appendChild(renderer.domElement);
 			scene.add(new THREE.HemisphereLight(0xe5f8ff, 0x1b2633, 2.4)); const light = new THREE.DirectionalLight(0xffffff, 2); light.position.set(3, 5, 4); scene.add(light); const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({ color: 0x263b49 })); floor.rotation.x = -Math.PI / 2; scene.add(floor); scene.add(model);
 			let box = new THREE.Box3().setFromObject(model), height = box.getSize(new THREE.Vector3()).y; model.scale.setScalar(1.65 / height); model.updateMatrixWorld(true); box = new THREE.Box3().setFromObject(model); model.position.y -= box.min.y;

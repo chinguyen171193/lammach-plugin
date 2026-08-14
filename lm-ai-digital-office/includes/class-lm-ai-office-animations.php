@@ -28,12 +28,25 @@ final class LM_AI_Office_Animations {
 		) );
 	}
 	public static function library() { return wp_parse_args( get_option( self::OPTION, array() ), self::default_library() ); }
-	public static function assets( $employee = self::EMPLOYEE ) { $library = self::library(); $owner = LM_AI_Office_Characters::animation_owner( $employee ); return is_array( $library[ $owner ] ?? null ) ? $library[ $owner ] : array(); }
+	public static function assets( $employee = self::EMPLOYEE ) {
+		$library = self::library(); $owner = LM_AI_Office_Characters::animation_owner( $employee );
+		$assets = is_array( $library[ $owner ] ?? null ) ? $library[ $owner ] : array();
+		if ( $owner && self::EMPLOYEE !== $owner && is_array( $library[ self::EMPLOYEE ] ?? null ) ) {
+			foreach ( self::actions() as $action => $_action ) {
+				if ( ! empty( $assets[ $action ] ) || empty( $library[ self::EMPLOYEE ][ $action ] ) || ! is_array( $library[ self::EMPLOYEE ][ $action ] ) ) { continue; }
+				$assets[ $action ] = array_map( static function( $asset ) {
+					if ( is_array( $asset ) ) { $asset['shared_from'] = self::EMPLOYEE; }
+					return $asset;
+				}, $library[ self::EMPLOYEE ][ $action ] );
+			}
+		}
+		return $assets;
+	}
 	public static function public_assets( $employee = self::EMPLOYEE ) {
 		$out = array();
 		foreach ( self::assets( $employee ) as $action => $variants ) {
 			if ( ! isset( self::actions()[ $action ] ) || ! is_array( $variants ) ) { continue; }
-			$out[ $action ] = array_values( array_map( static function( $asset ) { return array_intersect_key( $asset, array_flip( array( 'url', 'format', 'label', 'clip', 'retarget_status' ) ) ); }, $variants ) );
+			$out[ $action ] = array_values( array_map( static function( $asset ) { return array_intersect_key( $asset, array_flip( array( 'url', 'format', 'label', 'clip', 'retarget_status', 'source', 'shared_from' ) ) ); }, $variants ) );
 		}
 		return $out;
 	}

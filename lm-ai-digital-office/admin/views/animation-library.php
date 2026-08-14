@@ -3,7 +3,7 @@ $employee = LM_AI_Office_Animations::EMPLOYEE; $actions = LM_AI_Office_Animation
 ?>
 <div class="wrap lm-ai-office-admin lm-ai-office-animation-library"><h1>Thư viện chuyển động</h1>
 <?php if ( $notice ) : ?><div class="notice notice-info is-dismissible"><p><?php echo esc_html( $notice ); ?></p></div><?php endif; ?>
-<section class="lm-ai-office-panel"><label for="lm-ai-office-character"><strong>Nhân vật:</strong></label> <select id="lm-ai-office-character"><option value="employee_001">Employee 001</option></select><p>Chỉ nhận tệp FBX, GLB hoặc GLTF từ Media Library. Mỗi hành động có thể có nhiều biến thể.</p></section>
+<section class="lm-ai-office-panel"><label for="lm-ai-office-character"><strong>Thư viện dùng chung:</strong></label> <select id="lm-ai-office-character"><option value="employee_001">Employee 001</option></select><p>Chỉ nhận tệp FBX, GLB hoặc GLTF từ Media Library. Animation lưu ở đây sẽ dùng cho Employee 001 và tự làm fallback cho Claudia 002 nếu nhân vật nữ chưa có animation riêng.</p></section>
 <div class="lm-ai-office-animation-list">
 <?php foreach ( $actions as $key => $action ) : $variants = $assets[ $key ] ?? array(); ?>
 <article class="lm-ai-office-animation-card"><h2><?php echo esc_html( $action['label'] ); ?></h2><p><?php echo esc_html( $action['description'] ); ?></p>

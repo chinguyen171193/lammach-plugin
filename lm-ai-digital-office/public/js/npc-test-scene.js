@@ -60,23 +60,45 @@
 		return source;
 	}
 
+	function normalizeBoneName(name) {
+		return String(name || '').replace(/^.*:/, '').replace(/^mixamorig/i, '').replace(/[\s._-]/g, '').toLowerCase();
+	}
+
+	function isFootBoneName(name) {
+		const normalized = normalizeBoneName(name);
+		return [ 'footl', 'leftfoot', 'footr', 'rightfoot' ].indexOf(normalized) !== -1;
+	}
+
 	function humanoidBoneMap(skeleton) {
-		const names = new Set(skeleton.bones.map(bone => bone.name)); const pick = (...choices) => choices.find(name => names.has(name)) || '';
+		const names = new Set(skeleton.bones.map(bone => bone.name)); const normalized = new Map();
+		skeleton.bones.forEach(bone => { const key = normalizeBoneName(bone.name); if (key && !normalized.has(key)) normalized.set(key, bone.name); });
+		const pick = (...choices) => choices.find(name => names.has(name)) || choices.map(normalizeBoneName).map(name => normalized.get(name)).find(Boolean) || '';
 		return {
-			hips: pick('Hips'), spine: pick('Abdomen', 'Spine'), chest: pick('Chest', 'Torso'), neck: pick('Neck'), head: pick('Head'),
-			leftShoulder: pick('ShoulderL'), leftUpperArm: pick('UpperArmL'), leftLowerArm: pick('LowerArmL'), leftHand: pick('HandL', 'WristL'),
-			rightShoulder: pick('ShoulderR'), rightUpperArm: pick('UpperArmR'), rightLowerArm: pick('LowerArmR'), rightHand: pick('HandR', 'WristR'),
-			leftUpperLeg: pick('UpperLegL'), leftLowerLeg: pick('LowerLegL'), leftFoot: pick('FootL'),
-			rightUpperLeg: pick('UpperLegR'), rightLowerLeg: pick('LowerLegR'), rightFoot: pick('FootR')
+			hips: pick('Hips', 'Pelvis', 'mixamorigHips', 'mixamorig:Hips', 'Bip001 Pelvis'),
+			spine: pick('Abdomen', 'Spine', 'mixamorigSpine', 'mixamorig:Spine', 'Bip001 Spine'),
+			chest: pick('Chest', 'Torso', 'Spine1', 'Spine2', 'mixamorigSpine1', 'mixamorigSpine2', 'mixamorig:Spine1', 'mixamorig:Spine2', 'Bip001 Spine1', 'Bip001 Spine2'),
+			neck: pick('Neck', 'mixamorigNeck', 'mixamorig:Neck', 'Bip001 Neck'),
+			head: pick('Head', 'mixamorigHead', 'mixamorig:Head', 'Bip001 Head'),
+			leftShoulder: pick('ShoulderL', 'Shoulder.L', 'LeftShoulder', 'mixamorigLeftShoulder', 'mixamorig:LeftShoulder', 'Bip001 L Clavicle'),
+			leftUpperArm: pick('UpperArmL', 'UpperArm.L', 'LeftArm', 'LeftUpperArm', 'mixamorigLeftArm', 'mixamorig:LeftArm', 'Bip001 L UpperArm'),
+			leftLowerArm: pick('LowerArmL', 'LowerArm.L', 'LeftForeArm', 'LeftLowerArm', 'mixamorigLeftForeArm', 'mixamorig:LeftForeArm', 'Bip001 L Forearm'),
+			leftHand: pick('HandL', 'Hand.L', 'WristL', 'Wrist.L', 'LeftHand', 'mixamorigLeftHand', 'mixamorig:LeftHand', 'Bip001 L Hand'),
+			rightShoulder: pick('ShoulderR', 'Shoulder.R', 'RightShoulder', 'mixamorigRightShoulder', 'mixamorig:RightShoulder', 'Bip001 R Clavicle'),
+			rightUpperArm: pick('UpperArmR', 'UpperArm.R', 'RightArm', 'RightUpperArm', 'mixamorigRightArm', 'mixamorig:RightArm', 'Bip001 R UpperArm'),
+			rightLowerArm: pick('LowerArmR', 'LowerArm.R', 'RightForeArm', 'RightLowerArm', 'mixamorigRightForeArm', 'mixamorig:RightForeArm', 'Bip001 R Forearm'),
+			rightHand: pick('HandR', 'Hand.R', 'WristR', 'Wrist.R', 'RightHand', 'mixamorigRightHand', 'mixamorig:RightHand', 'Bip001 R Hand'),
+			leftUpperLeg: pick('UpperLegL', 'UpperLeg.L', 'LeftUpLeg', 'LeftUpperLeg', 'LeftThigh', 'mixamorigLeftUpLeg', 'mixamorig:LeftUpLeg', 'Bip001 L Thigh'),
+			leftLowerLeg: pick('LowerLegL', 'LowerLeg.L', 'LeftLeg', 'LeftLowerLeg', 'LeftShin', 'mixamorigLeftLeg', 'mixamorig:LeftLeg', 'Bip001 L Calf'),
+			leftFoot: pick('FootL', 'Foot.L', 'LeftFoot', 'mixamorigLeftFoot', 'mixamorig:LeftFoot', 'Bip001 L Foot'),
+			rightUpperLeg: pick('UpperLegR', 'UpperLeg.R', 'RightUpLeg', 'RightUpperLeg', 'RightThigh', 'mixamorigRightUpLeg', 'mixamorig:RightUpLeg', 'Bip001 R Thigh'),
+			rightLowerLeg: pick('LowerLegR', 'LowerLeg.R', 'RightLeg', 'RightLowerLeg', 'RightShin', 'mixamorigRightLeg', 'mixamorig:RightLeg', 'Bip001 R Calf'),
+			rightFoot: pick('FootR', 'Foot.R', 'RightFoot', 'mixamorigRightFoot', 'mixamorig:RightFoot', 'Bip001 R Foot')
 		};
 	}
 
 	function retargetNameMap(targetSkeleton, sourceSkeleton) {
-		const sourceNames = new Set(sourceSkeleton.bones.map(bone => bone.name)); const names = {};
-		// Formal.fbx calls these joints HandL/R; the official female animation FBX
-		// calls the same joints WristL/R. No left/right or upper/lower swap occurs.
-		if (sourceNames.has('WristL')) names.HandL = 'WristL';
-		if (sourceNames.has('WristR')) names.HandR = 'WristR';
+		const targetMap = humanoidBoneMap(targetSkeleton); const sourceMap = humanoidBoneMap(sourceSkeleton); const names = {};
+		Object.keys(targetMap).forEach(key => { if (targetMap[key] && sourceMap[key] && targetMap[key] !== sourceMap[key]) names[targetMap[key]] = sourceMap[key]; });
 		return names;
 	}
 
@@ -89,7 +111,7 @@
 			const match = track.name.match(/^\.bones\[(.+)]\.quaternion$/); const target = match && targetByName.get(match[1]);
 			// Controller owns world/root motion. Retarget only bone rotations; this
 			// prevents source limb translations from collapsing the target skeleton.
-			if (!target || [ 'FootL', 'FootR' ].indexOf(target.name) !== -1) return out;
+			if (!target || isFootBoneName(target.name)) return out;
 			const next = track.clone(); next.name = target.uuid + '.quaternion'; out.push(next); return out;
 		}, []);
 		return new THREE.AnimationClip(clip.name, clip.duration, tracks);
@@ -106,19 +128,23 @@
 			}).filter(clip => clip.tracks.length);
 			return { clips: retargeted, targetBoneNames: targets.reduce((count, mesh) => count + mesh.skeleton.bones.length, 0), skippedTracks: 0, failed: false };
 		}
-		const bindPoseBones = new Set([ 'FootL', 'FootR' ]); const targetsByName = new Map();
+		const targetsByName = new Map();
 		skeleton.bones.forEach(bone => { if (!targetsByName.has(bone.name)) targetsByName.set(bone.name, bone); });
 		let skippedTracks = 0;
 		const retargetedClips = clips.map(clip => {
 			const tracks = [];
 			clip.tracks.forEach(track => {
 				const match = track.name.match(/^(.+)\.(quaternion)$/);
-				if (!match || match[1] === 'CharacterArmature' || bindPoseBones.has(match[1])) { skippedTracks += 1; return; }
+				if (!match || match[1] === 'CharacterArmature' || isFootBoneName(match[1])) { skippedTracks += 1; return; }
 				const target = targetsByName.get(match[1]); if (!target) { skippedTracks += 1; return; }
 				const retargetedTrack = track.clone(); retargetedTrack.name = target.uuid + '.' + match[2]; tracks.push(retargetedTrack);
 			});
 			return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 		});
+		if (!retargetedClips.some(clip => clip.tracks.length) && sourceRig && sourceRig.skeleton && THREE.SkeletonUtils) {
+			const worldRetargeted = clips.map(clip => retargetWorldSpaceClip(clip, targetMesh, sourceRig)).filter(clip => clip.tracks.length);
+			if (worldRetargeted.length) return { clips: worldRetargeted, targetBoneNames: skeleton.bones.length, skippedTracks, failed: false };
+		}
 		return { clips: retargetedClips, targetBoneNames: targetsByName.size, skippedTracks, failed: false };
 	}
 
@@ -487,13 +513,13 @@
 			});
 			character.add(model);
 			this.scene.add(character);
-			this.placeModelOnFloor(model);
+			this.placeModelOnFloor(model, definition);
 			this.addCharacterLabel(character, definition);
 			const mixer = new THREE.AnimationMixer(model);
 			const animationController = new global.LM_NPCAnimationController(mixer, retargetedClips, animationMap, { fadeDuration: 0.32 });
 			const characterController = new global.LM_NPCCharacterController(character, animationController, { speed: 1.65, arrivalThreshold: 0.06, typingAvailable: Boolean(resolvedActions.TYPING), workstationResolver: id => this.workstations.get(id) });
 			animationController.setState(global.LM_NPC_STATES.IDLE);
-			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null };
+			const record = { id: definition.id, definition, character, model, mixer, animationController, characterController, clips: clipTable, primaryMesh: skeletonSource.primaryMesh, skeleton: skeletonSource.primaryMesh.skeleton, skeletonMeshes: skeletonSource.meshes, skeletonStatus: retargetFailed ? 'Không tương thích' : definition.skeleton_status, retargetStatus: retargetFailed ? 'Failed' : retargetMode, sourceRig: (assets.IDLE || Object.values(assets)[0] || {}).sourceRig || null, skeletonHelper: null, officeBaseModelScale: model.scale.clone() };
 			this.characters.set(definition.id, record);
 			this.logSkeleton(record);
 		}
@@ -583,17 +609,24 @@
 			return avatar;
 		}
 
-		placeModelOnFloor(model) {
+		placeModelOnFloor(model, definition) {
 			const THREE = global.THREE;
+			const targetHeight = definition && definition.id === 'employee_002' ? 1.38 : 1.45;
 			model.updateMatrixWorld(true);
 			let box = new THREE.Box3().setFromObject(model);
 			const height = box.getSize(new THREE.Vector3()).y;
 			if (!height) throw new Error('Không thể xác định chiều cao model nhân vật.');
 			// The test scene needs a full-body NPC with ample space around the markers.
-			const scale = 1.45 / height;
+			const scale = THREE.MathUtils.clamp(targetHeight / height, 0.001, 3);
 			model.scale.setScalar(scale);
 			model.updateMatrixWorld(true);
 			box = new THREE.Box3().setFromObject(model);
+			const normalizedHeight = box.getSize(new THREE.Vector3()).y;
+			if (normalizedHeight && (normalizedHeight > 2.05 || normalizedHeight < 0.72)) {
+				model.scale.multiplyScalar(THREE.MathUtils.clamp(targetHeight / normalizedHeight, 0.05, 3));
+				model.updateMatrixWorld(true);
+				box = new THREE.Box3().setFromObject(model);
+			}
 			model.position.y -= box.min.y;
 			model.updateMatrixWorld(true);
 		}
@@ -644,6 +677,7 @@
 			const states = global.LM_NPC_STATES;
 			if (worker.record.isProcedural) return;
 			if (this.officeMode) {
+				if (this.playOfficeAnimatedWorkState(worker)) return;
 				this.setOfficeSeatedWorkPose(worker.record, worker);
 				return;
 			}
@@ -652,6 +686,30 @@
 			const state = preferred.slice(offset).concat(preferred.slice(0, offset)).find(candidate => worker.record.animationController.hasAnimation(candidate)) || states.IDLE;
 			worker.record.animationController.setState(state);
 			worker.phase = (worker.phase + 1) % preferred.length;
+		}
+
+		playOfficeAnimatedWorkState(worker) {
+			if (!worker || !worker.record || !worker.workstation || !worker.record.animationController) return false;
+			const states = global.LM_NPC_STATES;
+			const preferred = [ states.TYPING, states.USING_MOUSE, states.READING, states.WRITING, states.THINKING, states.TALKING, states.SITTING_IDLE ];
+			const offset = worker.phase % preferred.length;
+			const state = preferred.slice(offset).concat(preferred.slice(0, offset)).find(candidate => worker.record.animationController.hasAnimation(candidate));
+			if (!state) return false;
+			this.alignSeatedWorkerToDesk(worker.record, worker.workstation);
+			this.lowerModelIntoSeat(worker.record);
+			worker.record.model.updateMatrixWorld(true);
+			try {
+				worker.record.animationController.setState(state);
+			} catch (error) {
+				global.console.warn('[LM AI Office NPC] Không chạy được animation văn phòng, fallback pose tĩnh:', error);
+				return false;
+			}
+			worker.record.officeFallbackWork = false;
+			worker.record.characterController.target = null;
+			worker.record.characterController.currentInteraction = worker.workstation.id;
+			worker.record.characterController.targetObject = worker.workstation.computer.id;
+			worker.phase = (worker.phase + 1) % preferred.length;
+			return true;
 		}
 
 		setOfficeSeatedWorkPose(record, worker) {
@@ -670,6 +728,8 @@
 			record.animationController.currentAction = null;
 			record.animationController.currentState = 'WORKING';
 			record.animationController.currentAnimation = 'Ngồi làm việc tại bàn';
+			record.officeFallbackWork = true;
+			if (!record.officeFallbackSeed) record.officeFallbackSeed = Math.random() * Math.PI * 2;
 		}
 
 		alignSeatedWorkerToDesk(record, workstation) {
@@ -682,14 +742,69 @@
 
 		lowerModelIntoSeat(record) {
 			if (!record || !record.model) return;
+			if (record.officeBaseModelScale) record.model.scale.copy(record.officeBaseModelScale);
 			if (!record.officeBaseModelPosition) record.officeBaseModelPosition = record.model.position.clone();
 			const base = record.officeBaseModelPosition;
-			const offset = record.id === 'employee_002' ? 0.16 : 0.14;
+			const offset = this.officeSeatOffset(record);
 			record.model.position.set(base.x, base.y - offset, base.z);
+		}
+
+		officeSeatOffset(record) {
+			return record && record.id === 'employee_002' ? 0.16 : 0.14;
+		}
+
+		officeMotionTargets(record) {
+			if (record.officeMotionTargets) return record.officeMotionTargets;
+			record.officeMotionTargets = (record.skeletonMeshes || [ record.primaryMesh ]).map(mesh => {
+				if (!mesh || !mesh.skeleton) return null;
+				const byName = new Map(mesh.skeleton.bones.map(bone => [bone.name, bone]));
+				const map = humanoidBoneMap(mesh.skeleton);
+				const bone = key => map[key] && byName.get(map[key]) ? byName.get(map[key]) : null;
+				return {
+					skeleton: mesh.skeleton,
+					head: bone('head'),
+					leftUpperArm: bone('leftUpperArm'),
+					leftLowerArm: bone('leftLowerArm'),
+					leftHand: bone('leftHand'),
+					rightUpperArm: bone('rightUpperArm'),
+					rightLowerArm: bone('rightLowerArm'),
+					rightHand: bone('rightHand')
+				};
+			}).filter(Boolean);
+			return record.officeMotionTargets;
+		}
+
+		updateOfficeFallbackWork(delta) {
+			if (!this.officeWorkers || !this.officeWorkers.length) return;
+			this.officeWorkers.forEach(worker => {
+				const record = worker.record;
+				if (!record || !record.officeFallbackWork || record.isProcedural) return;
+				record.officeFallbackElapsed = (record.officeFallbackElapsed || 0) + delta;
+				const t = record.officeFallbackElapsed + (record.officeFallbackSeed || 0);
+				if (record.officeBaseModelScale) record.model.scale.copy(record.officeBaseModelScale);
+				if (record.officeBaseModelPosition) {
+					const offset = this.officeSeatOffset(record);
+					record.model.position.y = record.officeBaseModelPosition.y - offset + Math.sin(t * 2.2) * 0.006;
+				}
+				this.officeMotionTargets(record).forEach(target => {
+					target.skeleton.pose();
+					const headY = Math.sin(t * 1.25) * 0.055;
+					const armPulse = Math.sin(t * 7.4) * 0.045;
+					if (target.head) { target.head.rotation.y += headY; target.head.rotation.x += Math.sin(t * 1.7) * 0.018; }
+					if (target.leftUpperArm) { target.leftUpperArm.rotation.z += 0.08 + armPulse * 0.45; target.leftUpperArm.rotation.x += 0.035; }
+					if (target.rightUpperArm) { target.rightUpperArm.rotation.z -= 0.08 + armPulse * 0.45; target.rightUpperArm.rotation.x += 0.035; }
+					if (target.leftLowerArm) target.leftLowerArm.rotation.x += 0.16 + armPulse;
+					if (target.rightLowerArm) target.rightLowerArm.rotation.x += 0.16 - armPulse;
+					if (target.leftHand) target.leftHand.rotation.x += armPulse * 0.65;
+					if (target.rightHand) target.rightHand.rotation.x -= armPulse * 0.65;
+				});
+				record.model.updateMatrixWorld(true);
+			});
 		}
 
 		updateOfficeWork(delta) {
 			if (!this.officeWorkers || !this.officeWorkers.length) return;
+			this.updateOfficeFallbackWork(delta);
 			this.officeWorkElapsed += delta;
 			if (this.officeWorkElapsed < 6) return;
 			this.officeWorkElapsed = 0;
