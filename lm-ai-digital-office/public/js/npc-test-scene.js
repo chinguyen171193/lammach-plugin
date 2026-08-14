@@ -625,7 +625,9 @@
 				const record = this.characters.get(assignment.id);
 				const workstation = this.workstations.get(assignment.desk);
 				if (!record || !workstation) return workers;
-				record.character.position.copy(workstation.chair.sitPoint);
+				const seatPosition = workstation.chair.sitPoint.clone();
+				seatPosition.z -= 0.24;
+				record.character.position.copy(seatPosition);
 				record.character.rotation.y = workstation.chair.sitRotation;
 				record.characterController.target = null;
 				record.characterController.currentInteraction = workstation.id;
@@ -641,8 +643,8 @@
 		playOfficeWorkState(worker) {
 			const states = global.LM_NPC_STATES;
 			if (worker.record.isProcedural) return;
-			if (worker.record.definition.retarget_mode === 'Retargeted') {
-				this.setSafeSeatedWorkPose(worker.record);
+			if (this.officeMode) {
+				this.setSafeSeatedWorkPose(worker.record, worker);
 				return;
 			}
 			const preferred = [ states.TYPING, states.USING_MOUSE, states.READING, states.THINKING, states.SITTING_IDLE, states.IDLE ];
@@ -652,23 +654,79 @@
 			worker.phase = (worker.phase + 1) % preferred.length;
 		}
 
-		setSafeSeatedWorkPose(record) {
+		setSafeSeatedWorkPose(record, worker) {
 			if (record.isProcedural) return;
-			// The female model uses a different skeleton. Until a verified seated clip
-			// is supplied, preserve its intact bind pose at the workstation instead of
-			// allowing an unverified retarget clip to collapse or distort the mesh.
 			record.mixer.stopAllAction();
-			const posed = new Set();
+			const posed = [];
+			const seen = new Set();
 			(record.skeletonMeshes || [ record.primaryMesh ]).forEach(mesh => {
-				if (!posed.has(mesh.skeleton)) {
+				if (mesh && mesh.skeleton && !seen.has(mesh.skeleton)) {
 					mesh.skeleton.pose();
-					posed.add(mesh.skeleton);
+					seen.add(mesh.skeleton);
+					posed.push(mesh.skeleton);
 				}
 			});
+			posed.forEach(skeleton => this.applyOfficeSeatedBonePose(record, skeleton));
+			if (worker && worker.workstation) this.alignSeatedWorkerToDesk(record, worker.workstation);
 			record.model.updateMatrixWorld(true);
 			record.animationController.currentAction = null;
 			record.animationController.currentState = 'WORKING';
-			record.animationController.currentAnimation = 'Tư thế làm việc tại bàn';
+			record.animationController.currentAnimation = 'Ngồi làm việc tại bàn';
+		}
+
+		alignSeatedWorkerToDesk(record, workstation) {
+			if (!record || !workstation) return;
+			const seatPosition = workstation.chair.sitPoint.clone();
+			seatPosition.z -= 0.24;
+			record.character.position.copy(seatPosition);
+			record.character.rotation.y = workstation.chair.sitRotation;
+		}
+
+		applyOfficeSeatedBonePose(record, skeleton) {
+			if (!skeleton || !skeleton.bones) return;
+			const byName = new Map();
+			skeleton.bones.forEach(bone => byName.set(String(bone.name || '').toLowerCase(), bone));
+			const bone = names => names.map(name => byName.get(name.toLowerCase())).find(Boolean);
+			const set = (names, x, y, z) => {
+				const target = bone(names);
+				if (target) target.rotation.set(x, y, z);
+			};
+			const claudia = record.id === 'employee_002';
+			if (claudia) {
+				set([ 'spine_01' ], -0.08, 0, 0);
+				set([ 'spine_02' ], -0.12, 0, 0);
+				set([ 'spine_03' ], -0.08, 0, 0);
+				set([ 'neck' ], 0.1, 0, 0);
+				set([ 'head' ], 0.08, 0, 0);
+				set([ 'upperarm_l' ], 0.68, 0.24, -0.54);
+				set([ 'lowerarm_l' ], 1.08, -0.08, -0.14);
+				set([ 'hand_l' ], 0.05, 0, 0.08);
+				set([ 'upperarm_r' ], 0.68, -0.24, 0.54);
+				set([ 'lowerarm_r' ], 1.08, 0.08, 0.14);
+				set([ 'hand_r' ], 0.05, 0, -0.08);
+				set([ 'upperleg_l' ], -1.28, 0.08, -0.08);
+				set([ 'upperleg_r' ], -1.28, -0.08, 0.08);
+				set([ 'lowerleg_l' ], 1.28, 0, 0);
+				set([ 'lowerleg_r' ], 1.28, 0, 0);
+				set([ 'foot_l' ], 0.12, 0, 0);
+				set([ 'foot_r' ], 0.12, 0, 0);
+				return;
+			}
+			set([ 'Hips' ], -0.08, 0, 0);
+			set([ 'Neck' ], 0.08, 0, 0);
+			set([ 'Head' ], 0.08, 0, 0);
+			set([ 'UpperArm.L' ], 0.64, 0.18, -0.48);
+			set([ 'LowerArm.L' ], 1.02, -0.05, -0.1);
+			set([ 'Hand.L' ], 0.05, 0, 0.08);
+			set([ 'UpperArm.R' ], 0.64, -0.18, 0.48);
+			set([ 'LowerArm.R' ], 1.02, 0.05, 0.1);
+			set([ 'Hand.R' ], 0.05, 0, -0.08);
+			set([ 'UpperLeg.L' ], -1.24, 0.08, -0.04);
+			set([ 'UpperLeg.R' ], -1.24, -0.08, 0.04);
+			set([ 'LowerLeg.L' ], 1.22, 0, 0);
+			set([ 'LowerLeg.R' ], 1.22, 0, 0);
+			set([ 'Foot.L' ], 0.08, 0, 0);
+			set([ 'Foot.R' ], 0.08, 0, 0);
 		}
 
 		updateOfficeWork(delta) {
