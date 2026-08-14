@@ -69,14 +69,15 @@ class LM_AI_Office_Assets {
 	}
 
 	public function npc_test_assets( $in_footer = true ) {
-		wp_enqueue_style( 'lm-ai-office-npc-test', LM_AI_OFFICE_URL . 'public/css/npc-test-scene.css', array(), LM_AI_OFFICE_VERSION );
+		$npc_version = LM_AI_OFFICE_BUILD;
+		wp_enqueue_style( 'lm-ai-office-npc-test', LM_AI_OFFICE_URL . 'public/css/npc-test-scene.css', array(), $npc_version );
 		wp_enqueue_script( 'lm-ai-office-three', LM_AI_OFFICE_URL . 'public/js/vendor/three.min.js', array(), '0.128.0', $in_footer );
 		wp_enqueue_script( 'lm-ai-office-fflate', LM_AI_OFFICE_URL . 'public/js/vendor/fflate.min.js', array(), '0.6.10', $in_footer );
 		wp_enqueue_script( 'lm-ai-office-fbx-loader', LM_AI_OFFICE_URL . 'public/js/vendor/FBXLoader.js', array( 'lm-ai-office-three', 'lm-ai-office-fflate' ), '0.128.0', $in_footer );
 		wp_enqueue_script( 'lm-ai-office-gltf-loader', LM_AI_OFFICE_URL . 'public/js/vendor/GLTFLoader.js', array( 'lm-ai-office-three' ), '0.128.0', $in_footer );
 		wp_enqueue_script( 'lm-ai-office-skeleton-utils', LM_AI_OFFICE_URL . 'public/js/vendor/SkeletonUtils.js', array( 'lm-ai-office-three' ), '0.128.0', $in_footer );
-		wp_enqueue_script( 'lm-ai-office-npc-animation-controller', LM_AI_OFFICE_URL . 'public/js/npc-animation-controller.js', array( 'lm-ai-office-three' ), LM_AI_OFFICE_VERSION, $in_footer );
-		wp_enqueue_script( 'lm-ai-office-npc-character-controller', LM_AI_OFFICE_URL . 'public/js/npc-character-controller.js', array( 'lm-ai-office-three', 'lm-ai-office-npc-animation-controller' ), LM_AI_OFFICE_VERSION, $in_footer );
-		wp_enqueue_script( 'lm-ai-office-npc-test-scene', LM_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'lm-ai-office-fbx-loader', 'lm-ai-office-gltf-loader', 'lm-ai-office-skeleton-utils', 'lm-ai-office-npc-animation-controller', 'lm-ai-office-npc-character-controller' ), LM_AI_OFFICE_VERSION, $in_footer );
+		wp_enqueue_script( 'lm-ai-office-npc-animation-controller', LM_AI_OFFICE_URL . 'public/js/npc-animation-controller.js', array( 'lm-ai-office-three' ), $npc_version, $in_footer );
+		wp_enqueue_script( 'lm-ai-office-npc-character-controller', LM_AI_OFFICE_URL . 'public/js/npc-character-controller.js', array( 'lm-ai-office-three', 'lm-ai-office-npc-animation-controller' ), $npc_version, $in_footer );
+		wp_enqueue_script( 'lm-ai-office-npc-test-scene', LM_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'lm-ai-office-fbx-loader', 'lm-ai-office-gltf-loader', 'lm-ai-office-skeleton-utils', 'lm-ai-office-npc-animation-controller', 'lm-ai-office-npc-character-controller' ), $npc_version, $in_footer );
 	}
 }

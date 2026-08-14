@@ -662,6 +662,9 @@
 				seatPosition.z -= 0.08;
 				record.character.position.copy(seatPosition);
 				record.character.rotation.y = workstation.chair.sitRotation;
+				record.officeBaseCharacterPosition = seatPosition.clone();
+				record.officeBaseCharacterRotationY = workstation.chair.sitRotation;
+				record.officeTargetHeight = record.id === 'employee_002' ? 1.38 : 1.45;
 				record.characterController.target = null;
 				record.characterController.currentInteraction = workstation.id;
 				record.characterController.targetObject = workstation.computer.id;
@@ -738,6 +741,8 @@
 			seatPosition.z -= 0.08;
 			record.character.position.copy(seatPosition);
 			record.character.rotation.y = workstation.chair.sitRotation;
+			record.officeBaseCharacterPosition = seatPosition.clone();
+			record.officeBaseCharacterRotationY = workstation.chair.sitRotation;
 		}
 
 		lowerModelIntoSeat(record) {
@@ -751,6 +756,27 @@
 
 		officeSeatOffset(record) {
 			return record && record.id === 'employee_002' ? 0.16 : 0.14;
+		}
+
+		enforceOfficeCharacterScale(record, workstation) {
+			if (!record || !record.model || record.isProcedural) return;
+			const THREE = global.THREE;
+			record.officeScaleGuardElapsed = (record.officeScaleGuardElapsed || 0) + 1;
+			if (record.officeScaleGuardElapsed % 12 !== 1) return;
+			record.model.updateMatrixWorld(true);
+			const box = new THREE.Box3().setFromObject(record.model);
+			const height = box.getSize(new THREE.Vector3()).y;
+			const targetHeight = record.officeTargetHeight || (record.id === 'employee_002' ? 1.38 : 1.45);
+			if (!height || (height >= 0.78 && height <= 1.92)) return;
+			const factor = THREE.MathUtils.clamp(targetHeight / height, 0.025, 2.25);
+			record.model.scale.multiplyScalar(factor);
+			if (record.officeBaseModelScale) record.officeBaseModelScale.copy(record.model.scale);
+			record.model.updateMatrixWorld(true);
+			if (workstation) {
+				this.alignSeatedWorkerToDesk(record, workstation);
+				this.lowerModelIntoSeat(record);
+			}
+			global.console.info('[LM AI Office NPC] Scale guard applied', record.id, { height: Number(height.toFixed(3)), factor: Number(factor.toFixed(4)) });
 		}
 
 		officeMotionTargets(record) {
@@ -784,19 +810,27 @@
 				if (record.officeBaseModelScale) record.model.scale.copy(record.officeBaseModelScale);
 				if (record.officeBaseModelPosition) {
 					const offset = this.officeSeatOffset(record);
-					record.model.position.y = record.officeBaseModelPosition.y - offset + Math.sin(t * 2.2) * 0.006;
+					record.model.position.y = record.officeBaseModelPosition.y - offset;
+				}
+				if (record.officeBaseCharacterPosition) {
+					record.character.position.set(
+						record.officeBaseCharacterPosition.x + Math.sin(t * 1.45) * 0.012,
+						record.officeBaseCharacterPosition.y + Math.sin(t * 2.25) * 0.026,
+						record.officeBaseCharacterPosition.z + Math.sin(t * 1.15) * 0.014
+					);
+					record.character.rotation.y = (record.officeBaseCharacterRotationY || 0) + Math.sin(t * 1.35) * 0.032;
 				}
 				this.officeMotionTargets(record).forEach(target => {
 					target.skeleton.pose();
-					const headY = Math.sin(t * 1.25) * 0.055;
-					const armPulse = Math.sin(t * 7.4) * 0.045;
-					if (target.head) { target.head.rotation.y += headY; target.head.rotation.x += Math.sin(t * 1.7) * 0.018; }
-					if (target.leftUpperArm) { target.leftUpperArm.rotation.z += 0.08 + armPulse * 0.45; target.leftUpperArm.rotation.x += 0.035; }
-					if (target.rightUpperArm) { target.rightUpperArm.rotation.z -= 0.08 + armPulse * 0.45; target.rightUpperArm.rotation.x += 0.035; }
-					if (target.leftLowerArm) target.leftLowerArm.rotation.x += 0.16 + armPulse;
-					if (target.rightLowerArm) target.rightLowerArm.rotation.x += 0.16 - armPulse;
-					if (target.leftHand) target.leftHand.rotation.x += armPulse * 0.65;
-					if (target.rightHand) target.rightHand.rotation.x -= armPulse * 0.65;
+					const headY = Math.sin(t * 1.25) * 0.13;
+					const armPulse = Math.sin(t * 8.6) * 0.12;
+					if (target.head) { target.head.rotation.y += headY; target.head.rotation.x += Math.sin(t * 1.7) * 0.045; }
+					if (target.leftUpperArm) { target.leftUpperArm.rotation.z += 0.18 + armPulse * 0.55; target.leftUpperArm.rotation.x += 0.075; }
+					if (target.rightUpperArm) { target.rightUpperArm.rotation.z -= 0.18 + armPulse * 0.55; target.rightUpperArm.rotation.x += 0.075; }
+					if (target.leftLowerArm) target.leftLowerArm.rotation.x += 0.32 + armPulse;
+					if (target.rightLowerArm) target.rightLowerArm.rotation.x += 0.32 - armPulse;
+					if (target.leftHand) target.leftHand.rotation.x += armPulse;
+					if (target.rightHand) target.rightHand.rotation.x -= armPulse;
 				});
 				record.model.updateMatrixWorld(true);
 			});
@@ -804,6 +838,7 @@
 
 		updateOfficeWork(delta) {
 			if (!this.officeWorkers || !this.officeWorkers.length) return;
+			this.officeWorkers.forEach(worker => this.enforceOfficeCharacterScale(worker.record, worker.workstation));
 			this.updateOfficeFallbackWork(delta);
 			this.officeWorkElapsed += delta;
 			if (this.officeWorkElapsed < 6) return;

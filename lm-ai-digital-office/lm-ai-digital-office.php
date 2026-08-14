@@ -2,7 +2,7 @@
 /**
  * Plugin Name: LM AI Digital Office
  * Description: Văn phòng số 2.5D mô phỏng nhân viên và AI Agent phối hợp vận hành doanh nghiệp.
- * Version: 1.7.24
+ * Version: 1.7.25
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: LM
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LM_AI_OFFICE_VERSION', '1.7.24' );
-define( 'LM_AI_OFFICE_BUILD', '2026.08.14-shared-office-animation-fallback-11' );
+define( 'LM_AI_OFFICE_VERSION', '1.7.25' );
+define( 'LM_AI_OFFICE_BUILD', '2026.08.14-visible-office-motion-12' );
 define( 'LM_AI_OFFICE_FILE', __FILE__ );
 define( 'LM_AI_OFFICE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LM_AI_OFFICE_URL', plugin_dir_url( __FILE__ ) );
