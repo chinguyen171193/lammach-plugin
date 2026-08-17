@@ -1,0 +1,12 @@
+KayKit : Character Animations (1.1)
+Created/distributed by Kay Lousberg (www.kaylousberg.com)
+
+Source file: Animations/fbx/Rig_Medium/Rig_Medium_MovementBasic.fbx
+Project file: walk.fbx
+Source page: https://kaylousberg.itch.io/kaykit-character-animations
+
+License: Creative Commons Zero (CC0)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The source package states that this content is free to use in personal,
+educational, and commercial projects. Attribution is not mandatory.

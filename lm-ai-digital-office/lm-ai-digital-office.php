@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LM_AI_OFFICE_VERSION', '1.7.29' );
-define( 'LM_AI_OFFICE_BUILD', '2026.08.17-claudia-idle-retarget-01' );
+define( 'LM_AI_OFFICE_VERSION', '1.7.30' );
+define( 'LM_AI_OFFICE_BUILD', '2026.08.17-claudia-walk-retarget-01' );
 define( 'LM_AI_OFFICE_FILE', __FILE__ );
 define( 'LM_AI_OFFICE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LM_AI_OFFICE_URL', plugin_dir_url( __FILE__ ) );

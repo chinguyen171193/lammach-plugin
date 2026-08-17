@@ -31,6 +31,15 @@ Các clip đã được kiểm tra trực tiếp trong GLB: `Idle_Loop`, `Walk_L
 - Giấy phép: CC0 1.0 Universal; bản gốc được lưu tại `docs/assets/employee_001/License.txt`
 - Cấu hình animation đã kiểm tra trực tiếp: `CharacterArmature|Idle_Neutral` và `CharacterArmature|Walk`
 
+## Claudia reference character (NPC test scene)
+
+- Model runtime: `public/assets/characters/reference_character_v1/rp_claudia_rigged_002_yup_a.fbx`
+- Animation Idle runtime: `assets/animations/humanoid/idle.fbx` — Animated Characters 2 by Kenney / Kay Lousberg, CC0.
+- Animation Walk runtime: `assets/animations/humanoid/walk.fbx` — clip `Walking_A` from KayKit Character Animations 1.1 by Kay Lousberg, CC0.
+- Nguồn Walk: <https://kaylousberg.itch.io/kaykit-character-animations>
+- Giấy phép Walk: `assets/animations/humanoid/LICENSE-KAYKIT-CC0.txt`.
+- Runtime chỉ tạo quaternion track đã retarget; không phát position/scale/root-motion track từ source animation.
+
 ## Three.js
 
 - Thư viện runtime: Three.js r128 và addon `GLTFLoader`

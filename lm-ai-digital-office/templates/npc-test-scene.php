@@ -1,5 +1,5 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
-<section id="<?php echo esc_attr( $config['id'] ); ?>" class="lm-npc-test" data-lm-npc-test data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" data-npc-model-url="<?php echo esc_url( $config['reference_model_url'] ); ?>" data-npc-model-format="<?php echo esc_attr( $config['reference_model_format'] ); ?>" data-npc-model-available="<?php echo $config['reference_model_available'] ? 'true' : 'false'; ?>" data-npc-model-path="<?php echo esc_attr( $config['reference_model_path'] ); ?>" data-npc-idle-url="<?php echo esc_url( $config['idle_animation_url'] ); ?>" data-npc-idle-available="<?php echo $config['idle_animation_available'] ? 'true' : 'false'; ?>" style="--lm-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
+<section id="<?php echo esc_attr( $config['id'] ); ?>" class="lm-npc-test" data-lm-npc-test data-npc-version="<?php echo esc_attr( $config['version'] ); ?>" data-npc-model-url="<?php echo esc_url( $config['reference_model_url'] ); ?>" data-npc-model-format="<?php echo esc_attr( $config['reference_model_format'] ); ?>" data-npc-model-available="<?php echo $config['reference_model_available'] ? 'true' : 'false'; ?>" data-npc-model-path="<?php echo esc_attr( $config['reference_model_path'] ); ?>" data-npc-idle-url="<?php echo esc_url( $config['idle_animation_url'] ); ?>" data-npc-idle-available="<?php echo $config['idle_animation_available'] ? 'true' : 'false'; ?>" data-npc-walk-url="<?php echo esc_url( $config['walk_animation_url'] ); ?>" data-npc-walk-available="<?php echo $config['walk_animation_available'] ? 'true' : 'false'; ?>" style="--lm-npc-height:<?php echo esc_attr( $config['height'] ); ?>px">
 	<div class="lm-npc-test__canvas-wrap" data-npc-canvas></div>
 	<aside class="lm-npc-test__panel" data-npc-debug aria-label="NPC developer panel">
 		<h2>REFERENCE_CHARACTER_V1</h2>
@@ -12,7 +12,7 @@
 			<div><dt>Correction Rotation</dt><dd data-npc-forward>—</dd></div><div><dt>Status</dt><dd data-npc-status>Đang chuẩn bị model…</dd></div>
 		</dl>
 		<div class="lm-npc-test__actions" aria-label="NPC controls">
-			<button type="button" data-npc-action="REST_POSE">Rest Pose</button><button type="button" data-npc-action="IDLE">Idle</button><button type="button" data-npc-action="TOGGLE_SKELETON">Hiện bộ xương</button>
+			<button type="button" data-npc-action="REST_POSE">Rest Pose</button><button type="button" data-npc-action="IDLE">Idle</button><button type="button" data-npc-action="WALK">Walk</button><button type="button" data-npc-action="TOGGLE_SKELETON">Hiện bộ xương</button>
 		</div>
 		<details class="lm-npc-test__clips" open><summary>Embedded animations</summary><ul data-npc-clips><li>Đang quét model…</li></ul></details>
 		<details class="lm-npc-test__clips"><summary>Humanoid bone mapping (Developer)</summary><ul data-npc-bone-map><li>Đang map skeleton…</li></ul></details>

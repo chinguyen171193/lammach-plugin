@@ -83,11 +83,12 @@
 		async loadReferenceCharacter() {
 			if (this.root.dataset.npcModelAvailable !== 'true') return this.showError('Không thể tải asset từ Google Drive. Hãy đặt file model vào đường dẫn sau: ' + this.root.dataset.npcModelPath);
 			if (this.root.dataset.npcIdleAvailable !== 'true') return this.showError('Không tìm thấy external Idle animation.');
+			if (this.root.dataset.npcWalkAvailable !== 'true') return this.showError('Không tìm thấy external Walk animation.');
 			try {
 				const url = versionedUrl(this.root.dataset.npcModelUrl, this.root.dataset.npcVersion); const format = this.root.dataset.npcModelFormat;
-				const [ result, idleSource ] = await Promise.all([ this.loadModel(url, format), this.loadFBX(versionedUrl(this.root.dataset.npcIdleUrl, this.root.dataset.npcVersion)) ]);
+				const [ result, idleSource, walkSource ] = await Promise.all([ this.loadModel(url, format), this.loadFBX(versionedUrl(this.root.dataset.npcIdleUrl, this.root.dataset.npcVersion)), this.loadFBX(versionedUrl(this.root.dataset.npcWalkUrl, this.root.dataset.npcVersion)) ]);
 				if (this.destroyed) return;
-				this.installReferenceCharacter(result.model, result.animations, idleSource);
+				this.installReferenceCharacter(result.model, result.animations, idleSource, walkSource);
 				this.start();
 			} catch (error) {
 				global.console.error('[LM AI Office NPC] REFERENCE_CHARACTER_V1 failed to load', error);
@@ -103,7 +104,7 @@
 			return Promise.reject(new Error('Character loader không hỗ trợ định dạng: ' + format));
 		}
 
-		installReferenceCharacter(importedCharacter, embeddedClips, idleSource) {
+		installReferenceCharacter(importedCharacter, embeddedClips, idleSource, walkSource) {
 			const THREE = global.THREE;
 			const npcRoot = new THREE.Group(); npcRoot.name = 'NPCRoot';
 			const modelContainer = new THREE.Group(); modelContainer.name = 'ModelContainer'; modelContainer.rotation.y = MODEL_FORWARD_CORRECTION_RADIANS;
@@ -111,23 +112,29 @@
 			importedCharacter.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
 			const normalization = this.normalizeModel(modelContainer); const forwardAxes = new THREE.AxesHelper(0.45); forwardAxes.name = 'ModelForwardAxisDebug'; modelContainer.add(forwardAxes); const skeletonMeshes = findSkinnedMeshes(importedCharacter);
 			const clips = embeddedClips.slice();
-			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null, mixer: null, idleAction: null, retargetResult: null };
-			this.installIdle(idleSource);
-			this.renderDiagnostics(normalization, skeletonMeshes, clips, this.record.retargetResult);
-			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. Retarget PASS.');
+			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null, mixer: null, idleAction: null, walkAction: null, activeAction: null, retargetResults: null };
+			this.installAnimations(idleSource, walkSource);
+			this.renderDiagnostics(normalization, skeletonMeshes, clips, this.record.retargetResults.idle);
+			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. Idle + Walk retarget PASS.');
 		}
 
-		installIdle(source) {
+		findSourceClip(source, matcher, label) {
+			const clip = (source.animations || []).find(candidate => matcher.test(candidate.name));
+			if (!clip) throw new Error('External source không có ' + label + ' clip.');
+			return clip;
+		}
+
+		installAnimations(idleSource, walkSource) {
 			const targetMesh = this.record.skeletonMeshes[0];
 			if (!targetMesh) throw new Error('Claudia không có SkinnedMesh để retarget.');
-			const sourceClip = (source.animations || []).find(clip => /(^|[|_ ])idle$/i.test(clip.name)) || (source.animations || []).find(clip => /idle/i.test(clip.name));
-			if (!sourceClip) throw new Error('External source không có Idle clip.');
-			const result = new global.LM_HumanoidRetargeter().retarget(source, sourceClip, targetMesh.skeleton);
-			this.record.retargetResult = result;
+			const idleClip = this.findSourceClip(idleSource, /(^|[|_ ])idle$/i, 'Idle');
+			const walkClip = this.findSourceClip(walkSource, /^Walking_A$/i, 'Walk');
+			const retargeter = new global.LM_HumanoidRetargeter(); const idleResult = retargeter.retarget(idleSource, idleClip, targetMesh.skeleton, 'Idle'); const walkResult = retargeter.retarget(walkSource, walkClip, targetMesh.skeleton, 'Walk');
+			this.record.retargetResults = { idle: idleResult, walk: walkResult };
 			this.record.mixer = new global.THREE.AnimationMixer(this.record.importedCharacter);
-			this.record.idleAction = this.record.mixer.clipAction(result.clip);
-			this.setText('[data-npc-retarget]', 'PASS');
-			global.console.info('[LM AI Office NPC] Idle retarget PASS', { sourceClip: sourceClip.name, sourceBones: result.sourceBoneCount, targetBones: result.targetBoneCount, outputTracks: result.clip.tracks.length, rootMotion: result.rootMotion });
+			this.record.idleAction = this.record.mixer.clipAction(idleResult.clip); this.record.walkAction = this.record.mixer.clipAction(walkResult.clip);
+			this.setText('[data-npc-retarget]', 'PASS (Idle + Walk)');
+			global.console.info('[LM AI Office NPC] animation retarget PASS', { idle: { sourceClip: idleClip.name, sourceBones: idleResult.sourceBoneCount, targetBones: idleResult.targetBoneCount, outputTracks: idleResult.clip.tracks.length, profile: idleResult.sourceProfile }, walk: { sourceClip: walkClip.name, sourceBones: walkResult.sourceBoneCount, targetBones: walkResult.targetBoneCount, outputTracks: walkResult.clip.tracks.length, profile: walkResult.sourceProfile }, rootMotion: 'X/Z removed: output contains rotation tracks only.' });
 		}
 
 		normalizeModel(modelContainer) {
@@ -161,19 +168,32 @@
 			if (!this.record) return;
 			if (action === 'REST_POSE') { this.showRestPose(); return; }
 			if (action === 'IDLE') { this.playIdle(); return; }
+			if (action === 'WALK') { this.playWalk(); return; }
 			if (!this.restPoseReviewed && action !== 'TOGGLE_SKELETON') { this.showStatus('Hãy chọn “Xem tư thế gốc” để kiểm tra skinning.'); return; }
 			if (action === 'TOGGLE_SKELETON') { this.toggleSkeleton(); return; }
 		}
 
 		showRestPose() {
 			if (this.record.mixer) this.record.mixer.stopAllAction();
+			this.record.activeAction = null;
 			this.record.skeletonMeshes.forEach(mesh => mesh.skeleton.pose()); this.record.importedCharacter.updateMatrixWorld(true); this.restPoseReviewed = true; this.setStateDisplay('REST POSE'); this.setText('[data-npc-animation]', 'Rest Pose'); this.showStatus('READY — Rest pose đang hiển thị. Nếu hình bị biến dạng, dừng tại đây: Lỗi model hoặc skinning ở trạng thái gốc.');
 		}
 
 		playIdle() {
-			if (!this.record.idleAction) return this.showStatus('Retarget FAIL — Idle action không khả dụng.');
-			this.record.idleAction.reset().setLoop(global.THREE.LoopRepeat, Infinity).fadeIn(0.3).play();
-			this.setStateDisplay('IDLE'); this.setText('[data-npc-animation]', 'Idle'); this.setText('[data-npc-animation-source]', 'external'); this.showStatus('READY — Idle external đang chạy.');
+			this.playAnimation('IDLE', 'Idle', this.record.idleAction, 'external — Kenney Animated Characters 2');
+		}
+
+		playWalk() {
+			this.playAnimation('WALK', 'Walk', this.record.walkAction, 'external — KayKit 1.1 (CC0)');
+		}
+
+		playAnimation(state, label, action, source) {
+			if (!action) return this.showStatus('Retarget FAIL — ' + label + ' action không khả dụng.');
+			const previous = this.record.activeAction;
+			if (previous === action) return;
+			action.reset().setLoop(global.THREE.LoopRepeat, Infinity).setEffectiveTimeScale(1).setEffectiveWeight(1).play();
+			if (previous) action.crossFadeFrom(previous, 0.3, false); else action.fadeIn(0.3);
+			this.record.activeAction = action; this.setStateDisplay(state); this.setText('[data-npc-animation]', label); this.setText('[data-npc-animation-source]', source); this.showStatus('READY — ' + label + ' external đang chạy tại chỗ (root X/Z removed).');
 		}
 
 		toggleSkeleton() {
