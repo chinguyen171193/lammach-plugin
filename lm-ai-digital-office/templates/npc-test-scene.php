@@ -11,9 +11,7 @@
 			<div><dt>Correction Rotation</dt><dd data-npc-forward>—</dd></div><div><dt>Status</dt><dd data-npc-status>Đang chuẩn bị model…</dd></div>
 		</dl>
 		<div class="lm-npc-test__actions" aria-label="NPC controls">
-			<button type="button" data-npc-action="REST_POSE">Xem tư thế gốc</button><button type="button" data-npc-action="PLAY_IDLE">Chờ việc</button>
-			<button type="button" data-npc-action="GO_A">Đi A</button><button type="button" data-npc-action="GO_B">Đi B</button><button type="button" data-npc-action="GO_C">Đi C</button>
-			<button type="button" data-npc-action="STOP">Dừng</button><button type="button" data-npc-action="TOGGLE_SKELETON">Hiện bộ xương</button>
+			<button type="button" data-npc-action="REST_POSE">Xem tư thế gốc</button><button type="button" data-npc-action="TOGGLE_SKELETON">Hiện bộ xương</button>
 		</div>
 		<details class="lm-npc-test__clips" open><summary>Embedded animations</summary><ul data-npc-clips><li>Đang quét model…</li></ul></details>
 		<details class="lm-npc-test__clips"><summary>Skeleton (Developer)</summary><ul data-npc-bones><li>Chưa có skeleton.</li></ul></details>
