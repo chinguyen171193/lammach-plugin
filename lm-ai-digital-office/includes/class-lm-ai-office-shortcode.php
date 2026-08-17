@@ -35,6 +35,7 @@ class LM_AI_Office_Shortcode {
 	public function render_npc_test( $atts ) {
 		$atts = shortcode_atts( array( 'height' => '620', 'office' => 'no' ), $atts, 'lm_ai_office_npc_test' );
 		$reference_model_relative_path = 'public/assets/characters/reference_character_v1/rp_claudia_rigged_002_yup_a.fbx';
+		$idle_animation_relative_path = 'assets/animations/humanoid/idle.fbx';
 		$config = array(
 			'id'         => 'lm-ai-office-npc-' . wp_generate_uuid4(),
 			'height'     => min( 1000, max( 380, absint( $atts['height'] ) ) ),
@@ -43,6 +44,8 @@ class LM_AI_Office_Shortcode {
 			'reference_model_path' => $reference_model_relative_path,
 			'reference_model_format' => 'fbx',
 			'reference_model_available' => file_exists( LM_AI_OFFICE_DIR . $reference_model_relative_path ),
+			'idle_animation_url' => LM_AI_OFFICE_URL . $idle_animation_relative_path,
+			'idle_animation_available' => file_exists( LM_AI_OFFICE_DIR . $idle_animation_relative_path ),
 		);
 		$assets = new LM_AI_Office_Assets();
 		$assets->npc_test_assets();

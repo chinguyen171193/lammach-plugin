@@ -56,7 +56,7 @@
 		}
 
 		checkDependencies() {
-			const format = this.root.dataset.npcModelFormat; const report = { expectedThreeRevision: EXPECTED_THREE_REVISION, threeRevision: global.THREE && global.THREE.REVISION || null, fflate: typeof global.fflate === 'object', fbxLoader: Boolean(global.THREE && global.THREE.FBXLoader), gltfLoader: Boolean(global.THREE && global.THREE.GLTFLoader), modelFormat: format };
+			const format = this.root.dataset.npcModelFormat; const report = { expectedThreeRevision: EXPECTED_THREE_REVISION, threeRevision: global.THREE && global.THREE.REVISION || null, fflate: typeof global.fflate === 'object', fbxLoader: Boolean(global.THREE && global.THREE.FBXLoader), humanoidRetargeter: typeof global.LM_HumanoidRetargeter === 'function', gltfLoader: Boolean(global.THREE && global.THREE.GLTFLoader), modelFormat: format };
 			global.LM_NPC_DEPENDENCY_REPORT = report;
 			global.console.log('THREE', report.threeRevision);
 			global.console.info('[LM AI Office NPC] dependency check', report);
@@ -66,6 +66,7 @@
 			global.__LM_AI_OFFICE_THREE_REVISION__ = global.THREE.REVISION;
 			if (format === 'fbx' && typeof global.fflate !== 'object') return 'Dependency failed: fflate is missing (required by FBXLoader).';
 			if (format === 'fbx' && !global.THREE.FBXLoader) return 'Dependency failed: FBXLoader is missing (public/js/vendor/FBXLoader.js).';
+			if (!global.LM_HumanoidRetargeter) return 'Dependency failed: HumanoidRetargeter is missing (public/js/humanoid-retargeter.js).';
 			if ((format === 'glb' || format === 'gltf') && !global.THREE.GLTFLoader) return 'Dependency failed: GLTFLoader is missing (public/js/vendor/GLTFLoader.js).';
 			return '';
 		}
@@ -81,11 +82,12 @@
 
 		async loadReferenceCharacter() {
 			if (this.root.dataset.npcModelAvailable !== 'true') return this.showError('Không thể tải asset từ Google Drive. Hãy đặt file model vào đường dẫn sau: ' + this.root.dataset.npcModelPath);
+			if (this.root.dataset.npcIdleAvailable !== 'true') return this.showError('Không tìm thấy external Idle animation.');
 			try {
 				const url = versionedUrl(this.root.dataset.npcModelUrl, this.root.dataset.npcVersion); const format = this.root.dataset.npcModelFormat;
-				const result = await this.loadModel(url, format);
+				const [ result, idleSource ] = await Promise.all([ this.loadModel(url, format), this.loadFBX(versionedUrl(this.root.dataset.npcIdleUrl, this.root.dataset.npcVersion)) ]);
 				if (this.destroyed) return;
-				this.installReferenceCharacter(result.model, result.animations);
+				this.installReferenceCharacter(result.model, result.animations, idleSource);
 				this.start();
 			} catch (error) {
 				global.console.error('[LM AI Office NPC] REFERENCE_CHARACTER_V1 failed to load', error);
@@ -93,13 +95,15 @@
 			}
 		}
 
+		loadFBX(url) { return new Promise((resolve, reject) => new global.THREE.FBXLoader().load(url, resolve, undefined, reject)); }
+
 		loadModel(url, format) {
 			if (format === 'fbx' && global.THREE.FBXLoader) return new Promise((resolve, reject) => new global.THREE.FBXLoader().load(url, model => resolve({ model, animations: model.animations || [] }), undefined, reject));
 			if ((format === 'glb' || format === 'gltf') && global.THREE.GLTFLoader) return new Promise((resolve, reject) => new global.THREE.GLTFLoader().load(url, gltf => resolve({ model: gltf.scene, animations: gltf.animations || [] }), undefined, reject));
 			return Promise.reject(new Error('Character loader không hỗ trợ định dạng: ' + format));
 		}
 
-		installReferenceCharacter(importedCharacter, embeddedClips) {
+		installReferenceCharacter(importedCharacter, embeddedClips, idleSource) {
 			const THREE = global.THREE;
 			const npcRoot = new THREE.Group(); npcRoot.name = 'NPCRoot';
 			const modelContainer = new THREE.Group(); modelContainer.name = 'ModelContainer'; modelContainer.rotation.y = MODEL_FORWARD_CORRECTION_RADIANS;
@@ -107,9 +111,23 @@
 			importedCharacter.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
 			const normalization = this.normalizeModel(modelContainer); const forwardAxes = new THREE.AxesHelper(0.45); forwardAxes.name = 'ModelForwardAxisDebug'; modelContainer.add(forwardAxes); const skeletonMeshes = findSkinnedMeshes(importedCharacter);
 			const clips = embeddedClips.slice();
-			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null };
-			this.renderDiagnostics(normalization, skeletonMeshes, clips);
-			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations.');
+			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null, mixer: null, idleAction: null, retargetResult: null };
+			this.installIdle(idleSource);
+			this.renderDiagnostics(normalization, skeletonMeshes, clips, this.record.retargetResult);
+			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. Retarget PASS.');
+		}
+
+		installIdle(source) {
+			const targetMesh = this.record.skeletonMeshes[0];
+			if (!targetMesh) throw new Error('Claudia không có SkinnedMesh để retarget.');
+			const sourceClip = (source.animations || []).find(clip => /(^|[|_ ])idle$/i.test(clip.name)) || (source.animations || []).find(clip => /idle/i.test(clip.name));
+			if (!sourceClip) throw new Error('External source không có Idle clip.');
+			const result = new global.LM_HumanoidRetargeter().retarget(source, sourceClip, targetMesh.skeleton);
+			this.record.retargetResult = result;
+			this.record.mixer = new global.THREE.AnimationMixer(this.record.importedCharacter);
+			this.record.idleAction = this.record.mixer.clipAction(result.clip);
+			this.setText('[data-npc-retarget]', 'PASS');
+			global.console.info('[LM AI Office NPC] Idle retarget PASS', { sourceClip: sourceClip.name, sourceBones: result.sourceBoneCount, targetBones: result.targetBoneCount, outputTracks: result.clip.tracks.length, rootMotion: result.rootMotion });
 		}
 
 		normalizeModel(modelContainer) {
@@ -122,13 +140,14 @@
 			return { originalHeight, scaleFactor, finalHeight };
 		}
 
-		renderDiagnostics(normalization, meshes, clips) {
-			const set = (selector, value) => { const node = this.root.querySelector(selector); if (node) node.textContent = value; };
+		renderDiagnostics(normalization, meshes, clips, retargetResult) {
+			const set = (selector, value) => this.setText(selector, value);
 			set('[data-npc-height]', normalization.originalHeight.toFixed(3) + 'm → ' + normalization.finalHeight.toFixed(3) + 'm (scale ' + normalization.scaleFactor.toFixed(5) + ')'); set('[data-npc-model-forward]', 'local +Z (blue debug axis)'); set('[data-npc-forward]', (MODEL_FORWARD_CORRECTION_RADIANS * 180 / Math.PI).toFixed(1) + '°');
 			const boneCount = meshes.reduce((count, mesh) => count + mesh.skeleton.bones.length, 0); set('[data-npc-skeleton]', meshes.length ? boneCount + ' bones / ' + meshes.length + ' skinned mesh(es)' : 'Model không có skeleton');
 			const clipList = this.root.querySelector('[data-npc-clips]'); clipList.innerHTML = clips.length ? clips.map(clip => '<li>' + this.escape(clip.name) + ' · ' + Number(clip.duration.toFixed(3)) + 's · ' + clip.tracks.length + ' tracks</li>').join('') : '<li>0 animations</li>';
 			const boneList = this.root.querySelector('[data-npc-bones]'); const bones = meshes.length ? meshes[0].skeleton.bones : [];
 			boneList.innerHTML = bones.length ? bones.map(bone => '<li>' + this.escape(bone.name) + (bone.parent && bone.parent.isBone ? ' ← ' + this.escape(bone.parent.name) : ' (root)') + '</li>').join('') : '<li>Không có skeleton.</li>';
+			const mappingList = this.root.querySelector('[data-npc-bone-map]'); mappingList.innerHTML = retargetResult ? retargetResult.mapping.map(item => '<li>' + this.escape(item.semantic) + ': ' + this.escape(item.source) + ' → ' + this.escape(item.target) + ' (' + item.status + ')</li>').join('') : '<li>Retarget chưa sẵn sàng.</li>';
 			global.console.groupCollapsed('[LM AI Office NPC] embedded animation clips'); global.console.table(clips.map(clip => ({ name: clip.name, duration: clip.duration, tracks: clip.tracks.length }))); global.console.groupEnd();
 		}
 
@@ -141,12 +160,20 @@
 		handleAction(action) {
 			if (!this.record) return;
 			if (action === 'REST_POSE') { this.showRestPose(); return; }
+			if (action === 'IDLE') { this.playIdle(); return; }
 			if (!this.restPoseReviewed && action !== 'TOGGLE_SKELETON') { this.showStatus('Hãy chọn “Xem tư thế gốc” để kiểm tra skinning.'); return; }
 			if (action === 'TOGGLE_SKELETON') { this.toggleSkeleton(); return; }
 		}
 
 		showRestPose() {
-			this.record.skeletonMeshes.forEach(mesh => mesh.skeleton.pose()); this.record.importedCharacter.updateMatrixWorld(true); this.restPoseReviewed = true; this.setStateDisplay('REST POSE'); this.showStatus('READY — Rest pose đang hiển thị. Nếu hình bị biến dạng, dừng tại đây: Lỗi model hoặc skinning ở trạng thái gốc.');
+			if (this.record.mixer) this.record.mixer.stopAllAction();
+			this.record.skeletonMeshes.forEach(mesh => mesh.skeleton.pose()); this.record.importedCharacter.updateMatrixWorld(true); this.restPoseReviewed = true; this.setStateDisplay('REST POSE'); this.setText('[data-npc-animation]', 'Rest Pose'); this.showStatus('READY — Rest pose đang hiển thị. Nếu hình bị biến dạng, dừng tại đây: Lỗi model hoặc skinning ở trạng thái gốc.');
+		}
+
+		playIdle() {
+			if (!this.record.idleAction) return this.showStatus('Retarget FAIL — Idle action không khả dụng.');
+			this.record.idleAction.reset().setLoop(global.THREE.LoopRepeat, Infinity).fadeIn(0.3).play();
+			this.setStateDisplay('IDLE'); this.setText('[data-npc-animation]', 'Idle'); this.setText('[data-npc-animation-source]', 'external'); this.showStatus('READY — Idle external đang chạy.');
 		}
 
 		toggleSkeleton() {
@@ -155,11 +182,12 @@
 			this.record.skeletonHelper = new global.THREE.SkeletonHelper(this.record.importedCharacter); this.scene.add(this.record.skeletonHelper); this.showStatus('Đang hiện bộ xương. Chi tiết bone ở Developer panel.');
 		}
 
-		setStateDisplay(state) { const node = this.root.querySelector('[data-npc-state]'); if (node) node.textContent = state; }
+		setText(selector, value) { const node = this.root.querySelector(selector); if (node) node.textContent = value; }
+		setStateDisplay(state) { this.setText('[data-npc-state]', state); }
 		showStatus(message) { const node = this.root.querySelector('[data-npc-status]'); if (node) node.textContent = message; }
 		showError(message) { const error = this.root.querySelector('[data-npc-error]'); error.textContent = message; error.hidden = false; this.showStatus(message); }
 
-		start() { const tick = timestamp => { if (this.destroyed) return; this.frame = global.requestAnimationFrame(tick); this.previousTime = timestamp; if (this.record && this.record.skeletonHelper) this.record.skeletonHelper.update(); this.renderer.render(this.scene, this.camera); }; this.frame = global.requestAnimationFrame(tick); }
+		start() { const tick = timestamp => { if (this.destroyed) return; this.frame = global.requestAnimationFrame(tick); const delta = this.previousTime ? Math.min((timestamp - this.previousTime) / 1000, 0.1) : 0; this.previousTime = timestamp; if (this.record) { if (this.record.mixer) this.record.mixer.update(delta); if (this.record.skeletonHelper) this.record.skeletonHelper.update(); } this.renderer.render(this.scene, this.camera); }; this.frame = global.requestAnimationFrame(tick); }
 		destroy() { this.destroyed = true; global.cancelAnimationFrame(this.frame); if (this.resizeObserver) this.resizeObserver.disconnect(); if (this.resizeHandler) global.removeEventListener('resize', this.resizeHandler); if (this.orbit) this.orbit.destroy(); if (this.renderer) this.renderer.dispose(); }
 	}
 

@@ -74,6 +74,7 @@ class LM_AI_Office_Assets {
 		wp_enqueue_script( 'lm-ai-office-three', LM_AI_OFFICE_URL . 'public/js/vendor/three.min.js', array(), '0.128.0', $in_footer );
 		wp_enqueue_script( 'lm-ai-office-fflate', LM_AI_OFFICE_URL . 'public/js/vendor/fflate.min.js', array(), '0.6.10', $in_footer );
 		wp_enqueue_script( 'lm-ai-office-fbx-loader', LM_AI_OFFICE_URL . 'public/js/vendor/FBXLoader.js', array( 'lm-ai-office-three', 'lm-ai-office-fflate' ), '0.128.0', $in_footer );
-		wp_enqueue_script( 'lm-ai-office-npc-test-scene', LM_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'lm-ai-office-fbx-loader' ), $npc_version, $in_footer );
+		wp_enqueue_script( 'lm-ai-office-humanoid-retargeter', LM_AI_OFFICE_URL . 'public/js/humanoid-retargeter.js', array( 'lm-ai-office-three' ), $npc_version, $in_footer );
+		wp_enqueue_script( 'lm-ai-office-npc-test-scene', LM_AI_OFFICE_URL . 'public/js/npc-test-scene.js', array( 'lm-ai-office-fbx-loader', 'lm-ai-office-humanoid-retargeter' ), $npc_version, $in_footer );
 	}
 }
