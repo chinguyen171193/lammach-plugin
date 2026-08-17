@@ -34,12 +34,15 @@ class LM_AI_Office_Shortcode {
 	 */
 	public function render_npc_test( $atts ) {
 		$atts = shortcode_atts( array( 'height' => '620', 'office' => 'no' ), $atts, 'lm_ai_office_npc_test' );
+		$reference_model_relative_path = 'public/assets/characters/reference_character_v1/rp_claudia_rigged_002_yup_a.fbx';
 		$config = array(
 			'id'         => 'lm-ai-office-npc-' . wp_generate_uuid4(),
 			'height'     => min( 1000, max( 380, absint( $atts['height'] ) ) ),
-			'characters_endpoint' => rest_url( 'lm-ai-office/v1/characters' ),
 			'version'    => LM_AI_OFFICE_BUILD,
-			'office_mode' => 'yes' === $atts['office'],
+			'reference_model_url' => LM_AI_OFFICE_URL . $reference_model_relative_path,
+			'reference_model_path' => $reference_model_relative_path,
+			'reference_model_format' => 'fbx',
+			'reference_model_available' => file_exists( LM_AI_OFFICE_DIR . $reference_model_relative_path ),
 		);
 		$assets = new LM_AI_Office_Assets();
 		$assets->npc_test_assets();
@@ -48,9 +51,8 @@ class LM_AI_Office_Shortcode {
 		return ob_get_clean();
 	}
 
-	/** Renders the two registered 3D employees working at their desks. */
+	/** Compatibility alias for the isolated reference-character test scene. */
 	public function render_3d_office( $atts ) {
-		$atts['office'] = 'yes';
 		return $this->render_npc_test( $atts );
 	}
 }
