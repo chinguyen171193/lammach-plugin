@@ -67,18 +67,34 @@
 			const mapping = this.buildMapping(sourceRoot, targetSkeleton); const sourceBones = mapping.sourceBones; const sourceTrackByName = quaternionTrackMap(sourceClip);
 			const times = Array.from(new Set(mapping.entries.flatMap(entry => Array.from((sourceTrackByName.get(entry.source.name) || { times: [] }).times)))).sort((a, b) => a - b);
 			if (!times.length) throw new Error('Source không có quaternion tracks cho humanoid mapping.');
-			const sourceRestWorld = new Map(sourceBones.map(bone => [ bone, bone.getWorldQuaternion(new global.THREE.Quaternion()) ])); const targetRestWorld = new Map(mapping.entries.map(entry => [ entry.target, entry.target.getWorldQuaternion(new global.THREE.Quaternion()) ])); const output = new Map(mapping.entries.map(entry => [ entry.target, [] ]));
-
-			times.forEach(time => {
-				const localCurrent = new Map(sourceBones.map(bone => [ bone, sampleQuaternion(sourceTrackByName.get(bone.name), time, bone.quaternion) ])); const sourceCurrentWorld = new Map();
-				const sourceWorld = bone => { if (sourceCurrentWorld.has(bone)) return sourceCurrentWorld.get(bone); const parent = bone.parent; const parentWorld = parent && parent.isBone ? sourceWorld(parent) : parent ? parent.getWorldQuaternion(new global.THREE.Quaternion()) : new global.THREE.Quaternion(); const value = parentWorld.clone().multiply(localCurrent.get(bone)); sourceCurrentWorld.set(bone, value); return value; };
-				const targetCurrentWorld = new Map();
-				const targetWorld = bone => { if (targetCurrentWorld.has(bone)) return targetCurrentWorld.get(bone); const parent = bone.parent; const parentWorld = parent && parent.isBone ? targetWorld(parent) : parent ? parent.getWorldQuaternion(new global.THREE.Quaternion()) : new global.THREE.Quaternion(); const value = parentWorld.clone().multiply(bone.quaternion); targetCurrentWorld.set(bone, value); return value; };
-				mapping.entries.forEach(entry => { const sourceDelta = sourceRestWorld.get(entry.source).clone().invert().multiply(sourceWorld(entry.source)); const targetCurrent = targetRestWorld.get(entry.target).clone().multiply(sourceDelta); const parent = entry.target.parent; const parentWorld = parent && parent.isBone ? targetWorld(parent) : parent ? parent.getWorldQuaternion(new global.THREE.Quaternion()) : new global.THREE.Quaternion(); const local = parentWorld.clone().invert().multiply(targetCurrent).normalize(); targetCurrentWorld.set(entry.target, targetCurrent); output.get(entry.target).push(local.x, local.y, local.z, local.w); });
+			const sourceRestLocal = new Map(sourceBones.map(bone => [ bone, bone.quaternion.clone() ]));
+			const targetRestLocal = new Map(mapping.entries.map(entry => [ entry.target, entry.target.quaternion.clone() ]));
+			const sourceRestWorld = new Map(sourceBones.map(bone => [ bone, bone.getWorldQuaternion(new global.THREE.Quaternion()) ]));
+			const targetRestWorld = new Map(mapping.entries.map(entry => [ entry.target, entry.target.getWorldQuaternion(new global.THREE.Quaternion()) ]));
+			const sourceToTargetLocal = new Map(mapping.entries.map(entry => [ entry, targetRestWorld.get(entry.target).clone().invert().multiply(sourceRestWorld.get(entry.source)).normalize() ]));
+			const output = new Map(mapping.entries.map(entry => [ entry.target, [] ]));
+			const angularReport = mapping.entries.map(entry => {
+				const correction = sourceToTargetLocal.get(entry); let maxDeltaDeg = 0;
+				times.forEach(time => { const delta = sourceRestLocal.get(entry.source).clone().invert().multiply(sampleQuaternion(sourceTrackByName.get(entry.source.name), time, sourceRestLocal.get(entry.source))).normalize(); maxDeltaDeg = Math.max(maxDeltaDeg, global.THREE.MathUtils.radToDeg(2 * Math.acos(Math.min(1, Math.abs(delta.w))))); });
+				const restOffsetDeg = global.THREE.MathUtils.radToDeg(2 * Math.acos(Math.min(1, Math.abs(correction.w))));
+				return { source: entry.source.name, target: entry.target.name, restOffsetDeg: Number(restOffsetDeg.toFixed(2)), currentDeltaDeg: Number(maxDeltaDeg.toFixed(2)), flag: maxDeltaDeg > 150 ? 'CHECK >150°' : 'OK' };
 			});
 
+			times.forEach(time => {
+				mapping.entries.forEach(entry => {
+					// The delta stays in source LOCAL bone space. Convert its basis using
+					// each bone's bind/rest world orientation, then restore target LOCAL rest.
+					const sourceAnimatedLocal = sampleQuaternion(sourceTrackByName.get(entry.source.name), time, sourceRestLocal.get(entry.source));
+					const sourceLocalDelta = sourceRestLocal.get(entry.source).clone().invert().multiply(sourceAnimatedLocal).normalize();
+					const correction = sourceToTargetLocal.get(entry); const convertedDelta = correction.clone().multiply(sourceLocalDelta).multiply(correction.clone().invert()).normalize();
+					const targetAnimatedLocal = targetRestLocal.get(entry.target).clone().multiply(convertedDelta).normalize();
+					output.get(entry.target).push(targetAnimatedLocal.x, targetAnimatedLocal.y, targetAnimatedLocal.z, targetAnimatedLocal.w);
+				});
+			});
+
+			global.console.table(angularReport);
 			const tracks = mapping.entries.map(entry => new global.THREE.QuaternionKeyframeTrack(entry.target.uuid + '.quaternion', times, output.get(entry.target))); const clip = new global.THREE.AnimationClip(outputName || sourceClip.name, sourceClip.duration, tracks);
-			return { clip, mapping: mapping.report, sourceProfile: mapping.profile, sourceBoneCount: mapping.sourceBoneCount, targetBoneCount: mapping.targetBoneCount, rootMotion: 'X/Z removed: output contains rotation tracks only.' };
+			return { clip, mapping: mapping.report, sourceProfile: mapping.profile, sourceBoneCount: mapping.sourceBoneCount, targetBoneCount: mapping.targetBoneCount, angularReport, rootMotion: 'X/Z removed: output contains rotation tracks only.' };
 		}
 	}
 

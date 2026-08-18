@@ -14,8 +14,12 @@
 		<div class="lm-npc-test__actions" aria-label="NPC controls">
 			<button type="button" data-npc-action="REST_POSE">Rest Pose</button><button type="button" data-npc-action="IDLE">Idle</button><button type="button" data-npc-action="WALK">Walk</button><button type="button" data-npc-action="TOGGLE_SKELETON">Hiện bộ xương</button>
 		</div>
+		<div class="lm-npc-test__actions" aria-label="Walk retarget debug controls">
+			<button type="button" data-npc-action="WALK_SOURCE_REST">Walk source rest</button><button type="button" data-npc-action="WALK_FRAME_0">Walk frame 0</button><button type="button" data-npc-action="WALK_FRAME_10">Walk frame 10</button><button type="button" data-npc-action="WALK_FRAME_20">Walk frame 20</button>
+		</div>
 		<details class="lm-npc-test__clips" open><summary>Embedded animations</summary><ul data-npc-clips><li>Đang quét model…</li></ul></details>
 		<details class="lm-npc-test__clips"><summary>Humanoid bone mapping (Developer)</summary><ul data-npc-bone-map><li>Đang map skeleton…</li></ul></details>
+		<details class="lm-npc-test__clips" open><summary>Retarget debug (Source pink · Target cyan)</summary><ul data-npc-retarget-debug><li>Đang tạo debug report…</li></ul></details>
 		<details class="lm-npc-test__clips"><summary>Skeleton (Developer)</summary><ul data-npc-bones><li>Chưa có skeleton.</li></ul></details>
 		<p class="lm-npc-test__hint">Kéo chuột trái để xoay · chuột phải để pan · cuộn để zoom.</p>
 	</aside>

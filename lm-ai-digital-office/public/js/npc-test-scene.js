@@ -3,6 +3,8 @@
 
 	const TARGET_HEIGHT_METERS = 1.72;
 	const EXPECTED_THREE_REVISION = '128';
+	const RETARGET_DEBUG = true;
+	const WALK_FRAME_RATE = 30;
 	// This is the only allowed orientation adjustment. Verify it with the axes
 	// helper after the reference asset is installed; never alter a bone to rotate.
 	const MODEL_FORWARD_CORRECTION_RADIANS = 0;
@@ -112,10 +114,10 @@
 			importedCharacter.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
 			const normalization = this.normalizeModel(modelContainer); const forwardAxes = new THREE.AxesHelper(0.45); forwardAxes.name = 'ModelForwardAxisDebug'; modelContainer.add(forwardAxes); const skeletonMeshes = findSkinnedMeshes(importedCharacter);
 			const clips = embeddedClips.slice();
-			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null, mixer: null, idleAction: null, walkAction: null, activeAction: null, retargetResults: null };
+			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null, mixer: null, idleAction: null, walkAction: null, activeAction: null, retargetResults: null, debugSource: null, debugSourceMixer: null, debugSourceWalkAction: null, debugSourceMeshes: [] };
 			this.installAnimations(idleSource, walkSource);
 			this.renderDiagnostics(normalization, skeletonMeshes, clips, this.record.retargetResults.idle);
-			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. Idle + Walk retarget PASS.');
+			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. Walk retarget technical PASS; inspect debug frames.');
 		}
 
 		findSourceClip(source, matcher, label) {
@@ -133,8 +135,22 @@
 			this.record.retargetResults = { idle: idleResult, walk: walkResult };
 			this.record.mixer = new global.THREE.AnimationMixer(this.record.importedCharacter);
 			this.record.idleAction = this.record.mixer.clipAction(idleResult.clip); this.record.walkAction = this.record.mixer.clipAction(walkResult.clip);
-			this.setText('[data-npc-retarget]', 'PASS (Idle + Walk)');
+			this.setText('[data-npc-retarget]', 'TECHNICAL PASS — visual review');
 			global.console.info('[LM AI Office NPC] animation retarget PASS', { idle: { sourceClip: idleClip.name, sourceBones: idleResult.sourceBoneCount, targetBones: idleResult.targetBoneCount, outputTracks: idleResult.clip.tracks.length, profile: idleResult.sourceProfile }, walk: { sourceClip: walkClip.name, sourceBones: walkResult.sourceBoneCount, targetBones: walkResult.targetBoneCount, outputTracks: walkResult.clip.tracks.length, profile: walkResult.sourceProfile }, rootMotion: 'X/Z removed: output contains rotation tracks only.' });
+			if (RETARGET_DEBUG) this.installRetargetDebug(walkSource, walkClip, walkResult);
+		}
+
+		installRetargetDebug(source, sourceClip, result) {
+			const THREE = global.THREE; source.updateMatrixWorld(true);
+			const box = new THREE.Box3().setFromObject(source); const height = box.getSize(new THREE.Vector3()).y;
+			if (height > 0) source.scale.setScalar(TARGET_HEIGHT_METERS / height);
+			source.updateMatrixWorld(true); const grounded = new THREE.Box3().setFromObject(source); source.position.set(-1.5, -grounded.min.y, 0); source.updateMatrixWorld(true);
+			source.traverse(object => { if (object.isMesh) object.visible = false; }); this.scene.add(source);
+			const helper = new THREE.SkeletonHelper(source); helper.name = 'KayKitSourceSkeletonDebug'; helper.material.color.setHex(0xff4fc3); this.scene.add(helper);
+			this.record.debugSource = { root: source, helper }; this.record.debugSourceMeshes = findSkinnedMeshes(source); this.record.debugSourceMixer = new THREE.AnimationMixer(source); this.record.debugSourceWalkAction = this.record.debugSourceMixer.clipAction(sourceClip);
+			const list = this.root.querySelector('[data-npc-retarget-debug]');
+			if (list) list.innerHTML = [ '<li>RETARGET_DEBUG = true · KayKit source skeleton: pink · target: click “Hiện bộ xương” (cyan).</li>', '<li>Source bind pose: KayKit Rig Medium near T-pose; Claudia bind pose: A-pose. The per-bone rest correction converts between them.</li>' ].concat(result.angularReport.map(item => '<li>' + this.escape(item.source) + ' → ' + this.escape(item.target) + ' · rest offset ' + item.restOffsetDeg + '° · max delta ' + item.currentDeltaDeg + '° · ' + item.flag + '</li>')).join('');
+			global.console.table(result.angularReport);
 		}
 
 		normalizeModel(modelContainer) {
@@ -169,22 +185,47 @@
 			if (action === 'REST_POSE') { this.showRestPose(); return; }
 			if (action === 'IDLE') { this.playIdle(); return; }
 			if (action === 'WALK') { this.playWalk(); return; }
+			if (action === 'WALK_SOURCE_REST') { this.showWalkSourceRest(); return; }
+			if (action === 'WALK_FRAME_0') { this.showWalkFrame(0); return; }
+			if (action === 'WALK_FRAME_10') { this.showWalkFrame(10); return; }
+			if (action === 'WALK_FRAME_20') { this.showWalkFrame(20); return; }
 			if (!this.restPoseReviewed && action !== 'TOGGLE_SKELETON') { this.showStatus('Hãy chọn “Xem tư thế gốc” để kiểm tra skinning.'); return; }
 			if (action === 'TOGGLE_SKELETON') { this.toggleSkeleton(); return; }
 		}
 
 		showRestPose() {
 			if (this.record.mixer) this.record.mixer.stopAllAction();
+			if (this.record.debugSourceMixer) this.record.debugSourceMixer.stopAllAction();
 			this.record.activeAction = null;
-			this.record.skeletonMeshes.forEach(mesh => mesh.skeleton.pose()); this.record.importedCharacter.updateMatrixWorld(true); this.restPoseReviewed = true; this.setStateDisplay('REST POSE'); this.setText('[data-npc-animation]', 'Rest Pose'); this.showStatus('READY — Rest pose đang hiển thị. Nếu hình bị biến dạng, dừng tại đây: Lỗi model hoặc skinning ở trạng thái gốc.');
+			this.record.skeletonMeshes.forEach(mesh => mesh.skeleton.pose()); this.record.debugSourceMeshes.forEach(mesh => mesh.skeleton.pose()); this.record.importedCharacter.updateMatrixWorld(true); if (this.record.debugSource) this.record.debugSource.root.updateMatrixWorld(true); this.restPoseReviewed = true; this.setStateDisplay('REST POSE'); this.setText('[data-npc-animation]', 'Rest Pose'); this.showStatus('READY — Rest pose đang hiển thị. Nếu hình bị biến dạng, dừng tại đây: Lỗi model hoặc skinning ở trạng thái gốc.');
 		}
 
 		playIdle() {
+			if (this.record.debugSourceMixer) { this.record.debugSourceMixer.stopAllAction(); this.record.debugSourceMeshes.forEach(mesh => mesh.skeleton.pose()); }
 			this.playAnimation('IDLE', 'Idle', this.record.idleAction, 'external — Kenney Animated Characters 2');
 		}
 
 		playWalk() {
 			this.playAnimation('WALK', 'Walk', this.record.walkAction, 'external — KayKit 1.1 (CC0)');
+			this.playDebugSourceWalk();
+		}
+
+		playDebugSourceWalk() {
+			const action = this.record.debugSourceWalkAction;
+			if (!action) return;
+			action.reset().setLoop(global.THREE.LoopRepeat, Infinity).setEffectiveWeight(1).play();
+		}
+
+		showWalkSourceRest() {
+			this.showRestPose(); this.setStateDisplay('WALK SOURCE REST'); this.setText('[data-npc-animation]', 'Walk source rest frame'); this.showStatus('DEBUG — KayKit source bind/rest pose (pink) và Claudia rest pose (target) đang hiển thị.');
+		}
+
+		showWalkFrame(frame) {
+			const seconds = frame / WALK_FRAME_RATE; const targetAction = this.record.walkAction; const sourceAction = this.record.debugSourceWalkAction;
+			if (!targetAction) return this.showStatus('Retarget FAIL — Walk action không khả dụng.');
+			this.record.mixer.stopAllAction(); targetAction.reset().setLoop(global.THREE.LoopOnce, 1).setEffectiveWeight(1).play(); targetAction.time = seconds; targetAction.paused = true; this.record.mixer.update(0);
+			if (sourceAction && this.record.debugSourceMixer) { this.record.debugSourceMixer.stopAllAction(); sourceAction.reset().setLoop(global.THREE.LoopOnce, 1).setEffectiveWeight(1).play(); sourceAction.time = seconds; sourceAction.paused = true; this.record.debugSourceMixer.update(0); }
+			this.record.activeAction = null; this.setStateDisplay('WALK FRAME ' + frame); this.setText('[data-npc-animation]', 'Walk frame ' + frame + ' (' + seconds.toFixed(3) + 's)'); this.setText('[data-npc-animation-source]', 'debug — KayKit source pink / Claudia target cyan'); this.showStatus('DEBUG — Walk frame ' + frame + ' đang dừng để kiểm tra mapped bones.');
 		}
 
 		playAnimation(state, label, action, source) {
@@ -207,7 +248,7 @@
 		showStatus(message) { const node = this.root.querySelector('[data-npc-status]'); if (node) node.textContent = message; }
 		showError(message) { const error = this.root.querySelector('[data-npc-error]'); error.textContent = message; error.hidden = false; this.showStatus(message); }
 
-		start() { const tick = timestamp => { if (this.destroyed) return; this.frame = global.requestAnimationFrame(tick); const delta = this.previousTime ? Math.min((timestamp - this.previousTime) / 1000, 0.1) : 0; this.previousTime = timestamp; if (this.record) { if (this.record.mixer) this.record.mixer.update(delta); if (this.record.skeletonHelper) this.record.skeletonHelper.update(); } this.renderer.render(this.scene, this.camera); }; this.frame = global.requestAnimationFrame(tick); }
+		start() { const tick = timestamp => { if (this.destroyed) return; this.frame = global.requestAnimationFrame(tick); const delta = this.previousTime ? Math.min((timestamp - this.previousTime) / 1000, 0.1) : 0; this.previousTime = timestamp; if (this.record) { if (this.record.mixer) this.record.mixer.update(delta); if (this.record.debugSourceMixer) this.record.debugSourceMixer.update(delta); if (this.record.skeletonHelper) this.record.skeletonHelper.update(); if (this.record.debugSource) this.record.debugSource.helper.update(); } this.renderer.render(this.scene, this.camera); }; this.frame = global.requestAnimationFrame(tick); }
 		destroy() { this.destroyed = true; global.cancelAnimationFrame(this.frame); if (this.resizeObserver) this.resizeObserver.disconnect(); if (this.resizeHandler) global.removeEventListener('resize', this.resizeHandler); if (this.orbit) this.orbit.destroy(); if (this.renderer) this.renderer.dispose(); }
 	}
 
