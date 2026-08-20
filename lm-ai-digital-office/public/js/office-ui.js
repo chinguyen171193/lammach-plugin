@@ -33,7 +33,7 @@
 			}));
 		}
 
-		action(action) {
+		async action(action) {
 			if (action === 'demo') this.engine.runDemo();
 			if (action === 'zoom-in') this.engine.zoomBy(1.15);
 			if (action === 'zoom-out') this.engine.zoomBy(.87);
@@ -45,10 +45,15 @@
 			}
 			if (action === 'task') this.showTask();
 			if (action === 'build') {
-				if (this.engine.buildMode) this.engine.buildMode.activate();
+				if (this.engine.liveMode) this.engine.liveMode.deactivate();
+				if (this.engine.buildMode) await this.engine.buildMode.activate();
 				else this.bus.log({ actor: 'Hệ thống', department: 'ai_center', level: 'warning', message: 'Không thể bật Chế độ xây dựng.' });
 			}
-			if (action === 'activity' && this.engine.buildMode) this.engine.buildMode.deactivate();
+			if (action === 'activity') {
+				if (this.engine.liveMode) {
+					await this.engine.liveMode.activate();
+				} else if (this.engine.buildMode) this.engine.buildMode.deactivate();
+			}
 			if (action === 'sound') {
 				const key = 'datAiOfficeSound';
 				localStorage.setItem(key, localStorage.getItem(key) === '1' ? '0' : '1');

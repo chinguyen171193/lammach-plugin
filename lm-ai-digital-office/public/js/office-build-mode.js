@@ -52,9 +52,11 @@
 			this.config = engine.config;
 			this.shell = this.root.querySelector('[data-office-build]');
 			this.canvasHost = this.root.querySelector('[data-office-build-canvas]');
+			this.panel = this.root.querySelector('[data-office-build-panel]');
 			this.assetHost = this.root.querySelector('[data-office-build-assets]');
 			this.selectionPanel = this.root.querySelector('[data-office-build-selection]');
 			this.selectionName = this.root.querySelector('[data-office-build-selection-name]');
+			this.selectionEmpty = this.root.querySelector('[data-office-build-object-empty], .lm-ai-office__build-no-selection');
 			this.statusElement = this.root.querySelector('[data-office-build-status]');
 			this.assetFilter = 'ALL';
 			this.assets = [];
@@ -67,6 +69,9 @@
 			this.pendingAsset = null;
 			this.hydrated = false;
 			this.enabled = false;
+			this.mode = 'inactive';
+			this.panelState = this.defaultPanelState();
+			this.panelTab = 'library';
 			this.destroyed = false;
 			this.frame = 0;
 			this.pointer = null;
@@ -74,6 +79,9 @@
 			this.dataPromise = null;
 			if (!this.shell || !this.canvasHost) return;
 			this.bindPanel();
+			this.setPanelState(this.panelState);
+			this.setPanelTab(this.panelTab);
+			this.updateObjectTab();
 			this.dataPromise = this.fetchData();
 			this.dataPromise.catch(error => {
 				this.fetchError = error;
@@ -83,6 +91,10 @@
 
 		available() {
 			return Boolean(this.shell && this.canvasHost && global.THREE && global.THREE.GLTFLoader);
+		}
+
+		defaultPanelState() {
+			return global.matchMedia && global.matchMedia('(max-width: 1280px)').matches ? 'compact' : 'expanded';
 		}
 
 		async fetchData() {
@@ -107,49 +119,115 @@
 				this.root.querySelectorAll('[data-build-category]').forEach(item => item.classList.toggle('is-active', item === button));
 				this.renderAssetPanel();
 			}));
-			this.assetHost.addEventListener('click', event => {
+			if (this.assetHost) this.assetHost.addEventListener('click', event => {
 				const button = event.target.closest('[data-build-asset-id]');
 				if (button) this.preparePlacement(button.dataset.buildAssetId);
 			});
 			this.root.querySelectorAll('[data-build-action]').forEach(button => button.addEventListener('click', () => this.runAction(button.dataset.buildAction)));
 			const save = this.root.querySelector('[data-build-save]');
 			if (save) save.addEventListener('click', () => this.save());
+			this.root.querySelectorAll('[data-build-panel-state]').forEach(button => button.addEventListener('click', () => this.setPanelState(button.dataset.buildPanelState)));
+			this.root.querySelectorAll('[data-build-panel-tab]').forEach(button => button.addEventListener('click', () => this.setPanelTab(button.dataset.buildPanelTab)));
+		}
+
+		setPanelState(state) {
+			const valid = ['expanded', 'compact', 'collapsed'];
+			this.panelState = valid.indexOf(state) !== -1 ? state : this.defaultPanelState();
+			if (!this.panel) return;
+			this.panel.dataset.panelState = this.panelState;
+			valid.forEach(value => this.panel.classList.toggle('is-' + value, value === this.panelState));
+			this.root.querySelectorAll('[data-build-panel-state]').forEach(button => {
+				const active = button.dataset.buildPanelState === this.panelState;
+				button.classList.toggle('is-active', active);
+				button.setAttribute('aria-pressed', active ? 'true' : 'false');
+			});
+		}
+
+		setPanelTab(tab) {
+			this.panelTab = tab === 'object' ? 'object' : 'library';
+			this.root.querySelectorAll('[data-build-panel-tab]').forEach(button => {
+				const active = button.dataset.buildPanelTab === this.panelTab;
+				button.classList.toggle('is-active', active);
+				button.setAttribute('aria-selected', active ? 'true' : 'false');
+			});
+			this.root.querySelectorAll('[data-build-panel-pane]').forEach(pane => {
+				const active = pane.dataset.buildPanelPane === this.panelTab;
+				pane.hidden = !active;
+				pane.classList.toggle('is-active', active);
+			});
+			this.updateObjectTab();
+		}
+
+		updateObjectTab() {
+			const hasSelection = Boolean(this.selected);
+			if (this.selectionPanel) this.selectionPanel.hidden = !hasSelection;
+			if (this.selectionEmpty) this.selectionEmpty.hidden = hasSelection;
 		}
 
 		async activate() {
+			return this.activateMode('build');
+		}
+
+		async activateLive() {
+			return this.activateMode('live');
+		}
+
+		async activateMode(mode) {
 			if (!this.available()) {
-				this.setStatus('Không thể bật Xây dựng vì Three.js/GLTFLoader chưa sẵn sàng.');
+				this.setStatus('Không thể bật scene 3D vì Three.js/GLTFLoader chưa sẵn sàng.');
 				return false;
 			}
 			if (this.destroyed) return false;
 			this.enabled = true;
-			this.root.classList.add('is-build-mode');
+			this.mode = mode === 'live' ? 'live' : 'build';
+			this.root.classList.toggle('is-build-mode', this.mode === 'build');
+			this.root.classList.toggle('is-live-mode', this.mode === 'live');
 			this.shell.hidden = false;
-			this.setModeButtons('build');
+			this.shell.dataset.officeSceneMode = this.mode;
+			this.setModeButtons(this.mode === 'build' ? 'build' : 'activity');
 			this.initRenderer();
 			try {
 				await this.dataPromise;
-				if (!this.enabled) return false;
+				if (!this.enabled || this.mode !== mode) return false;
 				if (!this.hydrated) await this.hydrate();
-				if (!this.enabled) return false;
-				this.setStatus(this.pendingAsset ? 'Click xuống sàn để đặt ' + this.pendingAsset.name + '.' : 'Chọn một tài sản, sau đó click xuống sàn để đặt.');
+				if (!this.enabled || this.mode !== mode) return false;
+				if (this.mode === 'build') {
+					this.setStatus(this.pendingAsset ? 'Click xuống sàn để đặt ' + this.pendingAsset.name + '.' : 'Chọn một tài sản, sau đó click xuống sàn để đặt.');
+				} else {
+					this.pendingAsset = null;
+					this.clearSelection();
+				}
 			} catch (error) {
-				this.setStatus('Không thể tải dữ liệu xây dựng: ' + error.message);
+				this.setStatus('Không thể tải scene 3D: ' + error.message);
 			}
 			this.resize();
 			this.startRenderLoop();
+			this.notifyModeChange();
 			return true;
 		}
 
 		deactivate() {
 			if (!this.shell) return;
 			this.enabled = false;
+			this.mode = 'inactive';
 			this.pendingAsset = null;
-			this.root.classList.remove('is-build-mode');
+			this.root.classList.remove('is-build-mode', 'is-live-mode');
 			this.shell.hidden = true;
 			this.setModeButtons('activity');
 			global.cancelAnimationFrame(this.frame);
 			this.frame = 0;
+			this.notifyModeChange();
+		}
+
+		deactivateLive() {
+			if (this.mode === 'live') this.deactivate();
+		}
+
+		notifyModeChange() {
+			if (!this.root || typeof global.CustomEvent !== 'function') return;
+			this.root.dispatchEvent(new global.CustomEvent('lm-ai-office:scene-mode', {
+				detail: { mode: this.mode, objectCount: this.instances.size, buildMode: this },
+			}));
 		}
 
 		setModeButtons(mode) {
@@ -222,7 +300,7 @@
 				if (!this.pointer || this.pointer.id !== event.pointerId) return;
 				const click = this.pointer.button === 0 && !this.pointer.moved;
 				this.pointer = null;
-				if (click && this.enabled) this.handleCanvasClick(event);
+				if (click && this.enabled && this.mode === 'build') this.handleCanvasClick(event);
 			};
 			this.onCanvasWheel = event => {
 				event.preventDefault();
@@ -264,6 +342,7 @@
 		}
 
 		async preparePlacement(assetId) {
+			if (this.mode !== 'build') return;
 			const asset = this.assetsById.get(assetId);
 			if (!asset || !asset.model || !asset.model.available || !asset.model.url) {
 				this.setStatus('Tài sản này có lỗi mô hình và chưa thể đặt.');
@@ -388,8 +467,9 @@
 			this.selected = root;
 			this.selectionHelper = new global.THREE.BoxHelper(root, 0x65ecff);
 			this.scene.add(this.selectionHelper);
-			if (this.selectionPanel) this.selectionPanel.hidden = false;
 			if (this.selectionName) this.selectionName.textContent = (root.userData.asset.name || 'Object') + ' · ' + root.userData.instance.instance_id;
+			this.updateObjectTab();
+			if (this.mode === 'build') this.setPanelTab('object');
 			this.updateDebug();
 		}
 
@@ -401,11 +481,12 @@
 			}
 			this.selectionHelper = null;
 			this.selected = null;
-			if (this.selectionPanel) this.selectionPanel.hidden = true;
+			this.updateObjectTab();
 			this.updateDebug();
 		}
 
 		async runAction(action) {
+			if (this.mode !== 'build') return;
 			if (!this.selected) {
 				this.setStatus('Hãy chọn một object đã đặt trước.');
 				return;
