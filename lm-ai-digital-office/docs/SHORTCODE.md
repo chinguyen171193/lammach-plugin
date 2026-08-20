@@ -9,6 +9,8 @@ Các thuộc tính `height`, `mode`, `theme`, `fullscreen`, `show_dashboard`, `s
 
 Asset chỉ được enqueue khi shortcode được render, tương thích Gutenberg, Elementor và theme thông thường.
 
+Tài khoản có quyền quản trị sẽ thấy hai mode **Hoạt động** và **Xây dựng**. Build Mode dùng Thư viện tài sản GLB và lưu bố trí theo site. Xem hướng dẫn đầy đủ tại [ASSET-LIBRARY-BUILD-MODE.md](ASSET-LIBRARY-BUILD-MODE.md).
+
 ## NPC 3D test (FBX)
 
 Shortcode `[lm_ai_office_npc_test]` tạo scene kiểm thử độc lập cho

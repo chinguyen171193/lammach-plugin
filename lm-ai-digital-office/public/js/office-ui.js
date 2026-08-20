@@ -44,6 +44,11 @@
 				else document.exitFullscreen && document.exitFullscreen();
 			}
 			if (action === 'task') this.showTask();
+			if (action === 'build') {
+				if (this.engine.buildMode) this.engine.buildMode.activate();
+				else this.bus.log({ actor: 'Hệ thống', department: 'ai_center', level: 'warning', message: 'Không thể bật Chế độ xây dựng.' });
+			}
+			if (action === 'activity' && this.engine.buildMode) this.engine.buildMode.deactivate();
 			if (action === 'sound') {
 				const key = 'datAiOfficeSound';
 				localStorage.setItem(key, localStorage.getItem(key) === '1' ? '0' : '1');

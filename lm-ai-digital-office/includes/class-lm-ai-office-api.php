@@ -9,6 +9,26 @@ class LM_AI_Office_API {
 		foreach ( array( 'status' => 'status', 'departments' => 'departments', 'agents' => 'agents', 'workflows' => 'workflows', 'events' => 'events' ) as $route => $callback ) {
 			register_rest_route( $this->namespace, '/' . $route, array( 'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, $callback ), 'permission_callback' => '__return_true' ) );
 		}
+		register_rest_route(
+			$this->namespace,
+			'/assets',
+			array(
+				array( 'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, 'assets' ), 'permission_callback' => '__return_true' ),
+				array( 'methods' => WP_REST_Server::CREATABLE, 'callback' => array( $this, 'create_asset' ), 'permission_callback' => array( $this, 'can_manage' ) ),
+			)
+		);
+		register_rest_route(
+			$this->namespace,
+			'/assets/(?P<asset_id>asset_[a-z0-9_-]+)',
+			array(
+				array( 'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, 'asset' ), 'permission_callback' => '__return_true' ),
+				array( 'methods' => WP_REST_Server::EDITABLE, 'callback' => array( $this, 'update_asset' ), 'permission_callback' => array( $this, 'can_manage' ) ),
+				array( 'methods' => WP_REST_Server::DELETABLE, 'callback' => array( $this, 'delete_asset' ), 'permission_callback' => array( $this, 'can_manage' ) ),
+			)
+		);
+		$this->register_scene_route( '/scene' );
+		// Compatibility alias for clients that used the earlier V1 prototype name.
+		$this->register_scene_route( '/scene/current' );
 		register_rest_route( $this->namespace, '/tasks', array(
 			array( 'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, 'tasks' ), 'permission_callback' => array( $this, 'can_manage' ) ),
 			array( 'methods' => WP_REST_Server::CREATABLE, 'callback' => array( $this, 'create_task' ), 'permission_callback' => array( $this, 'can_manage' ) ),
@@ -24,6 +44,79 @@ class LM_AI_Office_API {
 
 	public function can_manage( WP_REST_Request $request ) {
 		return is_user_logged_in() && current_user_can( 'manage_options' ) && wp_verify_nonce( $request->get_header( 'X-WP-Nonce' ), 'wp_rest' );
+	}
+
+	/** Registers the single, site-level Build Mode scene endpoint. */
+	private function register_scene_route( $route ) {
+		register_rest_route(
+			$this->namespace,
+			$route,
+			array(
+				array( 'methods' => WP_REST_Server::READABLE, 'callback' => array( $this, 'scene' ), 'permission_callback' => '__return_true' ),
+				array( 'methods' => WP_REST_Server::EDITABLE, 'callback' => array( $this, 'save_scene' ), 'permission_callback' => array( $this, 'can_manage' ) ),
+			)
+		);
+	}
+
+	/** @return WP_REST_Response */
+	public function assets( WP_REST_Request $request ) {
+		$raw_category = $request->get_param( 'category' );
+		$category     = is_scalar( $raw_category ) ? strtoupper( sanitize_key( $raw_category ) ) : '';
+		$assets   = LM_AI_Office_Asset_Library::definitions();
+		if ( $category ) {
+			$assets = array_values( array_filter( $assets, static fn( $asset ) => $category === ( $asset['category'] ?? '' ) ) );
+		}
+		return rest_ensure_response( $assets );
+	}
+
+	/** @return WP_REST_Response|WP_Error */
+	public function asset( WP_REST_Request $request ) {
+		$asset = LM_AI_Office_Asset_Library::definition( $request['asset_id'] );
+		if ( empty( $asset ) ) {
+			return new WP_Error( 'lm_ai_office_asset_not_found', 'Không tìm thấy tài sản.', array( 'status' => 404 ) );
+		}
+		return rest_ensure_response( $asset );
+	}
+
+	/** @return WP_REST_Response|WP_Error */
+	public function create_asset( WP_REST_Request $request ) {
+		$asset = LM_AI_Office_Asset_Library::create( $this->request_data( $request ) );
+		if ( is_wp_error( $asset ) ) {
+			return $asset;
+		}
+		return new WP_REST_Response( $asset, 201 );
+	}
+
+	/** @return WP_REST_Response|WP_Error */
+	public function update_asset( WP_REST_Request $request ) {
+		$asset = LM_AI_Office_Asset_Library::update( $request['asset_id'], $this->request_data( $request ) );
+		return is_wp_error( $asset ) ? $asset : rest_ensure_response( $asset );
+	}
+
+	/** @return WP_REST_Response|WP_Error */
+	public function delete_asset( WP_REST_Request $request ) {
+		$result = LM_AI_Office_Asset_Library::delete( $request['asset_id'] );
+		return is_wp_error( $result ) ? $result : rest_ensure_response( array( 'deleted' => true ) );
+	}
+
+	/** @return WP_REST_Response */
+	public function scene() {
+		return rest_ensure_response( LM_AI_Office_Asset_Library::scene() );
+	}
+
+	/** @return WP_REST_Response|WP_Error */
+	public function save_scene( WP_REST_Request $request ) {
+		$scene = LM_AI_Office_Asset_Library::save_scene( $this->request_data( $request ) );
+		return is_wp_error( $scene ) ? $scene : rest_ensure_response( $scene );
+	}
+
+	/** @return array */
+	private function request_data( WP_REST_Request $request ) {
+		$params = $request->get_json_params();
+		if ( ! is_array( $params ) || empty( $params ) ) {
+			$params = $request->get_params();
+		}
+		return is_array( $params ) ? $params : array();
 	}
 	public function status() {
 		$data = LM_AI_Office::dataset();

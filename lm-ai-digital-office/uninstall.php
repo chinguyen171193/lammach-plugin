@@ -11,3 +11,5 @@ delete_option( 'lm_ai_office_settings' );
 delete_option( 'lm_ai_office_seeded' );
 delete_option( 'lm_ai_office_animation_library' );
 delete_option( 'lm_ai_office_character_models' );
+delete_option( 'lm_ai_office_asset_library' );
+delete_option( 'lm_ai_office_build_scene' );
