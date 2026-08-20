@@ -3,6 +3,9 @@
 
 	const ROTATION_STEP = Math.PI / 12;
 	const MOVE_STEP = 0.25;
+	const TAP_MAX_DURATION = 420;
+	const TAP_DISTANCE_MOUSE = 5;
+	const TAP_DISTANCE_TOUCH = 8;
 
 	function number(value, fallback) {
 		return Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -36,6 +39,10 @@
 		return [value.x, value.y, value.z].map(item => Number(item).toFixed(2)).join(', ');
 	}
 
+	function now() {
+		return global.performance && typeof global.performance.now === 'function' ? global.performance.now() : Date.now();
+	}
+
 	function apiError(response, fallback) {
 		return response.json().then(body => {
 			throw new Error(body && body.message ? body.message : fallback);
@@ -58,6 +65,7 @@
 			this.selectionName = this.root.querySelector('[data-office-build-selection-name]');
 			this.selectionEmpty = this.root.querySelector('[data-office-build-object-empty], .lm-ai-office__build-no-selection');
 			this.statusElement = this.root.querySelector('[data-office-build-status]');
+			this.debugPanel = this.root.querySelector('[data-office-build-debug]');
 			this.assetFilter = 'ALL';
 			this.assets = [];
 			this.assetsById = new Map();
@@ -74,7 +82,9 @@
 			this.panelTab = 'library';
 			this.destroyed = false;
 			this.frame = 0;
-			this.pointer = null;
+			this.inputPointers = new Map();
+			this.inputState = { input: '—', touches: 0, gesture: '—' };
+			this.twoFingerStart = null;
 			this.fetchError = null;
 			this.dataPromise = null;
 			if (!this.shell || !this.canvasHost) return;
@@ -90,7 +100,7 @@
 		}
 
 		available() {
-			return Boolean(this.shell && this.canvasHost && global.THREE && global.THREE.GLTFLoader);
+			return Boolean(this.shell && this.canvasHost && global.THREE && global.THREE.GLTFLoader && global.THREE.OrbitControls);
 		}
 
 		defaultPanelState() {
@@ -174,7 +184,7 @@
 
 		async activateMode(mode) {
 			if (!this.available()) {
-				this.setStatus('Không thể bật scene 3D vì Three.js/GLTFLoader chưa sẵn sàng.');
+				this.setStatus('Không thể bật scene 3D vì Three.js/GLTFLoader/OrbitControls chưa sẵn sàng.');
 				return false;
 			}
 			if (this.destroyed) return false;
@@ -186,6 +196,7 @@
 			this.shell.dataset.officeSceneMode = this.mode;
 			this.setModeButtons(this.mode === 'build' ? 'build' : 'activity');
 			this.initRenderer();
+			if (this.controls) this.controls.enabled = true;
 			try {
 				await this.dataPromise;
 				if (!this.enabled || this.mode !== mode) return false;
@@ -211,6 +222,8 @@
 			this.enabled = false;
 			this.mode = 'inactive';
 			this.pendingAsset = null;
+			this.clearInputPointers();
+			if (this.controls) this.controls.enabled = false;
 			this.root.classList.remove('is-build-mode', 'is-live-mode');
 			this.shell.hidden = true;
 			this.setModeButtons('activity');
@@ -241,7 +254,6 @@
 			this.scene.background = new THREE.Color(0x07131f);
 			this.camera = new THREE.PerspectiveCamera(48, 1, 0.01, 500);
 			this.camera.position.set(7, 8, 9);
-			this.camera.lookAt(0, 0, 0);
 			this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 			this.renderer.setPixelRatio(Math.min(global.devicePixelRatio || 1, 2));
 			this.renderer.outputEncoding = THREE.sRGBEncoding;
@@ -265,8 +277,28 @@
 			this.scene.add(this.floor, new THREE.GridHelper(36, 36, 0x356b85, 0x234756));
 			this.raycaster = new THREE.Raycaster();
 			this.pointerNdc = new THREE.Vector2();
-			this.orbit = { target: new THREE.Vector3(0, 0, 0), radius: 13.5, theta: 0.72, phi: 0.86 };
-			this.updateCamera();
+			this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+			this.controls.target.set(0, 0, 0);
+			this.controls.enableRotate = true;
+			this.controls.enableZoom = true;
+			this.controls.enablePan = true;
+			this.controls.enableDamping = true;
+			this.controls.dampingFactor = 0.08;
+			this.controls.minDistance = 3;
+			this.controls.maxDistance = 45;
+			this.controls.minPolarAngle = 0.18;
+			this.controls.maxPolarAngle = Math.PI / 2 - 0.08;
+			this.controls.screenSpacePanning = false;
+			this.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+			this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+			this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+			this.controls.touches.ONE = THREE.TOUCH.ROTATE;
+			this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+			if (this.debugPanel) {
+				this.onControlsChange = () => this.updateDebug();
+				this.controls.addEventListener('change', this.onControlsChange);
+			}
+			this.controls.update();
 			this.bindCanvas();
 			if ('ResizeObserver' in global) {
 				this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -279,47 +311,154 @@
 
 		bindCanvas() {
 			const canvas = this.renderer.domElement;
-			this.onCanvasDown = event => {
-				this.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, button: event.button, moved: false };
-				if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
+			// OrbitControls owns camera movement. These Pointer Events only decide whether a
+			// release is a safe Build Mode tap, so camera gestures can never place an asset.
+			this.onCanvasPointerDown = event => this.startInputPointer(event);
+			this.onCanvasPointerMove = event => this.moveInputPointer(event);
+			this.onCanvasPointerUp = event => this.finishInputPointer(event, false);
+			this.onCanvasPointerCancel = event => this.finishInputPointer(event, true);
+			this.onCanvasPointerLeave = event => {
+				if (event.pointerType !== 'touch') this.finishInputPointer(event, true);
 			};
-			this.onCanvasMove = event => {
-				if (!this.pointer || this.pointer.id !== event.pointerId) return;
-				const dx = event.clientX - this.pointer.x;
-				const dy = event.clientY - this.pointer.y;
-				if (Math.abs(event.clientX - this.pointer.startX) + Math.abs(event.clientY - this.pointer.startY) > 4) this.pointer.moved = true;
-				if (this.pointer.button === 2 || this.pointer.button === 1) {
-					this.orbit.theta -= dx * 0.008;
-					this.orbit.phi = Math.max(0.18, Math.min(Math.PI - 0.18, this.orbit.phi + dy * 0.008));
-					this.updateCamera();
-				}
-				this.pointer.x = event.clientX;
-				this.pointer.y = event.clientY;
+			this.onCanvasLostPointerCapture = event => this.finishInputPointer(event, true);
+			this.onCanvasTouchStart = event => {
+				if (!this.enabled || !event.touches || event.touches.length < 2) return;
+				this.markMultiTouchGesture();
+				this.setInputState('Touch', 'PAN', event.touches.length);
 			};
-			this.onCanvasUp = event => {
-				if (!this.pointer || this.pointer.id !== event.pointerId) return;
-				const click = this.pointer.button === 0 && !this.pointer.moved;
-				this.pointer = null;
-				if (click && this.enabled && this.mode === 'build') this.handleCanvasClick(event);
+			canvas.addEventListener('pointerdown', this.onCanvasPointerDown);
+			canvas.addEventListener('pointermove', this.onCanvasPointerMove);
+			canvas.addEventListener('pointerup', this.onCanvasPointerUp);
+			canvas.addEventListener('pointercancel', this.onCanvasPointerCancel);
+			canvas.addEventListener('pointerleave', this.onCanvasPointerLeave);
+			canvas.addEventListener('lostpointercapture', this.onCanvasLostPointerCapture);
+			canvas.addEventListener('touchstart', this.onCanvasTouchStart, { passive: true });
+		}
+
+		inputLabel(pointerType) {
+			if (pointerType === 'touch') return 'Touch';
+			if (pointerType === 'pen') return 'Pen';
+			return 'Mouse';
+		}
+
+		activeTouchPointers() {
+			return Array.from(this.inputPointers.values()).filter(pointer => pointer.pointerType === 'touch');
+		}
+
+		setInputState(input, gesture, touchCount) {
+			this.inputState = {
+				input: input || '—',
+				touches: Number.isFinite(touchCount) ? touchCount : this.activeTouchPointers().length,
+				gesture: gesture || '—',
 			};
-			this.onCanvasWheel = event => {
-				event.preventDefault();
-				this.orbit.radius = Math.max(3, Math.min(45, this.orbit.radius + event.deltaY * 0.012));
-				this.updateCamera();
+			this.updateDebug();
+		}
+
+		getTwoFingerMetrics(touches) {
+			if (!touches || touches.length < 2) return null;
+			const first = touches[0];
+			const second = touches[1];
+			const x = (first.lastX + second.lastX) / 2;
+			const y = (first.lastY + second.lastY) / 2;
+			return {
+				x,
+				y,
+				distance: Math.hypot(first.lastX - second.lastX, first.lastY - second.lastY),
 			};
-			this.onContextMenu = event => event.preventDefault();
-			canvas.addEventListener('pointerdown', this.onCanvasDown);
-			canvas.addEventListener('pointermove', this.onCanvasMove);
-			canvas.addEventListener('pointerup', this.onCanvasUp);
-			canvas.addEventListener('pointercancel', this.onCanvasUp);
-			canvas.addEventListener('wheel', this.onCanvasWheel, { passive: false });
-			canvas.addEventListener('contextmenu', this.onContextMenu);
+		}
+
+		markMultiTouchGesture() {
+			const touches = this.activeTouchPointers();
+			touches.forEach(pointer => { pointer.multiTouch = true; });
+			if (touches.length >= 2 && !this.twoFingerStart) this.twoFingerStart = this.getTwoFingerMetrics(touches);
+		}
+
+		updateTwoFingerGesture() {
+			const touches = this.activeTouchPointers();
+			this.markMultiTouchGesture();
+			const current = this.getTwoFingerMetrics(touches);
+			const start = this.twoFingerStart || current;
+			let gesture = 'PAN';
+			if (current && start) {
+				const pinchDistance = Math.abs(current.distance - start.distance);
+				const panDistance = Math.hypot(current.x - start.x, current.y - start.y);
+				if (pinchDistance > 4 && pinchDistance >= panDistance) gesture = 'PINCH';
+				else if (panDistance > 4) gesture = 'PAN';
+			}
+			this.setInputState('Touch', gesture, touches.length);
+		}
+
+		startInputPointer(event) {
+			if (!this.enabled) return;
+			const pointer = {
+				id: event.pointerId,
+				pointerType: event.pointerType || 'mouse',
+				button: event.button,
+				startX: event.clientX,
+				startY: event.clientY,
+				lastX: event.clientX,
+				lastY: event.clientY,
+				startedAt: now(),
+				moved: false,
+				multiTouch: false,
+			};
+			this.inputPointers.set(event.pointerId, pointer);
+			const touchCount = this.activeTouchPointers().length;
+			if (pointer.pointerType === 'touch' && touchCount >= 2) {
+				this.markMultiTouchGesture();
+				this.updateTwoFingerGesture();
+				return;
+			}
+			const gesture = pointer.pointerType === 'touch' ? 'TAP' : (pointer.button === 2 ? 'PAN' : pointer.button === 1 ? 'ZOOM' : 'TAP');
+			this.setInputState(this.inputLabel(pointer.pointerType), gesture, touchCount);
+		}
+
+		moveInputPointer(event) {
+			const pointer = this.inputPointers.get(event.pointerId);
+			if (!pointer) return;
+			pointer.lastX = event.clientX;
+			pointer.lastY = event.clientY;
+			const threshold = pointer.pointerType === 'touch' ? TAP_DISTANCE_TOUCH : TAP_DISTANCE_MOUSE;
+			if (Math.hypot(pointer.lastX - pointer.startX, pointer.lastY - pointer.startY) > threshold) pointer.moved = true;
+			const touchCount = this.activeTouchPointers().length;
+			if (touchCount >= 2) {
+				this.updateTwoFingerGesture();
+				return;
+			}
+			const gesture = pointer.pointerType === 'touch' ? (pointer.moved ? 'ROTATE' : 'TAP') : (pointer.button === 2 ? 'PAN' : pointer.button === 1 ? 'ZOOM' : pointer.moved ? 'ROTATE' : 'TAP');
+			this.setInputState(this.inputLabel(pointer.pointerType), gesture, touchCount);
+		}
+
+		finishInputPointer(event, cancelled) {
+			const pointer = this.inputPointers.get(event.pointerId);
+			if (!pointer) return;
+			if (!cancelled) {
+				pointer.lastX = event.clientX;
+				pointer.lastY = event.clientY;
+				const threshold = pointer.pointerType === 'touch' ? TAP_DISTANCE_TOUCH : TAP_DISTANCE_MOUSE;
+				if (Math.hypot(pointer.lastX - pointer.startX, pointer.lastY - pointer.startY) > threshold) pointer.moved = true;
+			}
+			const touchCountBefore = this.activeTouchPointers().length;
+			if (pointer.pointerType === 'touch' && touchCountBefore >= 2) this.markMultiTouchGesture();
+			const isTap = !cancelled && pointer.button === 0 && !pointer.moved && !pointer.multiTouch && now() - pointer.startedAt <= TAP_MAX_DURATION && (pointer.pointerType !== 'touch' || touchCountBefore === 1);
+			this.inputPointers.delete(event.pointerId);
+			const remainingTouches = this.activeTouchPointers();
+			if (remainingTouches.length) remainingTouches.forEach(item => { item.multiTouch = true; });
+			if (remainingTouches.length < 2) this.twoFingerStart = null;
+			const gesture = isTap ? 'TAP' : (pointer.pointerType === 'touch' && touchCountBefore >= 2 ? 'PAN' : pointer.moved ? (pointer.button === 2 ? 'PAN' : pointer.button === 1 ? 'ZOOM' : 'ROTATE') : '—');
+			this.setInputState(this.inputLabel(pointer.pointerType), gesture, remainingTouches.length);
+			if (isTap && this.enabled && this.mode === 'build') this.handleCanvasClick(event);
+		}
+
+		clearInputPointers() {
+			this.inputPointers.clear();
+			this.twoFingerStart = null;
+			this.inputState = { input: '—', touches: 0, gesture: '—' };
+			this.updateDebug();
 		}
 
 		updateCamera() {
-			if (!this.camera || !this.orbit) return;
-			this.camera.position.setFromSphericalCoords(this.orbit.radius, this.orbit.phi, this.orbit.theta).add(this.orbit.target);
-			this.camera.lookAt(this.orbit.target);
+			if (this.controls) this.controls.update();
 		}
 
 		resize() {
@@ -329,6 +468,7 @@
 			this.renderer.setSize(width, height, false);
 			this.camera.aspect = width / height;
 			this.camera.updateProjectionMatrix();
+			this.updateCamera();
 		}
 
 		async hydrate() {
@@ -605,11 +745,15 @@
 		}
 
 		updateDebug() {
+			if (!this.debugPanel) return;
 			const set = (selector, value) => {
 				const node = this.root.querySelector(selector);
 				if (node) node.textContent = value;
 			};
 			const data = this.selected && this.selected.userData ? this.selected.userData.instance : null;
+			const controls = this.controls;
+			const input = this.inputState || {};
+			const cameraDistance = controls && this.camera ? this.camera.position.distanceTo(controls.target) : null;
 			set('[data-build-debug-scene]', this.sceneData.scene_id || 'office_default');
 			set('[data-build-debug-count]', String(this.instances.size));
 			set('[data-build-debug-instance]', data ? data.instance_id : '—');
@@ -618,6 +762,11 @@
 			set('[data-build-debug-rotation]', data ? formatVector(data.rotation) : '—');
 			set('[data-build-debug-scale]', data ? formatVector(data.scale) : '—');
 			set('[data-build-debug-cache]', this.modelCache.size + ' mô hình');
+			set('[data-build-debug-input]', input.input || '—');
+			set('[data-build-debug-touches]', String(input.touches || 0));
+			set('[data-build-debug-gesture]', input.gesture || '—');
+			set('[data-build-debug-distance]', cameraDistance === null ? '—' : cameraDistance.toFixed(2) + ' m');
+			set('[data-build-debug-target]', controls ? formatVector(controls.target) : '—');
 		}
 
 		startRenderLoop() {
@@ -628,6 +777,7 @@
 					return;
 				}
 				this.frame = global.requestAnimationFrame(tick);
+				if (this.controls) this.controls.update();
 				if (this.selectionHelper && this.selected) this.selectionHelper.update();
 				this.renderer.render(this.scene, this.camera);
 			};
@@ -641,12 +791,18 @@
 			if (this.resizeHandler) global.removeEventListener('resize', this.resizeHandler);
 			if (this.renderer) {
 				const canvas = this.renderer.domElement;
-				canvas.removeEventListener('pointerdown', this.onCanvasDown);
-				canvas.removeEventListener('pointermove', this.onCanvasMove);
-				canvas.removeEventListener('pointerup', this.onCanvasUp);
-				canvas.removeEventListener('pointercancel', this.onCanvasUp);
-				canvas.removeEventListener('wheel', this.onCanvasWheel);
-				canvas.removeEventListener('contextmenu', this.onContextMenu);
+				canvas.removeEventListener('pointerdown', this.onCanvasPointerDown);
+				canvas.removeEventListener('pointermove', this.onCanvasPointerMove);
+				canvas.removeEventListener('pointerup', this.onCanvasPointerUp);
+				canvas.removeEventListener('pointercancel', this.onCanvasPointerCancel);
+				canvas.removeEventListener('pointerleave', this.onCanvasPointerLeave);
+				canvas.removeEventListener('lostpointercapture', this.onCanvasLostPointerCapture);
+				canvas.removeEventListener('touchstart', this.onCanvasTouchStart);
+				if (this.controls) {
+					if (this.onControlsChange) this.controls.removeEventListener('change', this.onControlsChange);
+					this.controls.dispose();
+					this.controls = null;
+				}
 				this.renderer.dispose();
 			}
 			this.clearSelection();

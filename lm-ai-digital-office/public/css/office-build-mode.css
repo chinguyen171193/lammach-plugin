@@ -9,7 +9,12 @@
 	background: #06101a;
 }
 
-.lm-ai-office__build-canvas { position: absolute; inset: 0; }
+.lm-ai-office__build-canvas {
+	position: absolute;
+	inset: 0;
+	touch-action: none;
+	overscroll-behavior: contain;
+}
 
 .lm-ai-office__build-canvas canvas {
 	display: block;

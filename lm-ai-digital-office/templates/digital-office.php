@@ -46,7 +46,26 @@
 								</div>
 								<div class="lm-ai-office__build-object-actions"><button type="button" data-build-action="rotate-left">Xoay trái</button><button type="button" data-build-action="rotate-right">Xoay phải</button><button type="button" data-build-action="duplicate">Nhân bản</button><button type="button" data-build-action="delete" class="is-danger">Xóa</button></div>
 							</section>
-							<?php if ( ! empty( $config['data']['settings']['debug'] ) ) : ?><details class="lm-ai-office__build-debug" data-office-build-debug><summary>Chế độ phát triển</summary><dl><div><dt>Scene ID</dt><dd data-build-debug-scene>—</dd></div><div><dt>Số object</dt><dd data-build-debug-count>0</dd></div><div><dt>Instance đang chọn</dt><dd data-build-debug-instance>—</dd></div><div><dt>Asset ID</dt><dd data-build-debug-asset>—</dd></div><div><dt>Vị trí</dt><dd data-build-debug-position>—</dd></div><div><dt>Góc xoay</dt><dd data-build-debug-rotation>—</dd></div><div><dt>Tỷ lệ</dt><dd data-build-debug-scale>—</dd></div><div><dt>Model cache</dt><dd data-build-debug-cache>0</dd></div></dl></details><?php endif; ?>
+							<?php if ( ! empty( $config['data']['settings']['debug'] ) ) : ?>
+								<details class="lm-ai-office__build-debug" data-office-build-debug>
+									<summary>Chế độ phát triển</summary>
+									<dl>
+										<div><dt>Scene ID</dt><dd data-build-debug-scene>—</dd></div>
+										<div><dt>Số object</dt><dd data-build-debug-count>0</dd></div>
+										<div><dt>Instance đang chọn</dt><dd data-build-debug-instance>—</dd></div>
+										<div><dt>Asset ID</dt><dd data-build-debug-asset>—</dd></div>
+										<div><dt>Vị trí</dt><dd data-build-debug-position>—</dd></div>
+										<div><dt>Góc xoay</dt><dd data-build-debug-rotation>—</dd></div>
+										<div><dt>Tỷ lệ</dt><dd data-build-debug-scale>—</dd></div>
+										<div><dt>Model cache</dt><dd data-build-debug-cache>0</dd></div>
+										<div><dt>Input</dt><dd data-build-debug-input>—</dd></div>
+										<div><dt>Touches</dt><dd data-build-debug-touches>0</dd></div>
+										<div><dt>Gesture</dt><dd data-build-debug-gesture>—</dd></div>
+										<div><dt>Camera Distance</dt><dd data-build-debug-distance>—</dd></div>
+										<div><dt>Camera Target</dt><dd data-build-debug-target>—</dd></div>
+									</dl>
+								</details>
+							<?php endif; ?>
 						</section>
 					</div>
 					<div class="lm-ai-office__build-footer"><p data-office-build-status>Chọn một tài sản, sau đó click xuống sàn để đặt.</p><button type="button" data-build-save class="lm-ai-office__build-save">Lưu văn phòng</button></div>
