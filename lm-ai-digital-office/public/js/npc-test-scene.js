@@ -117,7 +117,7 @@
 			this.record = { npcRoot, modelContainer, importedCharacter, skeletonMeshes, clips, skeletonHelper: null, mixer: null, idleAction: null, walkAction: null, activeAction: null, retargetResults: null, debugSource: null, debugSourceMixer: null, debugSourceWalkAction: null, debugSourceMeshes: [] };
 			this.installAnimations(idleSource, walkSource);
 			this.renderDiagnostics(normalization, skeletonMeshes, clips, this.record.retargetResults.idle);
-			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. Walk retarget technical PASS; inspect debug frames.');
+			this.showStatus('READY — Model loaded successfully – rig detected – ' + clips.length + ' embedded animations. KayKit Walk is diagnostic only; Mixamo source is required for final Walk.');
 		}
 
 		findSourceClip(source, matcher, label) {
@@ -135,7 +135,7 @@
 			this.record.retargetResults = { idle: idleResult, walk: walkResult };
 			this.record.mixer = new global.THREE.AnimationMixer(this.record.importedCharacter);
 			this.record.idleAction = this.record.mixer.clipAction(idleResult.clip); this.record.walkAction = this.record.mixer.clipAction(walkResult.clip);
-			this.setText('[data-npc-retarget]', 'TECHNICAL PASS — visual review');
+			this.setText('[data-npc-retarget]', 'SOURCE MISMATCH — Mixamo required');
 			global.console.info('[LM AI Office NPC] animation retarget PASS', { idle: { sourceClip: idleClip.name, sourceBones: idleResult.sourceBoneCount, targetBones: idleResult.targetBoneCount, outputTracks: idleResult.clip.tracks.length, profile: idleResult.sourceProfile }, walk: { sourceClip: walkClip.name, sourceBones: walkResult.sourceBoneCount, targetBones: walkResult.targetBoneCount, outputTracks: walkResult.clip.tracks.length, profile: walkResult.sourceProfile }, rootMotion: 'X/Z removed: output contains rotation tracks only.' });
 			if (RETARGET_DEBUG) this.installRetargetDebug(walkSource, walkClip, walkResult);
 		}
@@ -146,10 +146,10 @@
 			if (height > 0) source.scale.setScalar(TARGET_HEIGHT_METERS / height);
 			source.updateMatrixWorld(true); const grounded = new THREE.Box3().setFromObject(source); source.position.set(-1.5, -grounded.min.y, 0); source.updateMatrixWorld(true);
 			source.traverse(object => { if (object.isMesh) object.visible = false; }); this.scene.add(source);
-			const helper = new THREE.SkeletonHelper(source); helper.name = 'KayKitSourceSkeletonDebug'; helper.material.color.setHex(0xff4fc3); this.scene.add(helper);
+			const helper = new THREE.SkeletonHelper(source); helper.name = 'KayKitSourceSkeletonDebug'; helper.material.color.setHex(0xff4fc3); helper.visible = false; this.scene.add(helper);
 			this.record.debugSource = { root: source, helper }; this.record.debugSourceMeshes = findSkinnedMeshes(source); this.record.debugSourceMixer = new THREE.AnimationMixer(source); this.record.debugSourceWalkAction = this.record.debugSourceMixer.clipAction(sourceClip);
 			const list = this.root.querySelector('[data-npc-retarget-debug]');
-			if (list) list.innerHTML = [ '<li>RETARGET_DEBUG = true · KayKit source skeleton: pink · target: click “Hiện bộ xương” (cyan).</li>', '<li>Source bind pose: KayKit Rig Medium near T-pose; Claudia bind pose: A-pose. The per-bone rest correction converts between them.</li>' ].concat(result.angularReport.map(item => '<li>' + this.escape(item.source) + ' → ' + this.escape(item.target) + ' · rest offset ' + item.restOffsetDeg + '° · max delta ' + item.currentDeltaDeg + '° · ' + item.flag + '</li>')).join('');
+			if (list) list.innerHTML = [ '<li>RETARGET_DEBUG = true · source skeleton chỉ hiện khi bấm nút, nên không che Claudia. Target: click “Hiện bộ xương”.</li>', '<li>KayKit bind pose gần T-pose; Claudia bind pose là A-pose. Source thiếu neck/shoulder/wrist tương ứng, nên chỉ dùng để debug và không phải Walk cuối.</li>' ].concat(result.angularReport.map(item => '<li>' + this.escape(item.source) + ' → ' + this.escape(item.target) + ' · rest offset ' + item.restOffsetDeg + '° · max delta ' + item.currentDeltaDeg + '° · ' + item.flag + '</li>')).join('');
 			global.console.table(result.angularReport);
 		}
 
@@ -189,6 +189,7 @@
 			if (action === 'WALK_FRAME_0') { this.showWalkFrame(0); return; }
 			if (action === 'WALK_FRAME_10') { this.showWalkFrame(10); return; }
 			if (action === 'WALK_FRAME_20') { this.showWalkFrame(20); return; }
+			if (action === 'TOGGLE_RETARGET_SOURCE') { this.toggleRetargetSource(); return; }
 			if (!this.restPoseReviewed && action !== 'TOGGLE_SKELETON') { this.showStatus('Hãy chọn “Xem tư thế gốc” để kiểm tra skinning.'); return; }
 			if (action === 'TOGGLE_SKELETON') { this.toggleSkeleton(); return; }
 		}
@@ -216,6 +217,12 @@
 			action.reset().setLoop(global.THREE.LoopRepeat, Infinity).setEffectiveWeight(1).play();
 		}
 
+		toggleRetargetSource() {
+			if (!this.record.debugSource) return;
+			const helper = this.record.debugSource.helper; helper.visible = !helper.visible;
+			this.showStatus(helper.visible ? 'DEBUG — Đang hiện source skeleton màu hồng bên trái Claudia.' : 'DEBUG — Đã ẩn source skeleton để viewport chỉ còn Claudia.');
+		}
+
 		showWalkSourceRest() {
 			this.showRestPose(); this.setStateDisplay('WALK SOURCE REST'); this.setText('[data-npc-animation]', 'Walk source rest frame'); this.showStatus('DEBUG — KayKit source bind/rest pose (pink) và Claudia rest pose (target) đang hiển thị.');
 		}
@@ -234,7 +241,7 @@
 			if (previous === action) return;
 			action.reset().setLoop(global.THREE.LoopRepeat, Infinity).setEffectiveTimeScale(1).setEffectiveWeight(1).play();
 			if (previous) action.crossFadeFrom(previous, 0.3, false); else action.fadeIn(0.3);
-			this.record.activeAction = action; this.setStateDisplay(state); this.setText('[data-npc-animation]', label); this.setText('[data-npc-animation-source]', source); this.showStatus('READY — ' + label + ' external đang chạy tại chỗ (root X/Z removed).');
+			this.record.activeAction = action; this.setStateDisplay(state); this.setText('[data-npc-animation]', label); this.setText('[data-npc-animation-source]', source); this.showStatus(label === 'Walk' ? 'DEBUG — KayKit Walk đang chạy để đối chiếu; không dùng làm animation cuối vì skeleton mismatch.' : 'READY — ' + label + ' external đang chạy tại chỗ (root X/Z removed).');
 		}
 
 		toggleSkeleton() {
